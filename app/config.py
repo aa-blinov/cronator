@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     git_enabled: bool = False
     git_repo_url: str = ""
     git_branch: str = "main"
+    git_token: str = ""  # Personal access token for private repos
     git_sync_interval: int = 300  # seconds
     git_scripts_subdir: str = ""  # subdirectory in repo for scripts
 

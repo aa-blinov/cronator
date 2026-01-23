@@ -19,6 +19,7 @@ dependencies = [
     "aiosmtplib>=3.0.0",
     "aiofiles>=23.2.0",
     "httpx>=0.26.0",
+    "cryptography>=41.0.0",
 ]
 
 [project.optional-dependencies]

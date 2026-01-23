@@ -123,7 +123,7 @@
                                value="{{ script.name if script else '' }}"
                                placeholder="my-script"
                                class="input input-bordered w-full"
-                               pattern="[a-zA-Z0-9_-]+"
+                               pattern="[a-zA-Z0-9_\-]+"
                                required
                                {% if script %}readonly{% endif %}>
                         <label class="label">

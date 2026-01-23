@@ -63,3 +63,10 @@ scripts/*/
 # UV
 .uv/
 uv.lock
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Build artifacts (keep output.css for Docker)
+app/static/input.css

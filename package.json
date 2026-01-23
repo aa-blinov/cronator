@@ -1,0 +1,13 @@
+{
+  "name": "cronator-ui",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./app/static/input.css -o ./app/static/output.css --minify",
+    "watch:css": "tailwindcss -i ./app/static/input.css -o ./app/static/output.css --watch"
+  },
+  "devDependencies": {
+    "daisyui": "^4.4.24",
+    "tailwindcss": "^3.4.0"
+  }
+}

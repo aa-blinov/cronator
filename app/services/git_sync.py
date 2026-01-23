@@ -24,6 +24,7 @@ class GitSyncService:
         self.enabled = settings.git_enabled
         self.repo_url = settings.git_repo_url
         self.branch = settings.git_branch
+        self.token = settings.git_token
         self.sync_interval = settings.git_sync_interval
         self.scripts_subdir = settings.git_scripts_subdir
         
@@ -31,13 +32,46 @@ class GitSyncService:
         self._sync_task: asyncio.Task | None = None
         self._repo_path = settings.data_dir / "git_repo"
 
+    async def _get_settings(self) -> dict:
+        """Get current settings from DB, fallback to env."""
+        from app.services.settings_service import settings_service
+        
+        return {
+            "enabled": await settings_service.get("git_enabled", self.enabled),
+            "repo_url": await settings_service.get("git_repo_url", self.repo_url),
+            "branch": await settings_service.get("git_branch", self.branch),
+            "token": await settings_service.get("git_token", self.token),
+            "sync_interval": await settings_service.get("git_sync_interval", self.sync_interval),
+            "scripts_subdir": await settings_service.get("git_scripts_subdir", self.scripts_subdir),
+        }
+
+    async def _get_authenticated_url(self) -> str:
+        """Get repository URL with token authentication if configured."""
+        cfg = await self._get_settings()
+        token = cfg["token"]
+        repo_url = cfg["repo_url"]
+        
+        if not token:
+            return repo_url
+        
+        # For HTTPS URLs, inject token
+        # Supports: https://github.com/user/repo.git
+        # Converts to: https://token@github.com/user/repo.git
+        if repo_url.startswith("https://"):
+            return repo_url.replace("https://", f"https://{token}@")
+        
+        # For SSH URLs or other formats, return as-is
+        return repo_url
+
     async def start(self) -> None:
         """Start the git sync service."""
-        if not self.enabled:
+        cfg = await self._get_settings()
+        
+        if not cfg["enabled"]:
             logger.info("Git sync is disabled")
             return
 
-        if not self.repo_url:
+        if not cfg["repo_url"]:
             logger.warning("Git repo URL not configured")
             return
 
@@ -46,7 +80,7 @@ class GitSyncService:
 
         # Start periodic sync
         self._sync_task = asyncio.create_task(self._periodic_sync())
-        logger.info(f"Git sync started, interval: {self.sync_interval}s")
+        logger.info(f"Git sync started, interval: {cfg['sync_interval']}s")
 
     async def stop(self) -> None:
         """Stop the git sync service."""
@@ -61,7 +95,8 @@ class GitSyncService:
     async def _periodic_sync(self) -> None:
         """Periodically sync from git."""
         while True:
-            await asyncio.sleep(self.sync_interval)
+            cfg = await self._get_settings()
+            await asyncio.sleep(cfg["sync_interval"])
             try:
                 await self.sync()
             except Exception as e:
@@ -74,7 +109,9 @@ class GitSyncService:
         Returns:
             Tuple of (success, message)
         """
-        if not self.enabled or not self.repo_url:
+        cfg = await self._get_settings()
+        
+        if not cfg["enabled"] or not cfg["repo_url"]:
             return False, "Git sync is not configured"
 
         try:
@@ -99,16 +136,18 @@ class GitSyncService:
     async def _clone(self) -> tuple[bool, str]:
         """Clone the repository."""
         try:
-            logger.info(f"Cloning repository: {self.repo_url}")
+            cfg = await self._get_settings()
+            auth_url = await self._get_authenticated_url()
+            logger.info(f"Cloning repository: {cfg['repo_url']}")
             
             # Run git clone in a thread pool
             loop = asyncio.get_event_loop()
             self._repo = await loop.run_in_executor(
                 None,
                 lambda: Repo.clone_from(
-                    self.repo_url,
+                    auth_url,
                     self._repo_path,
-                    branch=self.branch,
+                    branch=cfg["branch"],
                 ),
             )
             
@@ -120,10 +159,16 @@ class GitSyncService:
     async def _pull(self) -> tuple[bool, str]:
         """Pull latest changes."""
         try:
+            cfg = await self._get_settings()
             logger.info("Pulling latest changes")
             
             if not self._repo:
                 self._repo = Repo(self._repo_path)
+
+            # Update remote URL if token is configured
+            auth_url = await self._get_authenticated_url()
+            if auth_url != cfg["repo_url"]:
+                self._repo.remotes.origin.set_url(auth_url)
 
             loop = asyncio.get_event_loop()
             
@@ -135,7 +180,7 @@ class GitSyncService:
             await loop.run_in_executor(
                 None,
                 lambda: self._repo.head.reset(
-                    f"origin/{self.branch}",
+                    f"origin/{cfg['branch']}",
                     index=True,
                     working_tree=True,
                 ),
@@ -148,9 +193,10 @@ class GitSyncService:
 
     async def _scan_and_update_scripts(self) -> None:
         """Scan the repository for scripts and update the database."""
+        cfg = await self._get_settings()
         scripts_path = self._repo_path
-        if self.scripts_subdir:
-            scripts_path = scripts_path / self.scripts_subdir
+        if cfg["scripts_subdir"]:
+            scripts_path = scripts_path / cfg["scripts_subdir"]
 
         if not scripts_path.exists():
             logger.warning(f"Scripts directory not found: {scripts_path}")

@@ -107,10 +107,43 @@ if __name__ == "__main__":
 GIT_ENABLED=true
 GIT_REPO_URL=https://github.com/user/my-scripts.git
 GIT_BRANCH=main
+GIT_TOKEN=ghp_your_personal_access_token  # Для приватных репозиториев
 GIT_SYNC_INTERVAL=300
 ```
 
+**Для приватных репозиториев:**
+
+- **GitHub**: создайте Personal Access Token в Settings → Developer settings → Personal access tokens
+- **GitLab**: создайте Personal Access Token в User Settings → Access Tokens
+- **Bitbucket**: создайте App Password в Personal settings → App passwords
+
+Токен должен иметь права на чтение репозитория (`repo` scope для GitHub).
+
 ## Конфигурация
+
+### Первый запуск
+
+При первом запуске создайте `.env` файл с базовыми настройками:
+
+```bash
+cp .env.example .env
+# Отредактировать .env, изменить ADMIN_PASSWORD и SECRET_KEY
+```
+
+**Важно:** `.env` нужен только для первого запуска и задает начальные значения. После первого запуска все настройки можно менять через веб-интерфейс в разделе Settings.
+
+### Управление настройками
+
+После первого запуска все настройки хранятся в базе данных и редактируются через UI:
+
+1. Откройте <http://localhost:8080/settings>
+2. Нажмите "Edit Settings"
+3. Измените нужные настройки (SMTP, Git, таймауты)
+4. Сохраните изменения
+
+Настройки применяются немедленно без перезапуска контейнера.
+
+### Основные настройки
 
 | Переменная | Описание | По умолчанию |
 |------------|----------|--------------|
@@ -163,9 +196,23 @@ log.with_data("Processed", count=100, duration_ms=1234)
 
 ## Безопасность
 
-- Всегда меняйте `ADMIN_PASSWORD` и `SECRET_KEY` в production
-- Используйте HTTPS (через reverse proxy)
-- Ограничьте доступ к порту 8080
+⚠️ **Важные рекомендации по безопасности:**
+
+- **Всегда меняйте** `ADMIN_PASSWORD` и `SECRET_KEY` в production
+- **Используйте сильный SECRET_KEY** (минимум 32 символа) - он используется для шифрования чувствительных данных
+- **Не коммитьте `.env`** в систему контроля версий
+- **Используйте HTTPS** через reverse proxy (nginx, Caddy)
+- **Ограничьте доступ** к порту 8080 файрволлом
+
+### Шифрование данных
+
+Все чувствительные настройки (пароли SMTP, Git токены) **автоматически шифруются** перед сохранением в БД:
+
+- Алгоритм: Fernet (симметричное шифрование)
+- Ключ: производный от `SECRET_KEY` из `.env`
+- Проверка: запустите `python check_db_security.py`
+
+Подробнее см. [SECURITY.md](SECURITY.md)
 
 ## Лицензия
 

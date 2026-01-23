@@ -18,6 +18,7 @@ class AlertingService:
     """Service for sending email alerts."""
 
     def __init__(self) -> None:
+        # Default values from env, will be overridden by DB settings
         self.enabled = settings.smtp_enabled
         self.host = settings.smtp_host
         self.port = settings.smtp_port
@@ -27,6 +28,21 @@ class AlertingService:
         self.to_addr = settings.alert_email
         self.use_tls = settings.smtp_use_tls
 
+    async def _get_settings(self) -> dict:
+        """Get current settings from DB, fallback to env."""
+        from app.services.settings_service import settings_service
+        
+        return {
+            "enabled": await settings_service.get("smtp_enabled", self.enabled),
+            "host": await settings_service.get("smtp_host", self.host),
+            "port": await settings_service.get("smtp_port", self.port),
+            "user": await settings_service.get("smtp_user", self.user),
+            "password": await settings_service.get("smtp_password", self.password),
+            "from_addr": await settings_service.get("smtp_from", self.from_addr) or await settings_service.get("smtp_user", self.user),
+            "to_addr": await settings_service.get("alert_email", self.to_addr),
+            "use_tls": await settings_service.get("smtp_use_tls", self.use_tls),
+        }
+
     async def send_email(
         self,
         subject: str,
@@ -34,19 +50,22 @@ class AlertingService:
         body_text: str | None = None,
     ) -> bool:
         """Send an email alert."""
-        if not self.enabled:
+        # Get current settings from DB
+        cfg = await self._get_settings()
+        
+        if not cfg["enabled"]:
             logger.debug("Email alerts disabled, skipping")
             return False
 
-        if not self.to_addr:
+        if not cfg["to_addr"]:
             logger.warning("No alert email configured")
             return False
 
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
-            msg["From"] = self.from_addr
-            msg["To"] = self.to_addr
+            msg["From"] = cfg["from_addr"]
+            msg["To"] = cfg["to_addr"]
 
             if body_text:
                 msg.attach(MIMEText(body_text, "plain"))
@@ -54,11 +73,11 @@ class AlertingService:
 
             await aiosmtplib.send(
                 msg,
-                hostname=self.host,
-                port=self.port,
-                username=self.user,
-                password=self.password,
-                start_tls=self.use_tls,
+                hostname=cfg["host"],
+                port=cfg["port"],
+                username=cfg["user"],
+                password=cfg["password"],
+                use_tls=cfg["use_tls"],
             )
 
             logger.info(f"Alert email sent to {self.to_addr}: {subject}")
@@ -196,16 +215,19 @@ Stderr:
 
     async def test_connection(self) -> tuple[bool, str]:
         """Test SMTP connection."""
-        if not self.enabled:
+        # Get current settings from DB
+        cfg = await self._get_settings()
+        
+        if not cfg["enabled"]:
             return False, "SMTP is disabled"
 
         try:
             async with aiosmtplib.SMTP(
-                hostname=self.host,
-                port=self.port,
-                start_tls=self.use_tls,
+                hostname=cfg["host"],
+                port=cfg["port"],
+                start_tls=cfg["use_tls"],
             ) as smtp:
-                await smtp.login(self.user, self.password)
+                await smtp.login(cfg["user"], cfg["password"])
                 return True, "Connection successful"
         except Exception as e:
             return False, str(e)

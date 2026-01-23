@@ -7,6 +7,7 @@ from app.config import get_settings
 from app.services.alerting import alerting_service
 from app.services.git_sync import git_sync_service
 from app.services.scheduler import scheduler_service
+from app.services.settings_service import settings_service
 
 router = APIRouter()
 settings = get_settings()
@@ -58,23 +59,38 @@ class SchedulerStatus(BaseModel):
 @router.get("")
 async def get_settings_info() -> SettingsResponse:
     """Get current settings (non-sensitive)."""
+    # Get runtime settings from DB, fallback to env
+    smtp_enabled = await settings_service.get("smtp_enabled", settings.smtp_enabled)
+    smtp_host = await settings_service.get("smtp_host", settings.smtp_host)
+    smtp_port = await settings_service.get("smtp_port", settings.smtp_port)
+    smtp_user = await settings_service.get("smtp_user", settings.smtp_user)
+    smtp_from = await settings_service.get("smtp_from", settings.smtp_from)
+    smtp_use_tls = await settings_service.get("smtp_use_tls", settings.smtp_use_tls)
+    alert_email = await settings_service.get("alert_email", settings.alert_email)
+    git_enabled = await settings_service.get("git_enabled", settings.git_enabled)
+    git_repo_url = await settings_service.get("git_repo_url", settings.git_repo_url)
+    git_branch = await settings_service.get("git_branch", settings.git_branch)
+    git_sync_interval = await settings_service.get("git_sync_interval", settings.git_sync_interval)
+    git_scripts_subdir = await settings_service.get("git_scripts_subdir", settings.git_scripts_subdir)
+    default_timeout = await settings_service.get("default_timeout", settings.default_timeout)
+    
     return SettingsResponse(
         app_name=settings.app_name,
         scripts_dir=str(settings.scripts_dir),
         envs_dir=str(settings.envs_dir),
-        smtp_enabled=settings.smtp_enabled,
-        smtp_host=settings.smtp_host,
-        smtp_port=settings.smtp_port,
-        smtp_user=settings.smtp_user,
-        smtp_from=settings.smtp_from,
-        smtp_use_tls=settings.smtp_use_tls,
-        alert_email=settings.alert_email,
-        git_enabled=settings.git_enabled,
-        git_repo_url=settings.git_repo_url,
-        git_branch=settings.git_branch,
-        git_sync_interval=settings.git_sync_interval,
-        git_scripts_subdir=settings.git_scripts_subdir,
-        default_timeout=settings.default_timeout,
+        smtp_enabled=smtp_enabled,
+        smtp_host=smtp_host,
+        smtp_port=smtp_port,
+        smtp_user=smtp_user,
+        smtp_from=smtp_from,
+        smtp_use_tls=smtp_use_tls,
+        alert_email=alert_email,
+        git_enabled=git_enabled,
+        git_repo_url=git_repo_url,
+        git_branch=git_branch,
+        git_sync_interval=git_sync_interval,
+        git_scripts_subdir=git_scripts_subdir,
+        default_timeout=default_timeout,
     )
 
 
@@ -173,6 +189,7 @@ class UpdateSettingsRequest(BaseModel):
     git_enabled: bool | None = None
     git_repo_url: str | None = None
     git_branch: str | None = None
+    git_token: str | None = None
     git_sync_interval: int | None = None
     git_scripts_subdir: str | None = None
     
@@ -181,77 +198,45 @@ class UpdateSettingsRequest(BaseModel):
 
 @router.post("/update")
 async def update_settings(request: UpdateSettingsRequest):
-    """Update settings in .env file."""
-    from pathlib import Path
+    """Update settings in database."""
+    # Collect updates
+    updates = {}
     
-    env_path = Path(".env")
-    if not env_path.exists():
-        raise HTTPException(status_code=404, detail=".env file not found")
+    if request.smtp_enabled is not None:
+        updates["smtp_enabled"] = request.smtp_enabled
+    if request.smtp_host is not None:
+        updates["smtp_host"] = request.smtp_host
+    if request.smtp_port is not None:
+        updates["smtp_port"] = request.smtp_port
+    if request.smtp_user is not None:
+        updates["smtp_user"] = request.smtp_user
+    if request.smtp_password is not None:
+        updates["smtp_password"] = request.smtp_password
+    if request.smtp_from is not None:
+        updates["smtp_from"] = request.smtp_from
+    if request.smtp_use_tls is not None:
+        updates["smtp_use_tls"] = request.smtp_use_tls
+    if request.alert_email is not None:
+        updates["alert_email"] = request.alert_email
+    if request.git_enabled is not None:
+        updates["git_enabled"] = request.git_enabled
+    if request.git_repo_url is not None:
+        updates["git_repo_url"] = request.git_repo_url
+    if request.git_branch is not None:
+        updates["git_branch"] = request.git_branch
+    if request.git_token is not None:
+        updates["git_token"] = request.git_token
+    if request.git_sync_interval is not None:
+        updates["git_sync_interval"] = request.git_sync_interval
+    if request.git_scripts_subdir is not None:
+        updates["git_scripts_subdir"] = request.git_scripts_subdir
+    if request.default_timeout is not None:
+        updates["default_timeout"] = request.default_timeout
     
-    # Read current .env
-    with open(env_path, encoding="utf-8") as f:
-        lines = f.readlines()
-    
-    # Update values
-    updates = {
-        "SMTP_ENABLED": request.smtp_enabled,
-        "SMTP_HOST": request.smtp_host,
-        "SMTP_PORT": request.smtp_port,
-        "SMTP_USER": request.smtp_user,
-        "SMTP_PASSWORD": request.smtp_password,
-        "SMTP_FROM": request.smtp_from,
-        "SMTP_USE_TLS": request.smtp_use_tls,
-        "ALERT_EMAIL": request.alert_email,
-        "GIT_ENABLED": request.git_enabled,
-        "GIT_REPO_URL": request.git_repo_url,
-        "GIT_BRANCH": request.git_branch,
-        "GIT_SYNC_INTERVAL": request.git_sync_interval,
-        "GIT_SCRIPTS_SUBDIR": request.git_scripts_subdir,
-        "DEFAULT_TIMEOUT": request.default_timeout,
-    }
-    
-    # Filter out None values
-    updates = {k: v for k, v in updates.items() if v is not None}
-    
-    # Update lines
-    new_lines = []
-    updated_keys = set()
-    
-    for line in lines:
-        stripped = line.strip()
-        if stripped and not stripped.startswith("#") and "=" in stripped:
-            key = stripped.split("=", 1)[0].strip()
-            if key in updates:
-                value = updates[key]
-                if isinstance(value, bool):
-                    value = "true" if value else "false"
-                new_lines.append(f"{key}={value}\n")
-                updated_keys.add(key)
-            else:
-                new_lines.append(line)
-        else:
-            new_lines.append(line)
-    
-    # Add new keys that weren't in the file
-    for key, value in updates.items():
-        if key not in updated_keys:
-            if isinstance(value, bool):
-                value = "true" if value else "false"
-            new_lines.append(f"{key}={value}\n")
-    
-    # Write back
-    with open(env_path, "w", encoding="utf-8") as f:
-        f.writelines(new_lines)
-    
-    # Reload settings
-    get_settings(reload=True)
-    
-    # Reload services
-    from app.services.alerting import alerting_service
-    from app.services.git_sync import git_sync_service
+    # Save to database
+    await settings_service.bulk_set(updates)
     
     # Reinitialize services with new settings
-    alerting_service.__init__()
-    git_sync_service.__init__()
+    # Services will read from settings_service
     
     return {"success": True, "message": "Settings updated successfully"}

@@ -51,6 +51,13 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
     
+    # Initialize settings service and migrate from .env if needed
+    from app.services.settings_service import settings_service
+    await settings_service.load_from_db()
+    migrated = await settings_service.migrate_from_env()
+    if migrated > 0:
+        logger.info(f"Migrated {migrated} settings from .env to database")
+    
     # Start scheduler
     await scheduler_service.start()
     logger.info("Scheduler started")

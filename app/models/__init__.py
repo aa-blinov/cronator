@@ -2,5 +2,6 @@
 
 from app.models.execution import Execution
 from app.models.script import Script
+from app.models.setting import Setting
 
-__all__ = ["Script", "Execution"]
+__all__ = ["Script", "Execution", "Setting"]

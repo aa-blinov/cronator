@@ -22,6 +22,22 @@ COPY . .
 # Install the project
 RUN uv sync --frozen --no-dev
 
+# Build CSS stage
+FROM node:20-slim AS css-builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json tailwind.config.js ./
+COPY app/static/input.css ./app/static/
+
+# Install dependencies and build CSS
+RUN npm install && \
+    npx tailwindcss -i ./app/static/input.css -o ./app/static/output.css --minify
+
+# Copy templates for content scanning
+COPY app/templates ./app/templates
+
 
 # Runtime stage
 FROM python:3.11-slim
@@ -43,6 +59,9 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/app /app/app
 COPY --from=builder /app/cronator_lib /app/cronator_lib
 COPY --from=builder /app/pyproject.toml /app/
+
+# Copy built CSS from css-builder
+COPY --from=css-builder /app/app/static/output.css /app/app/static/output.css
 
 # Create directories
 RUN mkdir -p /app/scripts /app/envs /app/logs /app/data \

@@ -191,6 +191,10 @@
                         <input type="text" name="git_branch" value="{{ git_status.branch }}" class="input input-bordered input-sm">
                     </label>
                     <label class="form-control">
+                        <span class="label-text">Personal Access Token (optional)</span>
+                        <input type="password" name="git_token" placeholder="••••••••" class="input input-bordered input-sm">
+                    </label>
+                    <label class="form-control">
                         <span class="label-text">Sync Interval (seconds)</span>
                         <input type="number" name="git_sync_interval" value="{{ git_status.sync_interval }}" class="input input-bordered input-sm">
                     </label>
@@ -256,6 +260,7 @@
         
         if (formData.get('git_repo_url')) data.git_repo_url = formData.get('git_repo_url');
         if (formData.get('git_branch')) data.git_branch = formData.get('git_branch');
+        if (formData.get('git_token')) data.git_token = formData.get('git_token');
         if (formData.get('git_sync_interval')) data.git_sync_interval = parseInt(formData.get('git_sync_interval'));
         if (formData.get('git_scripts_subdir')) data.git_scripts_subdir = formData.get('git_scripts_subdir');
         

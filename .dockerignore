@@ -1,0 +1,70 @@
+# Node modules
+node_modules/
+package-lock.json
+
+# Build artifacts (but keep input.css for Docker build)
+# app/static/input.css is needed for CSS building
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+envs/
+env/
+venv/
+ENV/
+.venv
+
+# Data directories (should be mounted as volumes)
+data/
+logs/
+scripts/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Development
+.env
+.env.local
+*.db
+*.db-journal
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Security check scripts
+check_db_security.py
+verify_security.py
