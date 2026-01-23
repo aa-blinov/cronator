@@ -70,7 +70,7 @@ class AlertingService:
 
     async def send_failure_alert(self, script: Script, execution: Execution) -> bool:
         """Send an alert for a failed execution."""
-        subject = f"[Cronator] ❌ Script Failed: {script.name}"
+        subject = f"[Cronator] ✗ Script Failed: {script.name}"
         
         body_html = f"""
         <html>
@@ -151,7 +151,7 @@ Stderr:
 
     async def send_success_alert(self, script: Script, execution: Execution) -> bool:
         """Send an alert for a successful execution."""
-        subject = f"[Cronator] ✅ Script Succeeded: {script.name}"
+        subject = f"[Cronator] Script Succeeded: {script.name}\"
         
         body_html = f"""
         <html>

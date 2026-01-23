@@ -92,18 +92,18 @@ class CronatorLogger(logging.Logger):
     
     def success(self, msg: str, *args, **kwargs) -> None:
         """Log a success message (INFO level with success marker)."""
-        self.info(f"✅ {msg}", *args, **kwargs)
+        self.info(f"[SUCCESS] {msg}", *args, **kwargs)
     
     def task_start(self, task_name: str) -> None:
         """Log the start of a task."""
-        self.info(f"🚀 Starting: {task_name}")
+        self.info(f"[STARTING] {task_name}")
     
     def task_end(self, task_name: str, success: bool = True) -> None:
         """Log the end of a task."""
         if success:
-            self.info(f"✅ Completed: {task_name}")
+            self.info(f"[COMPLETED] {task_name}")
         else:
-            self.error(f"❌ Failed: {task_name}")
+            self.error(f"[FAILED] {task_name}")
     
     def with_data(self, msg: str, **data: Any) -> None:
         """Log a message with additional structured data."""

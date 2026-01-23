@@ -210,7 +210,7 @@ class EnvironmentService:
                 logger.info("Dependencies validated and resolved successfully")
                 return (
                     True,
-                    f"✓ All {len(valid_packages)} packages are valid and resolvable",
+                    f"All {len(valid_packages)} packages are valid and resolvable",
                     valid_packages,
                 )
                 

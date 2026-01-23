@@ -54,7 +54,7 @@ uv run python -m uvicorn app.main:app --reload --port 8080
 
 ### Через UI
 
-1. Откройте http://localhost:8080
+1. Откройте <http://localhost:8080>
 2. Нажмите "New Script"
 3. Напишите код, укажите расписание и зависимости
 4. Сохраните
@@ -72,6 +72,7 @@ scripts/
 ```
 
 **cronator.yaml:**
+
 ```yaml
 name: my-task
 description: Описание задачи
@@ -83,6 +84,7 @@ alert_on_failure: true
 ```
 
 **script.py:**
+
 ```python
 from cronator_lib import get_logger
 

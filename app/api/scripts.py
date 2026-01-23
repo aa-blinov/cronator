@@ -483,5 +483,5 @@ async def validate_script(
     return {
         "valid": True,
         "errors": [],
-        "message": "✓ Code is valid",
+        "message": "Code is valid",
     }
