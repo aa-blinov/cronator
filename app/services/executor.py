@@ -177,6 +177,7 @@ class ExecutorService:
                 try:
                     process = await asyncio.create_subprocess_exec(
                         str(python_path),
+                        "-u",  # Unbuffered output for real-time streaming
                         str(script_path),
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE,

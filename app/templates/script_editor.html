@@ -454,16 +454,23 @@
     let currentExecutionId = null;
     
     function appendToConsole(text, animate = true) {
-        const line = document.createElement('div');
-        line.textContent = text;
-        if (animate) {
-            line.style.opacity = '0';
-            line.style.transition = 'opacity 0.3s ease-in';
-        }
-        outputConsole.appendChild(line);
-        if (animate) {
-            setTimeout(() => line.style.opacity = '1', 10);
-        }
+        // Split by newlines and create separate divs
+        const lines = text.split('\n');
+        lines.forEach((lineText, index) => {
+            // Skip empty lines except the last one
+            if (!lineText && index < lines.length - 1) return;
+            
+            const line = document.createElement('div');
+            line.textContent = lineText || ' '; // Use space for empty lines
+            if (animate) {
+                line.style.opacity = '0';
+                line.style.transition = 'opacity 0.3s ease-in';
+            }
+            outputConsole.appendChild(line);
+            if (animate) {
+                setTimeout(() => line.style.opacity = '1', 10);
+            }
+        });
         // Auto-scroll to bottom
         outputConsole.scrollTop = outputConsole.scrollHeight;
     }
@@ -554,7 +561,7 @@
             }
             
             // Start test
-            appendToConsole('\\n--- Test Started ---', false);
+            appendToConsole('\n--- Test Started ---', false);
             setConsoleStatus('Running...', 'badge-warning');
             
             const testResponse = await fetch(`/api/scripts/${scriptId}/test`, {
@@ -577,12 +584,24 @@
             currentEventSource = new EventSource(`/api/executions/${currentExecutionId}/stream`);
             
             currentEventSource.onmessage = (event) => {
-                appendToConsole(event.data, true);
+                try {
+                    // Try to parse as JSON (cronator_lib logs)
+                    const logData = JSON.parse(event.data);
+                    if (logData.message) {
+                        const timestamp = new Date(logData.timestamp).toLocaleTimeString();
+                        appendToConsole(`[${timestamp}] ${logData.level.padEnd(8)} ${logData.message}`, true);
+                    } else {
+                        appendToConsole(event.data, true);
+                    }
+                } catch (e) {
+                    // Not JSON, show as-is
+                    appendToConsole(event.data, true);
+                }
             };
             
             currentEventSource.addEventListener('done', (event) => {
                 const data = JSON.parse(event.data);
-                appendToConsole(`\\n--- Test Finished: ${data.status} (exit code: ${data.exit_code}) ---`, false);
+                appendToConsole(`\n--- Test Finished: ${data.status} (exit code: ${data.exit_code}) ---`, false);
                 
                 if (data.status === 'success') {
                     setConsoleStatus('Success', 'badge-success');

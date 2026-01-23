@@ -36,7 +36,8 @@ class CronatorFormatter(logging.Formatter):
         if hasattr(record, "extra_data"):
             log_entry["extra"] = record.extra_data
         
-        return json.dumps(log_entry)
+        # Add newline for proper streaming
+        return json.dumps(log_entry) + "\n"
 
 
 class PrettyFormatter(logging.Formatter):

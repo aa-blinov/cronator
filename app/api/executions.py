@@ -1,6 +1,7 @@
 """API routes for executions."""
 
 import asyncio
+import json
 from datetime import UTC
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -172,10 +173,24 @@ async def stream_execution_output(
         # Execution might have finished before streaming started
         # Return stored output
         async def send_stored_output():
-            yield f"data: {execution.stdout}\n\n"
-            if execution.stderr:
-                yield f"data: {execution.stderr}\n\n"
-            yield f"event: done\ndata: {{'status': '{execution.status}', 'exit_code': {execution.exit_code}}}\n\n"
+            def iter_lines(text: str):
+                # Preserve empty lines while avoiding trailing \r/\n in SSE payload
+                for raw in text.splitlines(keepends=True):
+                    yield raw.rstrip("\r\n")
+                if text.endswith("\n"):
+                    # splitlines(keepends=True) drops the final empty line after a trailing newline
+                    yield ""
+
+            for line in iter_lines(execution.stdout or ""):
+                yield f"data: {line}\n\n"
+            for line in iter_lines(execution.stderr or ""):
+                yield f"data: {line}\n\n"
+
+            done_payload = json.dumps({
+                "status": execution.status,
+                "exit_code": execution.exit_code,
+            })
+            yield f"event: done\ndata: {done_payload}\n\n"
         
         return StreamingResponse(
             send_stored_output(),
@@ -189,41 +204,39 @@ async def stream_execution_output(
     async def event_generator():
         """Generate SSE events from output queue."""
         queue = executor_service.output_queues[execution_id]
-        batch = []
-        last_send_time = asyncio.get_event_loop().time()
+        last_activity = asyncio.get_event_loop().time()
         
         try:
             while True:
                 try:
-                    # Wait for output with timeout for batching
+                    # Wait for output; periodically send keep-alive comments
                     stream_type, line = await asyncio.wait_for(
                         queue.get(),
-                        timeout=0.05  # 50ms batch interval
+                        timeout=15.0,
                     )
+                    last_activity = asyncio.get_event_loop().time()
                     
                     if stream_type == "done":
-                        # Send any remaining batch
-                        if batch:
-                            combined = "".join(batch)
-                            yield f"data: {combined}\n\n"
-                        
                         # Refresh execution to get final status
                         await db.refresh(execution)
-                        yield f"event: done\ndata: {{\"status\": \"{execution.status}\", \"exit_code\": {execution.exit_code}}}\n\n"
+                        done_payload = json.dumps({
+                            "status": execution.status,
+                            "exit_code": execution.exit_code,
+                        })
+                        yield f"event: done\ndata: {done_payload}\n\n"
                         break
-                    
-                    # Add to batch
-                    batch.append(line)
+
+                    # IMPORTANT: do not embed newlines inside an SSE `data:` line.
+                    # Send one log line per SSE message.
+                    payload = (line or "").rstrip("\r\n")
+                    yield f"data: {payload}\n\n"
                     
                 except asyncio.TimeoutError:
-                    # Timeout - send batch if we have one
-                    if batch:
-                        current_time = asyncio.get_event_loop().time()
-                        if current_time - last_send_time >= 0.05:
-                            combined = "".join(batch)
-                            yield f"data: {combined}\n\n"
-                            batch = []
-                            last_send_time = current_time
+                    # Keep-alive (comments are ignored by EventSource)
+                    current_time = asyncio.get_event_loop().time()
+                    if current_time - last_activity >= 15.0:
+                        yield ": keep-alive\n\n"
+                        last_activity = current_time
                     continue
                     
         finally:
