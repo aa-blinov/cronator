@@ -25,6 +25,7 @@ class ExecutorService:
 
     def __init__(self) -> None:
         self.running_processes: dict[int, asyncio.subprocess.Process] = {}
+        self.output_queues: dict[int, asyncio.Queue] = {}
         self._script_locks: dict[int, asyncio.Lock] = {}
         self._running_scripts: set[int] = set()
 
@@ -38,13 +39,15 @@ class ExecutorService:
         self,
         script_id: int,
         triggered_by: str = "scheduler",
+        is_test: bool = False,
     ) -> int:
         """
         Execute a script and return the execution ID.
         
         Args:
             script_id: ID of the script to execute
-            triggered_by: Who triggered the execution (scheduler, manual, api)
+            triggered_by: Who triggered the execution (scheduler, manual, api, test)
+            is_test: Whether this is a test execution
             
         Returns:
             Execution ID
@@ -67,6 +70,7 @@ class ExecutorService:
                 script_id=script_id,
                 status=ExecutionStatus.RUNNING.value,
                 triggered_by=triggered_by,
+                is_test=is_test,
                 started_at=datetime.now(UTC),
             )
             db.add(execution)
@@ -82,6 +86,10 @@ class ExecutorService:
         asyncio.create_task(self._run_script(script_id, execution_id))
         
         return execution_id
+    
+    def is_script_running(self, script_id: int) -> bool:
+        """Check if a script is currently running."""
+        return script_id in self._running_scripts
 
     async def _run_script(self, script_id: int, execution_id: int) -> None:
         """Actually run the script (called in background)."""
@@ -177,15 +185,43 @@ class ExecutorService:
                     )
 
                     self.running_processes[execution_id] = process
+                    
+                    # Create output queue for streaming
+                    output_queue = asyncio.Queue()
+                    self.output_queues[execution_id] = output_queue
+
+                    # Collect output and stream to queue
+                    stdout_lines = []
+                    stderr_lines = []
+                    
+                    async def read_stream(stream, is_stderr=False):
+                        """Read stream line by line and add to queue."""
+                        while True:
+                            line = await stream.readline()
+                            if not line:
+                                break
+                            decoded = line.decode("utf-8", errors="replace")
+                            if is_stderr:
+                                stderr_lines.append(decoded)
+                            else:
+                                stdout_lines.append(decoded)
+                            # Add to queue for streaming
+                            await output_queue.put(("stderr" if is_stderr else "stdout", decoded))
+                    
+                    # Read both streams concurrently
+                    await asyncio.gather(
+                        read_stream(process.stdout, False),
+                        read_stream(process.stderr, True),
+                    )
 
                     try:
-                        stdout, stderr = await asyncio.wait_for(
-                            process.communicate(),
+                        exit_code = await asyncio.wait_for(
+                            process.wait(),
                             timeout=script.timeout,
                         )
                         
-                        stdout_text = stdout.decode("utf-8", errors="replace") if stdout else ""
-                        stderr_text = stderr.decode("utf-8", errors="replace") if stderr else ""
+                        stdout_text = "".join(stdout_lines)
+                        stderr_text = "".join(stderr_lines)
                         
                         # Truncate if too large
                         if len(stdout_text) > settings.max_log_size:
@@ -193,7 +229,6 @@ class ExecutorService:
                         if len(stderr_text) > settings.max_log_size:
                             stderr_text = stderr_text[:settings.max_log_size] + "\n... (truncated)"
 
-                        exit_code = process.returncode
                         status = (
                             ExecutionStatus.SUCCESS
                             if exit_code == 0
@@ -220,7 +255,12 @@ class ExecutorService:
                         )
 
                 finally:
+                    # Cleanup
                     self.running_processes.pop(execution_id, None)
+                    # Signal end of stream
+                    if execution_id in self.output_queues:
+                        await self.output_queues[execution_id].put(("done", None))
+                        # Queue will be cleaned up by SSE endpoint
 
             except Exception as e:
                 logger.exception(f"Error executing script {script_id}")

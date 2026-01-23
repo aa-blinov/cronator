@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -66,6 +66,11 @@ class Execution(Base):
     # scheduler, manual, api
     triggered_by: Mapped[str] = mapped_column(
         String(50), default="scheduler"
+    )
+    
+    # Test execution flag
+    is_test: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
     )
     
     # Error details

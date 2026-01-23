@@ -10,6 +10,7 @@ class ExecutionBase(BaseModel):
 
     script_id: int
     triggered_by: str = Field(default="scheduler")
+    is_test: bool = Field(default=False)
 
 
 class ExecutionCreate(ExecutionBase):
@@ -31,6 +32,7 @@ class ExecutionRead(BaseModel):
     stdout: str = ""
     stderr: str = ""
     triggered_by: str = "scheduler"
+    is_test: bool = False
     error_message: str | None = None
     
     # Computed fields

@@ -304,6 +304,32 @@ async def run_script(
     return {"execution_id": execution_id, "message": "Script execution started"}
 
 
+@router.post("/{script_id}/test")
+async def test_script(
+    script_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Run a test execution (marked as test in database)."""
+    result = await db.execute(select(Script).where(Script.id == script_id))
+    script = result.scalar_one_or_none()
+    
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+    
+    # Check if script is already running
+    if executor_service.is_script_running(script_id):
+        raise HTTPException(status_code=409, detail="Script is already running")
+    
+    # Create execution with is_test=True
+    execution_id = await executor_service.execute_script(
+        script_id, 
+        triggered_by="test",
+        is_test=True
+    )
+    
+    return {"execution_id": execution_id, "message": "Test execution started"}
+
+
 @router.post("/{script_id}/toggle")
 async def toggle_script(
     script_id: int,
@@ -371,4 +397,91 @@ async def validate_dependencies(
         "valid": is_valid,
         "message": error_msg if not is_valid else "Dependencies are valid",
         "packages": packages,
+    }
+
+
+@router.post("/validate-script")
+async def validate_script(
+    data: dict,
+):
+    """Validate Python script syntax and code quality using Ruff."""
+    import ast
+    import asyncio
+    import json
+    import tempfile
+    from pathlib import Path
+    
+    code = data.get("code", "")
+    
+    if not code.strip():
+        return {
+            "valid": True,
+            "errors": [],
+            "message": "No code to validate",
+        }
+    
+    errors = []
+    
+    # Step 1: Check Python syntax
+    try:
+        ast.parse(code)
+    except SyntaxError as e:
+        errors.append({
+            "line": e.lineno or 0,
+            "column": e.offset or 0,
+            "code": "E999",
+            "message": f"SyntaxError: {e.msg}",
+        })
+        return {
+            "valid": False,
+            "errors": errors,
+            "message": "Syntax errors found",
+        }
+    
+    # Step 2: Run Ruff for critical errors only
+    # E9: Syntax errors, F63: Invalid print, F7: Syntax errors, F82: Undefined names
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(code)
+            temp_file = f.name
+        
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "ruff",
+                "check",
+                "--select=E9,F63,F7,F82",
+                "--output-format=json",
+                temp_file,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await process.communicate()
+            
+            if stdout:
+                ruff_results = json.loads(stdout.decode())
+                for result in ruff_results:
+                    errors.append({
+                        "line": result.get("location", {}).get("row", 0),
+                        "column": result.get("location", {}).get("column", 0),
+                        "code": result.get("code", ""),
+                        "message": result.get("message", ""),
+                    })
+        finally:
+            Path(temp_file).unlink(missing_ok=True)
+    
+    except Exception as e:
+        # If Ruff fails, just return syntax check result
+        pass
+    
+    if errors:
+        return {
+            "valid": False,
+            "errors": errors,
+            "message": f"Found {len(errors)} error(s)",
+        }
+    
+    return {
+        "valid": True,
+        "errors": [],
+        "message": "✓ Code is valid",
     }

@@ -19,11 +19,6 @@ class SchedulerService:
 
     def __init__(self) -> None:
         self.scheduler = AsyncIOScheduler(timezone="UTC")
-        self._execute_callback: Callable[[int], None] | None = None
-
-    def set_execute_callback(self, callback: Callable[[int], None]) -> None:
-        """Set the callback function for executing scripts."""
-        self._execute_callback = callback
 
     async def start(self) -> None:
         """Start the scheduler and load all enabled scripts."""
@@ -137,11 +132,11 @@ class SchedulerService:
 
     async def _execute_script(self, script_id: int) -> None:
         """Execute a script (called by scheduler)."""
-        if self._execute_callback:
-            from app.services.executor import executor_service
+        from app.services.executor import executor_service
+        try:
             await executor_service.execute_script(script_id, triggered_by="scheduler")
-        else:
-            logger.warning(f"No execute callback set, cannot execute script {script_id}")
+        except Exception:
+            logger.exception(f"Error executing script {script_id} from scheduler")
 
     def get_next_run_time(self, script_id: int) -> datetime | None:
         """Get the next run time for a script."""

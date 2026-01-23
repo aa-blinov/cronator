@@ -69,8 +69,43 @@
         <!-- Main editor -->
         <div class="lg:col-span-2 space-y-6">
             <div class="glass-card rounded-xl p-6">
-                <h3 class="text-lg font-semibold mb-4">Script Code</h3>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold">Script Code</h3>
+                    <div class="flex gap-2">
+                        <button type="button" id="validate-btn" class="btn btn-outline btn-info btn-sm gap-2">
+                            {{ icons.check_circle("w-4 h-4") }}
+                            Validate
+                        </button>
+                        <button type="button" id="run-test-btn" class="btn btn-outline btn-success btn-sm gap-2" {% if not script %}disabled title="Save script first"{% endif %}>
+                            {{ icons.play("w-4 h-4") }}
+                            Run Test
+                        </button>
+                        <button type="button" id="stop-test-btn" class="btn btn-outline btn-error btn-sm gap-2" style="display: none;">
+                            {{ icons.x_mark("w-4 h-4") }}
+                            Stop Test
+                        </button>
+                    </div>
+                </div>
                 <textarea id="code-editor" name="content">{{ content }}</textarea>
+            </div>
+            
+            <!-- Output Console -->
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-lg font-semibold">Output Console</h3>
+                        <span id="console-status" class="badge badge-ghost">Idle</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" id="reconnect-btn" class="btn btn-outline btn-warning btn-xs" style="display: none;">
+                            Reconnect
+                        </button>
+                        <button type="button" id="clear-output-btn" class="btn btn-outline btn-sm btn-xs">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+                <pre id="output-console" class="bg-base-200 p-4 rounded-lg font-mono text-sm overflow-y-auto custom-scrollbar" style="resize: vertical; min-height: 200px; max-height: 600px; height: 300px;"></pre>
             </div>
         </div>
         
@@ -403,6 +438,234 @@
             }
         } catch (err) {
             alert('Error: ' + err.message);
+        }
+    });
+    
+    // Output console management
+    const outputConsole = document.getElementById('output-console');
+    const consoleStatus = document.getElementById('console-status');
+    const clearOutputBtn = document.getElementById('clear-output-btn');
+    const validateBtn = document.getElementById('validate-btn');
+    const runTestBtn = document.getElementById('run-test-btn');
+    const stopTestBtn = document.getElementById('stop-test-btn');
+    const reconnectBtn = document.getElementById('reconnect-btn');
+    
+    let currentEventSource = null;
+    let currentExecutionId = null;
+    
+    function appendToConsole(text, animate = true) {
+        const line = document.createElement('div');
+        line.textContent = text;
+        if (animate) {
+            line.style.opacity = '0';
+            line.style.transition = 'opacity 0.3s ease-in';
+        }
+        outputConsole.appendChild(line);
+        if (animate) {
+            setTimeout(() => line.style.opacity = '1', 10);
+        }
+        // Auto-scroll to bottom
+        outputConsole.scrollTop = outputConsole.scrollHeight;
+    }
+    
+    function setConsoleStatus(status, badgeClass = 'badge-ghost') {
+        consoleStatus.textContent = status;
+        consoleStatus.className = `badge ${badgeClass}`;
+    }
+    
+    clearOutputBtn.addEventListener('click', () => {
+        outputConsole.innerHTML = '';
+    });
+    
+    // Validate script
+    validateBtn.addEventListener('click', async () => {
+        editor.save();
+        const code = document.getElementById('code-editor').value;
+        
+        validateBtn.disabled = true;
+        validateBtn.textContent = 'Validating...';
+        setConsoleStatus('Validating...', 'badge-info');
+        
+        try {
+            const response = await fetch('/api/scripts/validate-script', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code }),
+            });
+            
+            const result = await response.json();
+            
+            if (result.valid) {
+                appendToConsole(result.message, true);
+                setConsoleStatus('Idle', 'badge-success');
+            } else {
+                appendToConsole(result.message, true);
+                result.errors.forEach(err => {
+                    appendToConsole(`  Line ${err.line}, Column ${err.column}: [${err.code}] ${err.message}`, true);
+                });
+                setConsoleStatus('Validation Failed', 'badge-error');
+            }
+        } catch (err) {
+            appendToConsole(`Error: ${err.message}`, true);
+            setConsoleStatus('Error', 'badge-error');
+        } finally {
+            validateBtn.disabled = false;
+            validateBtn.innerHTML = `{{ icons.check_circle("w-4 h-4") | safe }} Validate`;
+        }
+    });
+    
+    // Run test
+    runTestBtn.addEventListener('click', async () => {
+        editor.save();
+        
+        // Save script first
+        const form = document.getElementById('script-form');
+        const formData = new FormData(form);
+        const data = {
+            name: formData.get('name'),
+            description: formData.get('description'),
+            content: formData.get('content'),
+            cron_expression: formData.get('cron_expression'),
+            python_version: formData.get('python_version'),
+            timeout: parseInt(formData.get('timeout')),
+            misfire_grace_time: parseInt(formData.get('misfire_grace_time')),
+            enabled: formData.get('enabled') === 'true',
+            dependencies: formData.get('dependencies'),
+            alert_on_failure: formData.get('alert_on_failure') === 'true',
+            alert_on_success: formData.get('alert_on_success') === 'true',
+            environment_vars: formData.get('environment_vars'),
+        };
+        
+        try {
+            runTestBtn.disabled = true;
+            setConsoleStatus('Saving...', 'badge-info');
+            
+            // Save script
+            const scriptId = {{ script.id if script else 'null' }};
+            const saveResponse = await fetch(`/api/scripts/${scriptId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            
+            if (!saveResponse.ok) {
+                const error = await saveResponse.json();
+                throw new Error(error.detail || 'Failed to save script');
+            }
+            
+            // Start test
+            appendToConsole('\\n--- Test Started ---', false);
+            setConsoleStatus('Running...', 'badge-warning');
+            
+            const testResponse = await fetch(`/api/scripts/${scriptId}/test`, {
+                method: 'POST',
+            });
+            
+            if (!testResponse.ok) {
+                const error = await testResponse.json();
+                throw new Error(error.detail || 'Failed to start test');
+            }
+            
+            const testResult = await testResponse.json();
+            currentExecutionId = testResult.execution_id;
+            
+            // Show stop button
+            runTestBtn.style.display = 'none';
+            stopTestBtn.style.display = 'inline-flex';
+            
+            // Connect to SSE stream
+            currentEventSource = new EventSource(`/api/executions/${currentExecutionId}/stream`);
+            
+            currentEventSource.onmessage = (event) => {
+                appendToConsole(event.data, true);
+            };
+            
+            currentEventSource.addEventListener('done', (event) => {
+                const data = JSON.parse(event.data);
+                appendToConsole(`\\n--- Test Finished: ${data.status} (exit code: ${data.exit_code}) ---`, false);
+                
+                if (data.status === 'success') {
+                    setConsoleStatus('Success', 'badge-success');
+                } else if (data.status === 'cancelled') {
+                    setConsoleStatus('Cancelled', 'badge-warning');
+                } else {
+                    setConsoleStatus('Failed', 'badge-error');
+                }
+                
+                currentEventSource.close();
+                currentEventSource = null;
+                currentExecutionId = null;
+                runTestBtn.style.display = 'inline-flex';
+                stopTestBtn.style.display = 'none';
+                runTestBtn.disabled = false;
+            });
+            
+            currentEventSource.onerror = (error) => {
+                console.error('SSE Error:', error);
+                appendToConsole('\\n[Connection lost]', false);
+                setConsoleStatus('Disconnected', 'badge-error');
+                reconnectBtn.style.display = 'inline-flex';
+                
+                if (currentEventSource) {
+                    currentEventSource.close();
+                    currentEventSource = null;
+                }
+                runTestBtn.style.display = 'inline-flex';
+                stopTestBtn.style.display = 'none';
+                runTestBtn.disabled = false;
+            };
+            
+        } catch (err) {
+            appendToConsole(`Error: ${err.message}`, false);
+            setConsoleStatus('Error', 'badge-error');
+            runTestBtn.disabled = false;
+            runTestBtn.style.display = 'inline-flex';
+            stopTestBtn.style.display = 'none';
+        }
+    });
+    
+    // Stop test
+    stopTestBtn.addEventListener('click', async () => {
+        if (!currentExecutionId) return;
+        
+        try {
+            const response = await fetch(`/api/executions/${currentExecutionId}/cancel`, {
+                method: 'POST',
+            });
+            
+            if (response.ok) {
+                appendToConsole('\\n[Test stopped by user]', false);
+            }
+        } catch (err) {
+            console.error('Failed to stop test:', err);
+        }
+        
+        if (currentEventSource) {
+            currentEventSource.close();
+            currentEventSource = null;
+        }
+        
+        currentExecutionId = null;
+        stopTestBtn.style.display = 'none';
+        runTestBtn.style.display = 'inline-flex';
+        runTestBtn.disabled = false;
+        setConsoleStatus('Stopped', 'badge-warning');
+    });
+    
+    // Reconnect
+    reconnectBtn.addEventListener('click', () => {
+        reconnectBtn.style.display = 'none';
+        runTestBtn.click();
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (currentEventSource) {
+            currentEventSource.close();
+        }
+        if (currentExecutionId) {
+            // Try to cancel execution (best effort)
+            fetch(`/api/executions/${currentExecutionId}/cancel`, { method: 'POST' }).catch(() => {});
         }
     });
 </script>

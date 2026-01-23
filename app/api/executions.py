@@ -1,8 +1,10 @@
 """API routes for executions."""
 
+import asyncio
 from datetime import UTC
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -150,6 +152,94 @@ async def cancel_execution(
         raise HTTPException(status_code=500, detail="Failed to cancel execution")
     
     return {"message": "Execution cancelled"}
+
+
+@router.get("/{execution_id}/stream")
+async def stream_execution_output(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Stream execution output using Server-Sent Events."""
+    # Check if execution exists
+    result = await db.execute(select(Execution).where(Execution.id == execution_id))
+    execution = result.scalar_one_or_none()
+    
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+    
+    # Check if output queue exists
+    if execution_id not in executor_service.output_queues:
+        # Execution might have finished before streaming started
+        # Return stored output
+        async def send_stored_output():
+            yield f"data: {execution.stdout}\n\n"
+            if execution.stderr:
+                yield f"data: {execution.stderr}\n\n"
+            yield f"event: done\ndata: {{'status': '{execution.status}', 'exit_code': {execution.exit_code}}}\n\n"
+        
+        return StreamingResponse(
+            send_stored_output(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        )
+    
+    async def event_generator():
+        """Generate SSE events from output queue."""
+        queue = executor_service.output_queues[execution_id]
+        batch = []
+        last_send_time = asyncio.get_event_loop().time()
+        
+        try:
+            while True:
+                try:
+                    # Wait for output with timeout for batching
+                    stream_type, line = await asyncio.wait_for(
+                        queue.get(),
+                        timeout=0.05  # 50ms batch interval
+                    )
+                    
+                    if stream_type == "done":
+                        # Send any remaining batch
+                        if batch:
+                            combined = "".join(batch)
+                            yield f"data: {combined}\n\n"
+                        
+                        # Refresh execution to get final status
+                        await db.refresh(execution)
+                        yield f"event: done\ndata: {{\"status\": \"{execution.status}\", \"exit_code\": {execution.exit_code}}}\n\n"
+                        break
+                    
+                    # Add to batch
+                    batch.append(line)
+                    
+                except asyncio.TimeoutError:
+                    # Timeout - send batch if we have one
+                    if batch:
+                        current_time = asyncio.get_event_loop().time()
+                        if current_time - last_send_time >= 0.05:
+                            combined = "".join(batch)
+                            yield f"data: {combined}\n\n"
+                            batch = []
+                            last_send_time = current_time
+                    continue
+                    
+        finally:
+            # Cleanup queue
+            if execution_id in executor_service.output_queues:
+                del executor_service.output_queues[execution_id]
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.delete("/{execution_id}")
