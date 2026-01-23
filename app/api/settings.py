@@ -1,6 +1,6 @@
 """API routes for settings."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.config import get_settings
@@ -70,8 +70,12 @@ async def get_settings_info() -> SettingsResponse:
     git_enabled = await settings_service.get("git_enabled", settings.git_enabled)
     git_repo_url = await settings_service.get("git_repo_url", settings.git_repo_url)
     git_branch = await settings_service.get("git_branch", settings.git_branch)
-    git_sync_interval = await settings_service.get("git_sync_interval", settings.git_sync_interval)
-    git_scripts_subdir = await settings_service.get("git_scripts_subdir", settings.git_scripts_subdir)
+    git_sync_interval = await settings_service.get(
+        "git_sync_interval", settings.git_sync_interval
+    )
+    git_scripts_subdir = await settings_service.get(
+        "git_scripts_subdir", settings.git_scripts_subdir
+    )
     default_timeout = await settings_service.get("default_timeout", settings.default_timeout)
     
     return SettingsResponse(

@@ -27,16 +27,14 @@ FROM node:20-slim AS css-builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and templates for content scanning
 COPY package.json tailwind.config.js ./
 COPY app/static/input.css ./app/static/
+COPY app/templates ./app/templates
 
 # Install dependencies and build CSS
 RUN npm install && \
     npx tailwindcss -i ./app/static/input.css -o ./app/static/output.css --minify
-
-# Copy templates for content scanning
-COPY app/templates ./app/templates
 
 
 # Runtime stage

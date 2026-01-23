@@ -96,9 +96,23 @@
                         <h3 class="text-lg font-semibold">Output Console</h3>
                         <span id="console-status" class="badge badge-ghost">Idle</span>
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex items-center gap-3">
+                        <label class="label cursor-pointer gap-2 py-0">
+                            <span class="label-text text-xs">Auto-scroll</span>
+                            <input type="checkbox" id="auto-scroll-toggle" class="toggle toggle-xs" checked>
+                        </label>
+                        <label class="label cursor-pointer gap-2 py-0">
+                            <span class="label-text text-xs">Raw</span>
+                            <input type="checkbox" id="raw-logs-toggle" class="toggle toggle-xs">
+                        </label>
                         <button type="button" id="reconnect-btn" class="btn btn-outline btn-warning btn-xs" style="display: none;">
                             Reconnect
+                        </button>
+                        <button type="button" id="copy-output-btn" class="btn btn-outline btn-xs">
+                            Copy
+                        </button>
+                        <button type="button" id="download-output-btn" class="btn btn-outline btn-xs">
+                            Download
                         </button>
                         <button type="button" id="clear-output-btn" class="btn btn-outline btn-sm btn-xs">
                             Clear
@@ -434,10 +448,10 @@
                 window.location.href = '/scripts/' + result.id;
             } else {
                 const error = await response.json();
-                alert('Error: ' + (error.detail || 'Failed to save script'));
+                window.showToast?.('Error: ' + (error.detail || 'Failed to save script'), 'error');
             }
         } catch (err) {
-            alert('Error: ' + err.message);
+            window.showToast?.('Error: ' + err.message, 'error');
         }
     });
     
@@ -445,15 +459,52 @@
     const outputConsole = document.getElementById('output-console');
     const consoleStatus = document.getElementById('console-status');
     const clearOutputBtn = document.getElementById('clear-output-btn');
+    const copyOutputBtn = document.getElementById('copy-output-btn');
+    const downloadOutputBtn = document.getElementById('download-output-btn');
     const validateBtn = document.getElementById('validate-btn');
     const runTestBtn = document.getElementById('run-test-btn');
     const stopTestBtn = document.getElementById('stop-test-btn');
     const reconnectBtn = document.getElementById('reconnect-btn');
+    const autoScrollToggle = document.getElementById('auto-scroll-toggle');
+    const rawLogsToggle = document.getElementById('raw-logs-toggle');
     
     let currentEventSource = null;
     let currentExecutionId = null;
+    let autoScrollEnabled = true;
+    let showRawLogs = false;
+    let logBuffer = []; // Store raw log data for re-rendering
+
+    // Persist console preferences
+    try {
+        autoScrollEnabled = localStorage.getItem('consoleAutoScroll') !== 'false';
+        showRawLogs = localStorage.getItem('consoleRawLogs') === 'true';
+    } catch (e) {}
+    autoScrollToggle.checked = autoScrollEnabled;
+    rawLogsToggle.checked = showRawLogs;
+
+    autoScrollToggle.addEventListener('change', (e) => {
+        autoScrollEnabled = !!e.target.checked;
+        try { localStorage.setItem('consoleAutoScroll', String(autoScrollEnabled)); } catch (err) {}
+    });
+    rawLogsToggle.addEventListener('change', (e) => {
+        showRawLogs = !!e.target.checked;
+        try { localStorage.setItem('consoleRawLogs', String(showRawLogs)); } catch (err) {}
+        window.showToast?.(showRawLogs ? 'Raw logs enabled' : 'Parsed logs enabled', 'info');
+        
+        // Re-render all logs with new format
+        rerenderLogs();
+    });
     
     function appendToConsole(text, animate = true) {
+        // Store raw data for re-rendering
+        logBuffer.push(text);
+        
+        // Format and render
+        const formatted = formatLogData(text);
+        renderLogLine(formatted, animate);
+    }
+    
+    function renderLogLine(text, animate = true) {
         // Split by newlines and create separate divs
         const lines = text.split('\n');
         lines.forEach((lineText, index) => {
@@ -471,8 +522,39 @@
                 setTimeout(() => line.style.opacity = '1', 10);
             }
         });
-        // Auto-scroll to bottom
-        outputConsole.scrollTop = outputConsole.scrollHeight;
+        // Auto-scroll to bottom (optional)
+        if (autoScrollEnabled) {
+            outputConsole.scrollTop = outputConsole.scrollHeight;
+        }
+    }
+    
+    function rerenderLogs() {
+        // Clear console
+        outputConsole.innerHTML = '';
+        
+        // Re-render all logs with current format
+        logBuffer.forEach(rawData => {
+            const formatted = formatLogData(rawData);
+            renderLogLine(formatted, false);
+        });
+    }
+    
+    function formatLogData(data) {
+        if (showRawLogs) {
+            return data;
+        }
+        
+        // Try to parse as JSON (cronator_lib logs)
+        try {
+            const logData = JSON.parse(data);
+            if (logData.message) {
+                const timestamp = new Date(logData.timestamp).toLocaleTimeString();
+                return `[${timestamp}] ${logData.level.padEnd(8)} ${logData.message}`;
+            }
+        } catch (e) {
+            // Not JSON, return as-is
+        }
+        return data;
     }
     
     function setConsoleStatus(status, badgeClass = 'badge-ghost') {
@@ -482,6 +564,31 @@
     
     clearOutputBtn.addEventListener('click', () => {
         outputConsole.innerHTML = '';
+        logBuffer = []; // Clear buffer too
+    });
+
+    copyOutputBtn.addEventListener('click', async () => {
+        try {
+            const text = outputConsole.innerText || '';
+            await navigator.clipboard.writeText(text);
+            window.showToast?.('Copied to clipboard', 'success');
+        } catch (err) {
+            window.showToast?.('Copy failed (clipboard permissions)', 'error');
+        }
+    });
+
+    downloadOutputBtn.addEventListener('click', () => {
+        const text = outputConsole.innerText || '';
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cronator-test-output-${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        window.showToast?.('Download started', 'info');
     });
     
     // Validate script
@@ -584,19 +691,7 @@
             currentEventSource = new EventSource(`/api/executions/${currentExecutionId}/stream`);
             
             currentEventSource.onmessage = (event) => {
-                try {
-                    // Try to parse as JSON (cronator_lib logs)
-                    const logData = JSON.parse(event.data);
-                    if (logData.message) {
-                        const timestamp = new Date(logData.timestamp).toLocaleTimeString();
-                        appendToConsole(`[${timestamp}] ${logData.level.padEnd(8)} ${logData.message}`, true);
-                    } else {
-                        appendToConsole(event.data, true);
-                    }
-                } catch (e) {
-                    // Not JSON, show as-is
-                    appendToConsole(event.data, true);
-                }
+                appendToConsole(event.data, true);
             };
             
             currentEventSource.addEventListener('done', (event) => {
@@ -637,6 +732,7 @@
         } catch (err) {
             appendToConsole(`Error: ${err.message}`, false);
             setConsoleStatus('Error', 'badge-error');
+            window.showToast?.(err.message, 'error');
             runTestBtn.disabled = false;
             runTestBtn.style.display = 'inline-flex';
             stopTestBtn.style.display = 'none';

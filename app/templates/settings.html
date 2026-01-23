@@ -277,12 +277,13 @@
             
             if (result.success) {
                 closeEditModal();
-                location.reload();
+                window.showToast?.('Settings saved', 'success');
+                setTimeout(() => location.reload(), 300);
             } else {
-                alert('Error: ' + result.message);
+                window.showToast?.(result.message || 'Failed to save settings', 'error');
             }
         } catch (err) {
-            alert('Error: ' + err.message);
+            window.showToast?.(err.message || 'Failed to save settings', 'error');
         }
     }
     
@@ -290,9 +291,9 @@
         try {
             const response = await fetch('/api/settings/test-email', { method: 'POST' });
             const data = await response.json();
-            alert(data.message);
+            window.showToast?.(data.message || 'Test email sent', data.success ? 'success' : 'warning');
         } catch (err) {
-            alert('Error: ' + err.message);
+            window.showToast?.(err.message || 'Failed to send test email', 'error');
         }
     }
     
@@ -300,12 +301,12 @@
         try {
             const response = await fetch('/api/settings/git-sync', { method: 'POST' });
             const data = await response.json();
-            alert(data.message);
+            window.showToast?.(data.message || 'Git sync complete', data.success ? 'success' : 'warning');
             if (data.success) {
-                location.reload();
+                setTimeout(() => location.reload(), 300);
             }
         } catch (err) {
-            alert('Error: ' + err.message);
+            window.showToast?.(err.message || 'Failed to sync git', 'error');
         }
     }
     
@@ -313,10 +314,11 @@
         try {
             const response = await fetch('/api/settings/reload-scheduler', { method: 'POST' });
             const data = await response.json();
-            alert(data.message + ' (' + data.job_count + ' jobs)');
-            location.reload();
+            const msg = (data.message || 'Scheduler reloaded') + (typeof data.job_count === 'number' ? ` (${data.job_count} jobs)` : '');
+            window.showToast?.(msg, data.success ? 'success' : 'warning');
+            if (data.success) setTimeout(() => location.reload(), 300);
         } catch (err) {
-            alert('Error: ' + err.message);
+            window.showToast?.(err.message || 'Failed to reload scheduler', 'error');
         }
     }
 </script>

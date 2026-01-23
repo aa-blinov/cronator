@@ -69,8 +69,61 @@
             </div>
         </main>
     </div>
+
+    <!-- Toasts -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 min-w-[320px]" style="pointer-events: none;"></div>
     
     <script>
+        // Global toast helper
+        window.showToast = function showToast(message, type = 'info', timeoutMs = 3500) {
+            console.log('[Toast] Showing:', message, 'type:', type);
+            const container = document.getElementById('toast-container');
+            if (!container) {
+                console.error('[Toast] Container not found!');
+                return;
+            }
+
+            const el = document.createElement('div');
+            const typeClass = {
+                success: 'alert-success',
+                error: 'alert-error',
+                warning: 'alert-warning',
+                info: 'alert-info',
+            }[type] || 'alert-info';
+
+            el.className = `alert ${typeClass} shadow-lg max-w-md`;
+            el.style.pointerEvents = 'auto';
+            // Явные inline стили для видимости
+            el.style.padding = '1rem';
+            el.style.borderRadius = '0.5rem';
+            el.style.marginBottom = '0.5rem';
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.minHeight = '3rem';
+            // Цвета по типу
+            const colors = {
+                'alert-success': { bg: '#22c55e', text: '#000' },
+                'alert-error': { bg: '#ef4444', text: '#fff' },
+                'alert-warning': { bg: '#f59e0b', text: '#000' },
+                'alert-info': { bg: '#3b82f6', text: '#fff' }
+            };
+            const color = colors[typeClass] || colors['alert-info'];
+            el.style.backgroundColor = color.bg;
+            el.style.color = color.text;
+            
+            const span = document.createElement('span');
+            span.className = 'text-sm break-words';
+            span.textContent = String(message);
+            el.appendChild(span);
+            container.appendChild(el);
+            console.log('[Toast] Element added, classList:', el.className);
+
+            const remove = () => {
+                if (el && el.parentNode) el.parentNode.removeChild(el);
+            };
+            setTimeout(remove, timeoutMs);
+        }
+
         // Auto-refresh for running executions
         function checkForUpdates() {
             const runningElements = document.querySelectorAll('.status-running, [data-status="running"]');

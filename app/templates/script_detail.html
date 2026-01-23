@@ -34,12 +34,12 @@ function deleteScript(scriptId) {
             window.location.href = '/';
         } else {
             return response.json().then(data => {
-                alert(`Failed to delete script: ${data.detail || 'Unknown error'}`);
+                window.showToast?.(`Failed to delete script: ${data.detail || 'Unknown error'}`, 'error');
             });
         }
     })
     .catch(error => {
-        alert(`Error deleting script: ${error.message}`);
+        window.showToast?.(`Error deleting script: ${error.message}`, 'error');
     });
 }
 </script>
@@ -273,12 +273,12 @@ document.getElementById('run-now-btn')?.addEventListener('click', async () => {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert('Error: ' + (error.detail || 'Failed to run script'));
+            window.showToast?.(error.detail || 'Failed to run script', 'error');
             btn.disabled = false;
             btn.innerHTML = originalHTML;
         }
     } catch (err) {
-        alert('Error: ' + err.message);
+        window.showToast?.(err.message || 'Failed to run script', 'error');
         btn.disabled = false;
         btn.innerHTML = originalHTML;
     }
@@ -298,12 +298,12 @@ document.getElementById('run-now-empty-btn')?.addEventListener('click', async ()
             window.location.reload();
         } else {
             const error = await response.json();
-            alert('Error: ' + (error.detail || 'Failed to run script'));
+            window.showToast?.(error.detail || 'Failed to run script', 'error');
             btn.disabled = false;
             btn.innerHTML = originalHTML;
         }
     } catch (err) {
-        alert('Error: ' + err.message);
+        window.showToast?.(err.message || 'Failed to run script', 'error');
         btn.disabled = false;
         btn.innerHTML = originalHTML;
     }
@@ -321,11 +321,11 @@ document.getElementById('toggle-btn')?.addEventListener('click', async () => {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert('Error: ' + (error.detail || 'Failed to toggle script'));
+            window.showToast?.(error.detail || 'Failed to toggle script', 'error');
             btn.disabled = false;
         }
     } catch (err) {
-        alert('Error: ' + err.message);
+        window.showToast?.(err.message || 'Failed to toggle script', 'error');
         btn.disabled = false;
     }
 });
@@ -375,15 +375,17 @@ document.querySelectorAll('.cancel-execution-btn').forEach(btn => {
                 
                 // Remove cancel button
                 e.target.remove();
+
+                window.showToast?.('Execution cancelled', 'success');
                 
                 // Show success message (optional)
                 // alert('Execution cancelled');
             } else {
                 const error = await response.json();
-                alert('Failed to cancel: ' + (error.detail || 'Unknown error'));
+                window.showToast?.(error.detail || 'Failed to cancel execution', 'error');
             }
         } catch (err) {
-            alert('Error: ' + err.message);
+            window.showToast?.(err.message || 'Failed to cancel execution', 'error');
         }
     });
 });
@@ -433,9 +435,13 @@ async function refreshExecutionHistory() {
                                     statusBadge.innerHTML = 'cancelled';
                                 }
                                 e.target.remove();
+                                window.showToast?.('Execution cancelled', 'success');
+                            } else {
+                                const error = await resp.json();
+                                window.showToast?.(error.detail || 'Failed to cancel execution', 'error');
                             }
                         } catch (err) {
-                            alert('Error: ' + err.message);
+                            window.showToast?.(err.message || 'Failed to cancel execution', 'error');
                         }
                     });
                 });

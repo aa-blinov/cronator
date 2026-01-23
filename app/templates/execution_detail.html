@@ -4,11 +4,9 @@
 {% block header_actions %}
 <div class="flex items-center gap-2">
     {% if execution.status == 'running' %}
-    <form action="/api/executions/{{ execution.id }}/cancel" method="POST">
-        <button type="submit" class="btn btn-error btn-sm gap-2">
-            {{ icons.x_mark("w-4 h-4") }} Cancel
-        </button>
-    </form>
+    <button type="button" id="cancel-exec-btn" data-execution-id="{{ execution.id }}" class="btn btn-error btn-sm gap-2">
+        {{ icons.x_mark("w-4 h-4") }} Cancel
+    </button>
     {% endif %}
     <a href="/scripts/{{ execution.script_id }}" class="btn btn-ghost btn-sm">
         ← Back to Script
@@ -113,11 +111,15 @@
             <h3 class="text-lg font-semibold flex items-center gap-2">
                 <span class="text-green-400">📤</span> Standard Output
             </h3>
-            <span class="text-xs text-gray-500">{{ execution.stdout | length }} chars</span>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">{{ execution.stdout | length }} chars</span>
+                <button type="button" id="copy-stdout-btn" class="btn btn-ghost btn-xs">Copy</button>
+                <button type="button" id="download-stdout-btn" class="btn btn-ghost btn-xs">Download</button>
+            </div>
         </div>
         <div class="p-4">
             {% if execution.stdout %}
-            <pre class="log-output">{{ execution.stdout }}</pre>
+            <pre id="stdout-log" class="log-output">{{ execution.stdout }}</pre>
             {% else %}
             <div class="text-center py-8 text-gray-500">
                 <p>No output</p>
@@ -132,11 +134,15 @@
             <h3 class="text-lg font-semibold flex items-center gap-2">
                 {{ icons.arrow_down_tray("w-5 h-5 inline text-red-400") }} Standard Error
             </h3>
-            <span class="text-xs text-gray-500">{{ execution.stderr | length }} chars</span>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">{{ execution.stderr | length }} chars</span>
+                <button type="button" id="copy-stderr-btn" class="btn btn-ghost btn-xs">Copy</button>
+                <button type="button" id="download-stderr-btn" class="btn btn-ghost btn-xs">Download</button>
+            </div>
         </div>
         <div class="p-4">
             {% if execution.stderr %}
-            <pre class="log-output text-red-300">{{ execution.stderr }}</pre>
+            <pre id="stderr-log" class="log-output text-red-300">{{ execution.stderr }}</pre>
             {% else %}
             <div class="text-center py-8 text-gray-500">
                 <p>No errors</p>
@@ -145,4 +151,80 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function downloadText(filename, text) {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    async function copyText(text) {
+        await navigator.clipboard.writeText(text);
+    }
+
+    const execId = {{ execution.id }};
+
+    // Cancel (AJAX, stay on page)
+    document.getElementById('cancel-exec-btn')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        if (!confirm('Cancel this execution?')) return;
+
+        btn.disabled = true;
+        try {
+            const resp = await fetch(`/api/executions/${execId}/cancel`, { method: 'POST' });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                window.showToast?.(data.detail || 'Failed to cancel execution', 'error');
+                btn.disabled = false;
+                return;
+            }
+            window.showToast?.('Execution cancelled', 'success');
+            setTimeout(() => location.reload(), 800);
+        } catch (err) {
+            window.showToast?.(err.message || 'Failed to cancel execution', 'error');
+            btn.disabled = false;
+        }
+    });
+
+    // Stdout helpers
+    document.getElementById('copy-stdout-btn')?.addEventListener('click', async () => {
+        const text = document.getElementById('stdout-log')?.innerText || '';
+        try {
+            await copyText(text);
+            window.showToast?.('Stdout copied', 'success');
+        } catch (err) {
+            window.showToast?.('Copy failed (clipboard permissions)', 'error');
+        }
+    });
+    document.getElementById('download-stdout-btn')?.addEventListener('click', () => {
+        const text = document.getElementById('stdout-log')?.innerText || '';
+        downloadText(`execution-${execId}-stdout.log`, text);
+        window.showToast?.('Download started', 'info');
+    });
+
+    // Stderr helpers
+    document.getElementById('copy-stderr-btn')?.addEventListener('click', async () => {
+        const text = document.getElementById('stderr-log')?.innerText || '';
+        try {
+            await copyText(text);
+            window.showToast?.('Stderr copied', 'success');
+        } catch (err) {
+            window.showToast?.('Copy failed (clipboard permissions)', 'error');
+        }
+    });
+    document.getElementById('download-stderr-btn')?.addEventListener('click', () => {
+        const text = document.getElementById('stderr-log')?.innerText || '';
+        downloadText(`execution-${execId}-stderr.log`, text);
+        window.showToast?.('Download started', 'info');
+    });
+</script>
 {% endblock %}

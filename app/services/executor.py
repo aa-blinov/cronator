@@ -52,10 +52,16 @@ class ExecutorService:
         Returns:
             Execution ID
         """
-        # Check if script is already running (prevent concurrent execution of same script)
-        if script_id in self._running_scripts:
-            logger.warning(f"Script {script_id} is already running, skipping execution")
-            raise ValueError(f"Script {script_id} is already running")
+        # Acquire lock to prevent race condition
+        lock = self._get_script_lock(script_id)
+        async with lock:
+            # Check if script is already running (prevent concurrent execution of same script)
+            if script_id in self._running_scripts:
+                logger.warning(f"Script {script_id} is already running, skipping execution")
+                raise ValueError(f"Script {script_id} is already running")
+            
+            # Mark script as running immediately while holding lock
+            self._running_scripts.add(script_id)
         
         async with async_session_maker() as db:
             # Get script
@@ -78,9 +84,6 @@ class ExecutorService:
             await db.refresh(execution)
 
             execution_id = execution.id
-
-        # Mark script as running
-        self._running_scripts.add(script_id)
         
         # Run execution in background
         asyncio.create_task(self._run_script(script_id, execution_id))
@@ -258,10 +261,14 @@ class ExecutorService:
                 finally:
                     # Cleanup
                     self.running_processes.pop(execution_id, None)
-                    # Signal end of stream
+                    # Signal end of stream and cleanup queue
                     if execution_id in self.output_queues:
-                        await self.output_queues[execution_id].put(("done", None))
-                        # Queue will be cleaned up by SSE endpoint
+                        try:
+                            await self.output_queues[execution_id].put(("done", None))
+                        except Exception:
+                            pass
+                        # Always remove queue to prevent memory leak
+                        self.output_queues.pop(execution_id, None)
 
             except Exception as e:
                 logger.exception(f"Error executing script {script_id}")

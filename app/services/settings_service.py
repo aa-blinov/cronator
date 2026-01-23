@@ -7,7 +7,7 @@ from typing import Any
 from cryptography.fernet import Fernet
 from sqlalchemy import select
 
-from app.config import Settings, get_settings
+from app.config import get_settings
 from app.database import async_session_maker
 from app.models.setting import Setting
 
@@ -31,11 +31,12 @@ class SettingsService:
 
     def _get_cipher(self) -> Fernet:
         """Get encryption cipher using secret key from config."""
+        import hashlib
+        from base64 import urlsafe_b64encode
+        
         env_settings = get_settings()
         # Use secret_key as basis for encryption key
         # Ensure it's 32 bytes URL-safe base64-encoded
-        from base64 import urlsafe_b64encode
-        import hashlib
         
         # Derive a proper Fernet key from secret_key
         key_material = hashlib.sha256(env_settings.secret_key.encode()).digest()
@@ -157,7 +158,7 @@ class SettingsService:
         """Convert value to string for storage."""
         if isinstance(value, bool):
             return "true" if value else "false"
-        elif isinstance(value, (int, float)):
+        elif isinstance(value, int | float):
             return str(value)
         elif isinstance(value, str):
             return value

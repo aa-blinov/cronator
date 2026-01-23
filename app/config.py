@@ -42,6 +42,25 @@ class Settings(BaseSettings):
             self.logs_dir = self.base_dir / self.logs_dir
         if not self.data_dir.is_absolute():
             self.data_dir = self.base_dir / self.data_dir
+        
+        # Validate production secrets ONLY in non-debug mode
+        # In development (DEBUG=True), default values are acceptable
+        if not self.debug:
+            if self.secret_key == "change-me-in-production-please":
+                import warnings
+                warnings.warn(
+                    "SECRET_KEY is using default value in production! "
+                    "Set a secure random value in environment or .env file.",
+                    stacklevel=2,
+                )
+            if self.admin_password == "admin":
+                import warnings
+                warnings.warn(
+                    "ADMIN_PASSWORD is using default value in production! "
+                    "Set a secure password in environment or .env file.",
+                    stacklevel=2,
+                )
+        
         return self
 
     # Authentication

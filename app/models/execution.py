@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -28,6 +28,12 @@ class Execution(Base):
     """Model representing a single script execution."""
 
     __tablename__ = "executions"
+    
+    # Define composite index for common query pattern
+    __table_args__ = (
+        Index('idx_script_started', 'script_id', 'started_at'),
+        Index('idx_status_started', 'status', 'started_at'),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     script_id: Mapped[int] = mapped_column(
@@ -70,7 +76,7 @@ class Execution(Base):
     
     # Test execution flag
     is_test: Mapped[bool] = mapped_column(
-        Boolean, default=False, server_default="0", nullable=False
+        default=False, server_default="0", nullable=False
     )
     
     # Error details

@@ -32,13 +32,16 @@ class AlertingService:
         """Get current settings from DB, fallback to env."""
         from app.services.settings_service import settings_service
         
+        smtp_from = await settings_service.get("smtp_from", self.from_addr)
+        smtp_user = await settings_service.get("smtp_user", self.user)
+        
         return {
             "enabled": await settings_service.get("smtp_enabled", self.enabled),
             "host": await settings_service.get("smtp_host", self.host),
             "port": await settings_service.get("smtp_port", self.port),
-            "user": await settings_service.get("smtp_user", self.user),
+            "user": smtp_user,
             "password": await settings_service.get("smtp_password", self.password),
-            "from_addr": await settings_service.get("smtp_from", self.from_addr) or await settings_service.get("smtp_user", self.user),
+            "from_addr": smtp_from or smtp_user,
             "to_addr": await settings_service.get("alert_email", self.to_addr),
             "use_tls": await settings_service.get("smtp_use_tls", self.use_tls),
         }

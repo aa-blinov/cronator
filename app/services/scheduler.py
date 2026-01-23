@@ -1,7 +1,6 @@
 """Scheduler service using APScheduler."""
 
 import logging
-from collections.abc import Callable
 from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler

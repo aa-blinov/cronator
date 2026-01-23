@@ -1,10 +1,11 @@
 """API routes for scripts."""
 
 import aiofiles
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.rate_limit import rate_limit
 from app.config import get_settings
 from app.database import get_db
 from app.models.execution import Execution
@@ -288,8 +289,10 @@ async def delete_script(
 
 
 @router.post("/{script_id}/run")
+@rate_limit(max_calls=5, period=60)  # Max 5 runs per minute
 async def run_script(
     script_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Manually trigger a script execution."""
@@ -305,8 +308,10 @@ async def run_script(
 
 
 @router.post("/{script_id}/test")
+@rate_limit(max_calls=10, period=60)  # Max 10 tests per minute
 async def test_script(
     script_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Run a test execution (marked as test in database)."""
@@ -352,8 +357,10 @@ async def toggle_script(
 
 
 @router.post("/{script_id}/rebuild-env")
+@rate_limit(max_calls=3, period=60)  # Max 3 rebuilds per minute (expensive operation)
 async def rebuild_environment(
     script_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Rebuild the script's virtual environment."""
@@ -469,7 +476,7 @@ async def validate_script(
         finally:
             Path(temp_file).unlink(missing_ok=True)
     
-    except Exception as e:
+    except Exception:
         # If Ruff fails, just return syntax check result
         pass
     

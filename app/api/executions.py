@@ -231,7 +231,7 @@ async def stream_execution_output(
                     payload = (line or "").rstrip("\r\n")
                     yield f"data: {payload}\n\n"
                     
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Keep-alive (comments are ignored by EventSource)
                     current_time = asyncio.get_event_loop().time()
                     if current_time - last_activity >= 15.0:
