@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+{% import "icons.html" as icons %}
+
+{% block extra_head %}
+<!-- CodeMirror -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<style>
+    .CodeMirror {
+        height: 500px;
+        font-size: 14px;
+        border-radius: 0.5rem;
+    }
+    
+    /* Custom scrollbar styling */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.5);
+    }
+    
+    /* For Firefox */
+    .custom-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="POST" action="{% if script %}/api/scripts/{{ script.id }}{% else %}/api/scripts{% endif %}" id="script-form">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold">{{ page_title }}</h2>
+        <div class="flex gap-2">
+            {% if script and script.git_commit %}
+            <div class="badge badge-info badge-lg gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.28 1.15-.28 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+                Managed by Git
+            </div>
+            {% endif %}
+            <a href="{% if script %}/scripts/{{ script.id }}{% else %}/{% endif %}" class="btn btn-ghost btn-sm">Cancel</a>
+        </div>
+    </div>
+    
+    {% if script and script.git_commit %}
+    <div class="alert alert-warning shadow-lg mb-6">
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <span><b>Warning:</b> This script is managed by Git. Local changes made here will be overwritten during the next Git sync.</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main editor -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4">Script Code</h3>
+                <textarea id="code-editor" name="content">{{ content }}</textarea>
+            </div>
+        </div>
+        
+        <!-- Settings sidebar -->
+        <div class="space-y-6">
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4">Settings</h3>
+                
+                <div class="space-y-4">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Script Name</span>
+                        </label>
+                        <input type="text" name="name" 
+                               value="{{ script.name if script else '' }}"
+                               placeholder="my-script"
+                               class="input input-bordered w-full"
+                               pattern="[a-zA-Z0-9_-]+"
+                               required
+                               {% if script %}readonly{% endif %}>
+                        <label class="label">
+                            <span class="label-text-alt text-gray-500">Letters, numbers, underscores, hyphens only</span>
+                        </label>
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Description</span>
+                        </label>
+                        <textarea name="description" 
+                                  class="textarea textarea-bordered w-full"
+                                  rows="2"
+                                  placeholder="What does this script do?">{{ script.description if script else '' }}</textarea>
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Cron Expression</span>
+                        </label>
+                        <input type="text" name="cron_expression" 
+                               value="{{ script.cron_expression if script else '0 * * * *' }}"
+                               placeholder="0 * * * *"
+                               class="input input-bordered w-full font-mono"
+                               required>
+                        <label class="label">
+                            <span class="label-text-alt text-gray-500">minute hour day month weekday</span>
+                        </label>
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Python Version</span>
+                        </label>
+                        <select name="python_version" class="select select-bordered w-full">
+                            {% for ver in python_versions %}
+                            <option value="{{ ver }}" {% if script and script.python_version == ver %}selected{% elif not script and ver == '3.11' %}selected{% endif %}>
+                                Python {{ ver }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Timeout (seconds)</span>
+                        </label>
+                        <input type="number" name="timeout" 
+                               value="{{ script.timeout if script else 3600 }}"
+                               min="1" max="86400"
+                               class="input input-bordered w-full">
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Misfire Grace Time (seconds)</span>
+                        </label>
+                        <input type="number" name="misfire_grace_time" 
+                               value="{{ script.misfire_grace_time if script else 60 }}"
+                               min="0" max="3600"
+                               class="input input-bordered w-full">
+                        <label class="label">
+                            <span class="label-text-alt text-gray-500">Wait time for missed runs</span>
+                        </label>
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label cursor-pointer">
+                            <span class="label-text">Enabled</span>
+                            <input type="checkbox" name="enabled" value="true"
+                                   class="toggle toggle-primary"
+                                   {% if not script or script.enabled %}checked{% endif %}>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4">Dependencies</h3>
+                <div class="form-control">
+                    <textarea name="dependencies" id="dependencies-input"
+                              class="textarea textarea-bordered w-full font-mono text-sm"
+                              rows="6"
+                              placeholder="requests&#10;pandas&#10;numpy==1.24.0">{{ script.dependencies if script else '' }}</textarea>
+                    <label class="label">
+                        <span class="label-text-alt text-gray-500">One package per line (pip format)</span>
+                    </label>
+                </div>
+                <div class="mt-3">
+                    <button type="button" id="validate-deps-btn" class="btn btn-sm btn-outline btn-info w-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Validate Dependencies
+                    </button>
+                </div>
+                <div id="validation-result" class="mt-3 hidden"></div>
+            </div>
+            
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4">Alerts</h3>
+                <div class="space-y-2">
+                    <div class="form-control">
+                        <label class="label cursor-pointer">
+                            <span class="label-text">Alert on failure</span>
+                            <input type="checkbox" name="alert_on_failure" value="true"
+                                   class="toggle toggle-error"
+                                   {% if not script or script.alert_on_failure %}checked{% endif %}>
+                        </label>
+                    </div>
+                    <div class="form-control">
+                        <label class="label cursor-pointer">
+                            <span class="label-text">Alert on success</span>
+                            <input type="checkbox" name="alert_on_success" value="true"
+                                   class="toggle toggle-success"
+                                   {% if script and script.alert_on_success %}checked{% endif %}>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4">Environment Variables</h3>
+                <div class="form-control">
+                    <textarea name="environment_vars" 
+                              class="textarea textarea-bordered w-full font-mono text-sm"
+                              rows="4"
+                              placeholder="API_KEY=secret&#10;DEBUG=true">{{ script.environment_vars if script else '' }}</textarea>
+                    <label class="label">
+                        <span class="label-text-alt text-gray-500">KEY=VALUE format, one per line</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="flex gap-3">
+                <button type="submit" class="btn btn-primary flex-1">
+                    {{ icons.check_circle("w-5 h-5") }} {% if script %}Save Changes{% else %}Create Script{% endif %}
+                </button>
+                <a href="{% if script %}/scripts/{{ script.id }}{% else %}/{% endif %}" class="btn btn-ghost">
+                    Cancel
+                </a>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Initialize CodeMirror
+    const textarea = document.getElementById('code-editor');
+    const editor = CodeMirror.fromTextArea(textarea, {
+        mode: 'python',
+        theme: 'dracula',
+        lineNumbers: true,
+        indentUnit: 4,
+        tabSize: 4,
+        indentWithTabs: false,
+        lineWrapping: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+    });
+    
+    // Validate dependencies
+    document.getElementById('validate-deps-btn').addEventListener('click', async () => {
+        const depsInput = document.getElementById('dependencies-input');
+        const validateBtn = document.getElementById('validate-deps-btn');
+        const resultDiv = document.getElementById('validation-result');
+        
+        const dependencies = depsInput.value;
+        
+        if (!dependencies.trim()) {
+            resultDiv.className = 'alert alert-info mt-3';
+            resultDiv.innerHTML = '<span>No dependencies to validate</span>';
+            resultDiv.classList.remove('hidden');
+            return;
+        }
+        
+        // Show loading state
+        validateBtn.disabled = true;
+        validateBtn.innerHTML = `
+            <span class="loading loading-spinner loading-xs"></span>
+            Validating...
+        `;
+        
+        try {
+            const response = await fetch('/api/scripts/validate-dependencies', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ dependencies }),
+            });
+            
+            const result = await response.json();
+            
+            if (result.valid) {
+                resultDiv.className = 'alert alert-success mt-3';
+                resultDiv.innerHTML = `
+                    <div class="w-full">
+                        <div class="flex items-start gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div class="flex-1">
+                                <div class="font-bold">Dependencies are valid!</div>
+                                <div class="text-sm mt-1">${result.message}</div>
+                                <div class="text-xs mt-2 opacity-75">
+                                    Packages: ${result.packages.join(', ')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                resultDiv.className = 'alert alert-error mt-3';
+                resultDiv.innerHTML = `
+                    <div class="w-full">
+                        <div class="flex items-start gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div class="flex-1">
+                                <div class="font-bold">Invalid dependencies!</div>
+                                <div class="text-sm mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap break-words custom-scrollbar">
+                                    ${result.message}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            resultDiv.classList.remove('hidden');
+            
+        } catch (err) {
+            resultDiv.className = 'alert alert-error mt-3';
+            resultDiv.innerHTML = `
+                <div class="w-full">
+                    <div class="flex items-start gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div class="flex-1">
+                            <div class="font-bold">Validation error</div>
+                            <div class="text-sm mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap break-words custom-scrollbar">
+                                ${err.message}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            resultDiv.classList.remove('hidden');
+        } finally {
+            // Reset button state
+            validateBtn.disabled = false;
+            validateBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Validate Dependencies
+            `;
+        }
+    });
+    
+    // Handle form submission
+    document.getElementById('script-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        // Update textarea with editor content
+        editor.save();
+        
+        const form = e.target;
+        const formData = new FormData(form);
+        
+        // Convert form data to JSON
+        const data = {
+            name: formData.get('name'),
+            description: formData.get('description'),
+            content: formData.get('content'),
+            cron_expression: formData.get('cron_expression'),
+            python_version: formData.get('python_version'),
+            timeout: parseInt(formData.get('timeout')),
+            misfire_grace_time: parseInt(formData.get('misfire_grace_time')),
+            enabled: formData.get('enabled') === 'true',
+            dependencies: formData.get('dependencies'),
+            alert_on_failure: formData.get('alert_on_failure') === 'true',
+            alert_on_success: formData.get('alert_on_success') === 'true',
+            environment_vars: formData.get('environment_vars'),
+        };
+        
+        try {
+            const isNew = !form.action.includes('/api/scripts/');
+            const url = isNew ? '/api/scripts' : form.action;
+            const method = isNew ? 'POST' : 'PUT';
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                window.location.href = '/scripts/' + result.id;
+            } else {
+                const error = await response.json();
+                alert('Error: ' + (error.detail || 'Failed to save script'));
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    });
+</script>
+{% endblock %}

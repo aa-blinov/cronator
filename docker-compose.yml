@@ -1,0 +1,59 @@
+services:
+  cronator:
+    build: .
+    container_name: cronator
+    restart: unless-stopped
+    command: >
+      python -m uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8080
+      --reload
+      --reload-dir /app/app
+      --reload-dir /app/cronator_lib
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    volumes:
+      # Development: Code hot-reload
+      - ./app:/app/app
+      - ./cronator_lib:/app/cronator_lib
+      # Configuration file
+      - ./.env:/app/.env
+      # Scripts directory - add your scripts here
+      - ./scripts:/app/scripts
+      # Data directory - database and git repo
+      - ./data:/app/data
+      # Virtual environments - cached between restarts
+      - ./envs:/app/envs
+      # Logs
+      - ./logs:/app/logs
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# Optional: For production with PostgreSQL
+# services:
+#   cronator:
+#     ...
+#     environment:
+#       - DATABASE_URL=postgresql+asyncpg://cronator:password@db:5432/cronator
+#     depends_on:
+#       - db
+#   
+#   db:
+#     image: postgres:16-alpine
+#     restart: unless-stopped
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+#     environment:
+#       - POSTGRES_USER=cronator
+#       - POSTGRES_PASSWORD=password
+#       - POSTGRES_DB=cronator
+# 
+# volumes:
+#   postgres_data:

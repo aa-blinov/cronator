@@ -1,0 +1,13 @@
+[project]
+name = "cronator-lib"
+version = "0.1.0"
+description = "Logging library for Cronator scripts"
+requires-python = ">=3.9"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cronator_lib"]

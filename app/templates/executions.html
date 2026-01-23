@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% import "icons.html" as icons %}
+
+{% block content %}
+<!-- Filters -->
+<div class="glass-card rounded-xl p-4 mb-6">
+    <form method="GET" action="/executions" class="flex flex-wrap items-center gap-4">
+        <div class="form-control">
+            <select name="script_id" class="select select-bordered select-sm">
+                <option value="">All Scripts</option>
+                {% for script in scripts %}
+                <option value="{{ script.id }}" {% if filters.script_id == script.id %}selected{% endif %}>
+                    {{ script.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-control">
+            <select name="status" class="select select-bordered select-sm">
+                <option value="">All Statuses</option>
+                {% for s in statuses %}
+                <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>
+                    {{ s }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+        <a href="/executions" class="btn btn-ghost btn-sm">Reset</a>
+    </form>
+</div>
+
+<!-- Executions Table -->
+<div class="glass-card rounded-xl overflow-hidden">
+    {% if executions %}
+    <div class="overflow-x-auto">
+        <table class="table w-full">
+            <thead>
+                <tr class="border-b border-gray-700/50">
+                    <th class="bg-transparent">ID</th>
+                    <th class="bg-transparent">Script</th>
+                    <th class="bg-transparent">Status</th>
+                    <th class="bg-transparent">Started</th>
+                    <th class="bg-transparent">Duration</th>
+                    <th class="bg-transparent">Exit Code</th>
+                    <th class="bg-transparent">Triggered By</th>
+                    <th class="bg-transparent">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exec in executions %}
+                <tr class="border-b border-gray-700/30 hover:bg-white/5" {% if exec.status == 'running' %}data-status="running"{% endif %}>
+                    <td>
+                        <a href="/executions/{{ exec.id }}" class="text-indigo-400 hover:underline">#{{ exec.id }}</a>
+                    </td>
+                    <td>
+                        <a href="/scripts/{{ exec.script_id }}" class="hover:text-indigo-400">
+                            {{ exec.script.name if exec.script else 'Unknown' }}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="status-badge {{ exec.status }}">
+                            {% if exec.status == 'running' %}
+                                <span class="pulse-dot"></span>
+                            {% endif %}
+                            {{ exec.status }}
+                        </span>
+                    </td>
+                    <td>{{ exec.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>{{ exec.duration_formatted }}</td>
+                    <td>
+                        {% if exec.exit_code is not none %}
+                            <code class="{% if exec.exit_code == 0 %}text-green-400{% else %}text-red-400{% endif %}">{{ exec.exit_code }}</code>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-ghost badge-sm">{{ exec.triggered_by }}</span>
+                    </td>
+                    <td>
+                        <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">View Logs</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="px-6 py-4 border-t border-gray-700/50 flex items-center justify-between">
+        <p class="text-sm text-gray-400">
+            Showing {{ (pagination.page - 1) * pagination.per_page + 1 }} - {{ [pagination.page * pagination.per_page, pagination.total] | min }} of {{ pagination.total }}
+        </p>
+        <div class="join">
+            {% if pagination.page > 1 %}
+            <a href="?page={{ pagination.page - 1 }}{% if filters.script_id %}&script_id={{ filters.script_id }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}" class="join-item btn btn-sm">«</a>
+            {% endif %}
+            
+            {% for p in range(1, pagination.pages + 1) %}
+                {% if p == pagination.page %}
+                    <button class="join-item btn btn-sm btn-active">{{ p }}</button>
+                {% elif p <= 3 or p > pagination.pages - 2 or (p >= pagination.page - 1 and p <= pagination.page + 1) %}
+                    <a href="?page={{ p }}{% if filters.script_id %}&script_id={{ filters.script_id }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}" class="join-item btn btn-sm">{{ p }}</a>
+                {% elif p == 4 or p == pagination.pages - 2 %}
+                    <button class="join-item btn btn-sm btn-disabled">...</button>
+                {% endif %}
+            {% endfor %}
+            
+            {% if pagination.page < pagination.pages %}
+            <a href="?page={{ pagination.page + 1 }}{% if filters.script_id %}&script_id={{ filters.script_id }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}" class="join-item btn btn-sm">»</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="p-12 text-center">
+        {{ icons.inbox("w-20 h-20 mb-4 opacity-50 mx-auto") }}
+        <h3 class="text-xl font-medium text-gray-400 mb-2">No executions found</h3>
+        <p class="text-gray-500">{% if filters.script_id or filters.status %}Try adjusting your filters{% else %}Run a script to see execution history{% endif %}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

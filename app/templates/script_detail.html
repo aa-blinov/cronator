@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% import "icons.html" as icons %}
+
+{% block header_actions %}
+<div class="flex items-center gap-2">
+    <form action="/scripts/{{ script.id }}/run" method="POST" class="inline">
+        <button type="submit" class="btn btn-primary btn-sm gap-2">
+            {{ icons.play("w-4 h-4") }} Run Now
+        </button>
+    </form>
+    <a href="/scripts/{{ script.id }}/edit" class="btn btn-ghost btn-sm gap-2">
+        {{ icons.pencil("w-4 h-4") }} Edit
+    </a>
+    <form action="/scripts/{{ script.id }}/toggle" method="POST" class="inline">
+        <button type="submit" class="btn btn-ghost btn-sm gap-2">
+            {% if script.enabled %}{{ icons.pause("w-4 h-4") }} Disable{% else %}{{ icons.play("w-4 h-4") }} Enable{% endif %}
+        </button>
+    </form>
+    <button type="button" onclick="deleteScript({{ script.id }})" class="btn btn-error btn-sm gap-2">
+        {{ icons.trash("w-4 h-4") }} Delete
+    </button>
+</div>
+
+<script>
+function deleteScript(scriptId) {
+    if (!confirm('Delete this script? This will remove the script, its environment, scheduled jobs, and all execution history. This action cannot be undone.')) {
+        return;
+    }
+    
+    fetch(`/api/scripts/${scriptId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            window.location.href = '/';
+        } else {
+            return response.json().then(data => {
+                alert(`Failed to delete script: ${data.detail || 'Unknown error'}`);
+            });
+        }
+    })
+    .catch(error => {
+        alert(`Error deleting script: ${error.message}`);
+    });
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<!-- Script Info -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <div class="lg:col-span-2 glass-card rounded-xl p-6">
+        <h3 class="text-lg font-semibold mb-4">Script Information</h3>
+        
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <p class="text-gray-400 text-sm">Name</p>
+                <p class="font-medium">{{ script.name }}</p>
+            </div>
+            <div>
+                <p class="text-gray-400 text-sm">Status</p>
+                <p>
+                    {% if script.enabled %}
+                        <span class="badge badge-success">Enabled</span>
+                    {% else %}
+                        <span class="badge badge-ghost">Disabled</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-gray-400 text-sm">Schedule</p>
+                <code class="text-sm bg-gray-800 px-2 py-1 rounded">{{ script.cron_expression }}</code>
+            </div>
+            <div>
+                <p class="text-gray-400 text-sm">Python Version</p>
+                <p>{{ script.python_version }}</p>
+            </div>
+            <div>
+                <p class="text-gray-400 text-sm">Timeout</p>
+                <p>{{ script.timeout }}s</p>
+            </div>
+            <div>
+                <p class="text-gray-400 text-sm">Next Run</p>
+                <p>{% if next_run %}{{ next_run.strftime('%Y-%m-%d %H:%M:%S UTC') }}{% else %}-{% endif %}</p>
+            </div>
+            <div class="col-span-2">
+                <p class="text-gray-400 text-sm">Path</p>
+                <code class="text-xs bg-gray-800 px-2 py-1 rounded break-all">{{ script.path }}</code>
+            </div>
+            {% if script.description %}
+            <div class="col-span-2">
+                <p class="text-gray-400 text-sm">Description</p>
+                <p>{{ script.description }}</p>
+            </div>
+            {% endif %}
+        </div>
+        
+        {% if script.dependencies %}
+        <div class="mt-6">
+            <p class="text-gray-400 text-sm mb-2">Dependencies</p>
+            <pre class="log-output text-xs">{{ script.dependencies }}</pre>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="glass-card rounded-xl p-6">
+        <h3 class="text-lg font-semibold mb-4">Statistics</h3>
+        
+        <div class="space-y-4">
+            <div>
+                <p class="text-gray-400 text-sm">Total Executions</p>
+                <p class="text-2xl font-bold">{{ stats.total }}</p>
+            </div>
+            <div>
+                <p class="text-gray-400 text-sm">Success Rate</p>
+                <p class="text-2xl font-bold {% if stats.total == 0 %}text-orange-400{% elif stats.success_rate >= 90 %}text-green-400{% elif stats.success_rate >= 50 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                    {{ stats.success_rate }}%
+                </p>
+            </div>
+            <div>
+                <p class="text-gray-400 text-sm">Alerts</p>
+                <p class="flex items-center gap-2">
+                    {% if script.alert_on_failure %}
+                        <span class="badge badge-error badge-sm">On Failure</span>
+                    {% endif %}
+                    {% if script.alert_on_success %}
+                        <span class="badge badge-success badge-sm">On Success</span>
+                    {% endif %}
+                    {% if not script.alert_on_failure and not script.alert_on_success %}
+                        <span class="text-gray-500">None</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-gray-400 text-sm">Last Alert Sent</p>
+                <p class="font-medium text-sm">
+                    {{ script.last_alert_at.strftime('%Y-%m-%d %H:%M:%S') if script.last_alert_at else 'Never' }}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Execution History -->
+<div class="glass-card rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-700/50">
+        <h3 class="text-lg font-semibold">Execution History</h3>
+    </div>
+    
+    {% if executions %}
+    <div class="overflow-x-auto">
+        <table class="table w-full">
+            <thead>
+                <tr class="border-b border-gray-700/50">
+                    <th class="bg-transparent">ID</th>
+                    <th class="bg-transparent">Status</th>
+                    <th class="bg-transparent">Started</th>
+                    <th class="bg-transparent">Duration</th>
+                    <th class="bg-transparent">Exit Code</th>
+                    <th class="bg-transparent">Triggered By</th>
+                    <th class="bg-transparent">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exec in executions %}
+                <tr class="border-b border-gray-700/30 hover:bg-white/5" {% if exec.status == 'running' %}data-status="running"{% endif %}>
+                    <td>
+                        <a href="/executions/{{ exec.id }}" class="text-indigo-400 hover:underline">#{{ exec.id }}</a>
+                    </td>
+                    <td>
+                        <span class="status-badge {{ exec.status }}">
+                            {% if exec.status == 'running' %}
+                                <span class="pulse-dot"></span>
+                            {% endif %}
+                            {{ exec.status }}
+                        </span>
+                    </td>
+                    <td>{{ exec.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>{{ exec.duration_formatted }}</td>
+                    <td>
+                        {% if exec.exit_code is not none %}
+                            <code class="{% if exec.exit_code == 0 %}text-green-400{% else %}text-red-400{% endif %}">{{ exec.exit_code }}</code>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-ghost badge-sm">{{ exec.triggered_by }}</span>
+                    </td>
+                    <td>
+                        <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="px-6 py-4 border-t border-gray-700/50 flex items-center justify-between">
+        <p class="text-sm text-gray-400">
+            Showing {{ (pagination.page - 1) * pagination.per_page + 1 }} - {{ [pagination.page * pagination.per_page, pagination.total] | min }} of {{ pagination.total }}
+        </p>
+        <div class="join">
+            {% if pagination.page > 1 %}
+            <a href="?page={{ pagination.page - 1 }}" class="join-item btn btn-sm">«</a>
+            {% endif %}
+            
+            {% for p in range(1, pagination.pages + 1) %}
+                {% if p == pagination.page %}
+                    <button class="join-item btn btn-sm btn-active">{{ p }}</button>
+                {% elif p <= 3 or p > pagination.pages - 2 or (p >= pagination.page - 1 and p <= pagination.page + 1) %}
+                    <a href="?page={{ p }}" class="join-item btn btn-sm">{{ p }}</a>
+                {% elif p == 4 or p == pagination.pages - 2 %}
+                    <button class="join-item btn btn-sm btn-disabled">...</button>
+                {% endif %}
+            {% endfor %}
+            
+            {% if pagination.page < pagination.pages %}
+            <a href="?page={{ pagination.page + 1 }}" class="join-item btn btn-sm">»</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="p-12 text-center">
+        {{ icons.inbox("w-20 h-20 mb-4 opacity-50 mx-auto") }}
+        <h3 class="text-xl font-medium text-gray-400 mb-2">No executions yet</h3>
+        <p class="text-gray-500 mb-6">Run the script to see execution history</p>
+        <form action="/scripts/{{ script.id }}/run" method="POST" class="inline">
+            <button type="submit" class="btn btn-primary gap-2">
+                {{ icons.play("w-4 h-4") }} Run Now
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
