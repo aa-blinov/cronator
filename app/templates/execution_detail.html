@@ -188,7 +188,7 @@
                 return;
             }
             window.showToast?.('Execution cancelled', 'success');
-            setTimeout(() => location.reload(), 800);
+            setTimeout(() => location.reload(), 2800);
         } catch (err) {
             window.showToast?.(err.message || 'Failed to cancel execution', 'error');
             btn.disabled = false;

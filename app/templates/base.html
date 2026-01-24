@@ -71,11 +71,11 @@
     </div>
 
     <!-- Toasts -->
-    <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 min-w-[320px]" style="pointer-events: none;"></div>
+    <div id="toast-container" style="position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; min-width: 320px; pointer-events: none;"></div>
     
     <script>
         // Global toast helper
-        window.showToast = function showToast(message, type = 'info', timeoutMs = 3500) {
+        window.showToast = function showToast(message, type = 'info', timeoutMs = 2000) {
             console.log('[Toast] Showing:', message, 'type:', type);
             const container = document.getElementById('toast-container');
             if (!container) {
@@ -93,13 +93,18 @@
 
             el.className = `alert ${typeClass} shadow-lg max-w-md`;
             el.style.pointerEvents = 'auto';
-            // Явные inline стили для видимости
+            // Стили для видимости
             el.style.padding = '1rem';
             el.style.borderRadius = '0.5rem';
             el.style.marginBottom = '0.5rem';
             el.style.display = 'flex';
             el.style.alignItems = 'center';
             el.style.minHeight = '3rem';
+            el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+            // Анимация появления
+            el.style.transform = 'translateX(100%)';
+            el.style.opacity = '0';
+            el.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
             // Цвета по типу
             const colors = {
                 'alert-success': { bg: '#22c55e', text: '#000' },
@@ -116,10 +121,23 @@
             span.textContent = String(message);
             el.appendChild(span);
             container.appendChild(el);
+            
+            // Запуск анимации появления
+            requestAnimationFrame(() => {
+                el.style.transform = 'translateX(0)';
+                el.style.opacity = '1';
+            });
+            
             console.log('[Toast] Element added, classList:', el.className);
 
             const remove = () => {
-                if (el && el.parentNode) el.parentNode.removeChild(el);
+                // Плавная анимация исчезновения
+                el.style.transition = 'transform 0.5s ease-in-out, opacity 0.5s ease-in-out';
+                el.style.transform = 'translateX(50px)';
+                el.style.opacity = '0';
+                setTimeout(() => {
+                    if (el && el.parentNode) el.parentNode.removeChild(el);
+                }, 500);
             };
             setTimeout(remove, timeoutMs);
         }

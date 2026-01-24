@@ -270,7 +270,8 @@ document.getElementById('run-now-btn')?.addEventListener('click', async () => {
         if (response.ok) {
             const result = await response.json();
             // Reload page to show new execution
-            window.location.reload();
+            window.showToast?.('Script started', 'success');
+            setTimeout(() => window.location.reload(), 2800);
         } else {
             const error = await response.json();
             window.showToast?.(error.detail || 'Failed to run script', 'error');
@@ -295,7 +296,8 @@ document.getElementById('run-now-empty-btn')?.addEventListener('click', async ()
         const response = await fetch(`/api/scripts/${scriptId}/run`, { method: 'POST' });
         
         if (response.ok) {
-            window.location.reload();
+            window.showToast?.('Script started', 'success');
+            setTimeout(() => window.location.reload(), 2800);
         } else {
             const error = await response.json();
             window.showToast?.(error.detail || 'Failed to run script', 'error');
@@ -318,7 +320,8 @@ document.getElementById('toggle-btn')?.addEventListener('click', async () => {
         const response = await fetch(`/api/scripts/${scriptId}/toggle`, { method: 'POST' });
         
         if (response.ok) {
-            window.location.reload();
+            window.showToast?.('Script toggled', 'success');
+            setTimeout(() => window.location.reload(), 2800);
         } else {
             const error = await response.json();
             window.showToast?.(error.detail || 'Failed to toggle script', 'error');

@@ -278,7 +278,7 @@
             if (result.success) {
                 closeEditModal();
                 window.showToast?.('Settings saved', 'success');
-                setTimeout(() => location.reload(), 300);
+                setTimeout(() => location.reload(), 2800);
             } else {
                 window.showToast?.(result.message || 'Failed to save settings', 'error');
             }
@@ -303,7 +303,7 @@
             const data = await response.json();
             window.showToast?.(data.message || 'Git sync complete', data.success ? 'success' : 'warning');
             if (data.success) {
-                setTimeout(() => location.reload(), 300);
+                setTimeout(() => location.reload(), 2800);
             }
         } catch (err) {
             window.showToast?.(err.message || 'Failed to sync git', 'error');
@@ -316,7 +316,7 @@
             const data = await response.json();
             const msg = (data.message || 'Scheduler reloaded') + (typeof data.job_count === 'number' ? ` (${data.job_count} jobs)` : '');
             window.showToast?.(msg, data.success ? 'success' : 'warning');
-            if (data.success) setTimeout(() => location.reload(), 300);
+            if (data.success) setTimeout(() => location.reload(), 2800);
         } catch (err) {
             window.showToast?.(err.message || 'Failed to reload scheduler', 'error');
         }
