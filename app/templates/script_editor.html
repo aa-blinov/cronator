@@ -4,7 +4,7 @@
 {% block extra_head %}
 <!-- CodeMirror -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-ocean.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
 <style>
@@ -418,7 +418,7 @@
     const textarea = document.getElementById('code-editor');
     const editor = CodeMirror.fromTextArea(textarea, {
         mode: 'python',
-        theme: 'dracula',
+        theme: 'material-ocean',
         lineNumbers: true,
         indentUnit: 4,
         tabSize: 4,

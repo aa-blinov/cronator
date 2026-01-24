@@ -18,20 +18,20 @@
         <h3 class="text-lg font-semibold mb-4">General Settings</h3>
         
         <div class="space-y-4">
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">App Name</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">App Name</span>
                 <span>{{ settings.app_name }}</span>
             </div>
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Scripts Directory</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Scripts Directory</span>
                 <code class="text-xs">{{ settings.scripts_dir }}</code>
             </div>
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Environments Directory</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Environments Directory</span>
                 <code class="text-xs">{{ settings.envs_dir }}</code>
             </div>
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Default Timeout</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Default Timeout</span>
                 <span>{{ settings.default_timeout }}s</span>
             </div>
         </div>
@@ -42,8 +42,8 @@
         <h3 class="text-lg font-semibold mb-4">Email Alerts</h3>
         
         <div class="space-y-4">
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">SMTP Enabled</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">SMTP Enabled</span>
                 {% if settings.smtp_enabled %}
                     <span class="badge badge-success">Enabled</span>
                 {% else %}
@@ -51,12 +51,12 @@
                 {% endif %}
             </div>
             {% if settings.smtp_enabled %}
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">SMTP Host</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">SMTP Host</span>
                 <code class="text-xs">{{ settings.smtp_host }}:{{ settings.smtp_port }}</code>
             </div>
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Alert Email</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Alert Email</span>
                 <span>{{ settings.alert_email or 'Not configured' }}</span>
             </div>
             <div class="mt-4">
@@ -73,8 +73,8 @@
         <h3 class="text-lg font-semibold mb-4">Git Sync</h3>
         
         <div class="space-y-4">
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Git Sync</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Git Sync</span>
                 {% if git_status.enabled %}
                     <span class="badge badge-success">Enabled</span>
                 {% else %}
@@ -82,20 +82,20 @@
                 {% endif %}
             </div>
             {% if git_status.enabled %}
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Repository</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Repository</span>
                 <code class="text-xs truncate max-w-[200px]">{{ git_status.repo_url }}</code>
             </div>
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Branch</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Branch</span>
                 <code>{{ git_status.branch }}</code>
             </div>
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Current Commit</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Current Commit</span>
                 <code class="text-xs">{{ git_status.current_commit[:8] if git_status.current_commit else 'N/A' }}</code>
             </div>
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Sync Interval</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Sync Interval</span>
                 <span>{{ git_status.sync_interval }}s</span>
             </div>
             <div class="mt-4">
@@ -112,7 +112,7 @@
         <h3 class="text-lg font-semibold mb-4">Backups & Maintenance</h3>
         
         <div class="space-y-4">
-            <p class="text-sm text-gray-400">
+            <p class="text-sm text-base-content/60">
                 All data is stored in the <code>/data</code> and <code>/scripts</code> volumes. 
                 Regular backup of these directories is recommended.
             </p>
@@ -136,7 +136,7 @@
         
         <form id="settings-form" class="space-y-6">
             <!-- Email Settings -->
-            <div class="border border-gray-700 rounded-lg p-4">
+            <div class="border border-base-300 rounded-lg p-4">
                 <h4 class="font-semibold mb-3">Email Alerts</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label class="form-control">
@@ -175,7 +175,7 @@
             </div>
             
             <!-- Git Settings -->
-            <div class="border border-gray-700 rounded-lg p-4">
+            <div class="border border-base-300 rounded-lg p-4">
                 <h4 class="font-semibold mb-3">Git Sync</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label class="form-control">
@@ -206,7 +206,7 @@
             </div>
             
             <!-- Execution Settings -->
-            <div class="border border-gray-700 rounded-lg p-4">
+            <div class="border border-base-300 rounded-lg p-4">
                 <h4 class="font-semibold mb-3">Execution</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label class="form-control">

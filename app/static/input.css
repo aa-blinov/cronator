@@ -1,5 +1,5 @@
 @tailwind base;
-@tailwind components;
+ @tailwind components;
 @tailwind utilities;
 
 body {
@@ -8,7 +8,7 @@ body {
 }
 
 .glass-card {
-    background: oklch(28.036% 0.019 264.182 / 0.7);
+    background: oklch(25% 0.019 264.182 / 0.7);
     backdrop-filter: blur(10px);
     border: 1px solid oklch(82.901% 0.031 222.959 / 0.1);
 }
@@ -51,7 +51,7 @@ body {
 }
 
 pre.log-output {
-    background: oklch(26.346% 0.018 262.177);
+    background: oklch(22% 0.018 262.177);
     border-radius: 0.5rem;
     padding: 1rem;
     overflow-x: auto;

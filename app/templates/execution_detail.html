@@ -9,7 +9,7 @@
     </button>
     {% endif %}
     <a href="/scripts/{{ execution.script_id }}" class="btn btn-ghost btn-sm">
-        ← Back to Script
+        Back to Script
     </a>
 </div>
 {% endblock %}
@@ -22,13 +22,13 @@
         
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
-                <p class="text-gray-400 text-sm">Script</p>
-                <a href="/scripts/{{ execution.script_id }}" class="font-medium hover:text-indigo-400">
+                <p class="text-base-content/60 text-sm">Script</p>
+                <a href="/scripts/{{ execution.script_id }}" class="font-medium hover:text-primary">
                     {{ execution.script.name if execution.script else 'Unknown' }}
                 </a>
             </div>
             <div>
-                <p class="text-gray-400 text-sm">Status</p>
+                <p class="text-base-content/60 text-sm">Status</p>
                 <span class="status-badge {{ execution.status }}">
                     {% if execution.status == 'running' %}
                         <span class="pulse-dot"></span>
@@ -37,42 +37,42 @@
                 </span>
             </div>
             <div>
-                <p class="text-gray-400 text-sm">Exit Code</p>
+                <p class="text-base-content/60 text-sm">Exit Code</p>
                 <p>
                     {% if execution.exit_code is not none %}
-                        <code class="{% if execution.exit_code == 0 %}text-green-400{% else %}text-red-400{% endif %} text-lg">{{ execution.exit_code }}</code>
+                        <code class="{% if execution.exit_code == 0 %}text-success{% else %}text-error{% endif %} text-lg">{{ execution.exit_code }}</code>
                     {% else %}
-                        <span class="text-gray-500">-</span>
+                        <span class="text-base-content/50">-</span>
                     {% endif %}
                 </p>
             </div>
             <div>
-                <p class="text-gray-400 text-sm">Started At</p>
+                <p class="text-base-content/60 text-sm">Started At</p>
                 <p>{{ execution.started_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</p>
             </div>
             <div>
-                <p class="text-gray-400 text-sm">Finished At</p>
+                <p class="text-base-content/60 text-sm">Finished At</p>
                 <p>
                     {% if execution.finished_at %}
                         {{ execution.finished_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}
                     {% else %}
-                        <span class="text-gray-500">Running...</span>
+                        <span class="text-base-content/50">Running...</span>
                     {% endif %}
                 </p>
             </div>
             <div>
-                <p class="text-gray-400 text-sm">Duration</p>
+                <p class="text-base-content/60 text-sm">Duration</p>
                 <p class="text-lg font-medium">{{ execution.duration_formatted }}</p>
             </div>
             <div>
-                <p class="text-gray-400 text-sm">Triggered By</p>
+                <p class="text-base-content/60 text-sm">Triggered By</p>
                 <span class="badge badge-ghost">{{ execution.triggered_by }}</span>
             </div>
         </div>
         
         {% if execution.error_message %}
         <div class="mt-6">
-            <p class="text-gray-400 text-sm mb-2">Error Message</p>
+            <p class="text-base-content/60 text-sm mb-2">Error Message</p>
             <div class="bg-red-900/30 border border-red-500/30 rounded-lg p-4">
                 <pre class="text-red-300 text-sm whitespace-pre-wrap">{{ execution.error_message }}</pre>
             </div>
@@ -85,17 +85,17 @@
         <h3 class="text-lg font-semibold mb-4">Quick Info</h3>
         
         <div class="space-y-4">
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Execution ID</span>
-                <code class="text-indigo-400">#{{ execution.id }}</code>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Execution ID</span>
+                <code class="text-primary">#{{ execution.id }}</code>
             </div>
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Script ID</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Script ID</span>
                 <code>{{ execution.script_id }}</code>
             </div>
             {% if execution.duration_ms %}
-            <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <span class="text-gray-400">Duration (ms)</span>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Duration (ms)</span>
                 <code>{{ execution.duration_ms }}</code>
             </div>
             {% endif %}
@@ -107,12 +107,12 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Stdout -->
     <div class="glass-card rounded-xl overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-700/50 flex items-center justify-between">
+        <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
             <h3 class="text-lg font-semibold flex items-center gap-2">
-                {{ icons.terminal("w-5 h-5 text-green-400") }} stdout
+                {{ icons.terminal("w-5 h-5 text-success") }} stdout
             </h3>
             <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-500">{{ execution.stdout | length }} chars</span>
+                <span class="text-xs text-base-content/50">{{ execution.stdout | length }} chars</span>
                 <button type="button" id="copy-stdout-btn" class="btn btn-ghost btn-xs">Copy</button>
                 <button type="button" id="download-stdout-btn" class="btn btn-ghost btn-xs">Download</button>
             </div>
@@ -121,7 +121,7 @@
             {% if execution.stdout %}
             <pre id="stdout-log" class="log-output">{{ execution.stdout }}</pre>
             {% else %}
-            <div class="text-center py-8 text-gray-500">
+            <div class="text-center py-8 text-base-content/50">
                 <p>No output</p>
             </div>
             {% endif %}
@@ -130,21 +130,21 @@
     
     <!-- Stderr -->
     <div class="glass-card rounded-xl overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-700/50 flex items-center justify-between">
+        <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
             <h3 class="text-lg font-semibold flex items-center gap-2">
-                {{ icons.exclamation_triangle("w-5 h-5 text-red-400") }} stderr
+                {{ icons.exclamation_triangle("w-5 h-5 text-error") }} stderr
             </h3>
             <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-500">{{ execution.stderr | length }} chars</span>
+                <span class="text-xs text-base-content/50">{{ execution.stderr | length }} chars</span>
                 <button type="button" id="copy-stderr-btn" class="btn btn-ghost btn-xs">Copy</button>
                 <button type="button" id="download-stderr-btn" class="btn btn-ghost btn-xs">Download</button>
             </div>
         </div>
         <div class="p-4">
             {% if execution.stderr %}
-            <pre id="stderr-log" class="log-output text-red-300">{{ execution.stderr }}</pre>
+            <pre id="stderr-log" class="log-output text-error">{{ execution.stderr }}</pre>
             {% else %}
-            <div class="text-center py-8 text-gray-500">
+            <div class="text-center py-8 text-base-content/50">
                 <p>No errors</p>
             </div>
             {% endif %}
