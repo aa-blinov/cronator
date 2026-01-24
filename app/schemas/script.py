@@ -37,35 +37,54 @@ class ScriptBase(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("Name cannot be empty")
-        
+
         # Length checks
         if len(v) < 2:
             raise ValueError("Name must be at least 2 characters")
         if len(v) > 100:  # Reasonable limit for directory name
             raise ValueError("Name must be 100 characters or less")
-        
+
         # Only allow safe characters for filesystem
         allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")
         if not all(c in allowed for c in v):
             raise ValueError("Name can only contain letters, numbers, underscores, and hyphens")
-        
+
         # Cannot start or end with hyphen/underscore (convention)
         if v[0] in "-_" or v[-1] in "-_":
             raise ValueError("Name cannot start or end with hyphen or underscore")
-        
+
         # Check for reserved names (Windows)
         reserved_windows = {
-            "CON", "PRN", "AUX", "NUL",
-            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+            "CON",
+            "PRN",
+            "AUX",
+            "NUL",
+            "COM1",
+            "COM2",
+            "COM3",
+            "COM4",
+            "COM5",
+            "COM6",
+            "COM7",
+            "COM8",
+            "COM9",
+            "LPT1",
+            "LPT2",
+            "LPT3",
+            "LPT4",
+            "LPT5",
+            "LPT6",
+            "LPT7",
+            "LPT8",
+            "LPT9",
         }
         if v.upper() in reserved_windows:
             raise ValueError(f"'{v}' is a reserved name on Windows systems")
-        
+
         # Check for Unix-reserved names
         if v in (".", ".."):
             raise ValueError("Cannot use '.' or '..' as name")
-        
+
         return v
 
 
@@ -123,7 +142,7 @@ class ScriptRead(ScriptBase):
     created_at: datetime
     updated_at: datetime
     git_commit: str | None = None
-    
+
     # Computed fields for UI
     last_run_status: str | None = None
     last_run_at: datetime | None = None

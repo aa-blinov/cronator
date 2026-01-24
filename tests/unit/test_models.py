@@ -1,10 +1,9 @@
 """Unit tests for database models."""
 
 import pytest
-from datetime import datetime, UTC
 
-from app.models.script import Script
 from app.models.execution import Execution, ExecutionStatus
+from app.models.script import Script
 
 
 class TestExecutionStatus:
@@ -78,7 +77,7 @@ class TestExecution:
     async def test_create_execution(self, script_factory, db_session):
         """Test creating an execution."""
         script = await script_factory(name="exec_test_script")
-        
+
         execution = Execution(
             script_id=script.id,
             status=ExecutionStatus.RUNNING.value,

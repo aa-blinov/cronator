@@ -29,27 +29,27 @@ async def list_scripts(
 ):
     """List all scripts with pagination."""
     query = select(Script)
-    
+
     if enabled is not None:
         query = query.where(Script.enabled == enabled)
-    
+
     if search:
         query = query.where(Script.name.ilike(f"%{search}%"))
-    
+
     # Count total
     count_query = select(func.count()).select_from(query.subquery())
     total = await db.scalar(count_query) or 0
-    
+
     # Paginate
     query = query.order_by(Script.name).offset((page - 1) * per_page).limit(per_page)
     result = await db.execute(query)
     scripts = result.scalars().all()
-    
+
     # Enrich with last run info and next run time
     items = []
     for script in scripts:
         script_data = ScriptRead.model_validate(script)
-        
+
         # Get last execution
         last_exec_query = (
             select(Execution)
@@ -59,16 +59,16 @@ async def list_scripts(
         )
         last_exec_result = await db.execute(last_exec_query)
         last_exec = last_exec_result.scalar_one_or_none()
-        
+
         if last_exec:
             script_data.last_run_status = last_exec.status
             script_data.last_run_at = last_exec.started_at
-        
+
         # Get next run time
         script_data.next_run_at = scheduler_service.get_next_run_time(script.id)
-        
+
         items.append(script_data)
-    
+
     return ScriptList(
         items=items,
         total=total,
@@ -86,12 +86,12 @@ async def get_script(
     """Get a script by ID."""
     result = await db.execute(select(Script).where(Script.id == script_id))
     script = result.scalar_one_or_none()
-    
+
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
-    
+
     script_data = ScriptRead.model_validate(script)
-    
+
     # Get last execution
     last_exec_query = (
         select(Execution)
@@ -101,15 +101,15 @@ async def get_script(
     )
     last_exec_result = await db.execute(last_exec_query)
     last_exec = last_exec_result.scalar_one_or_none()
-    
+
     if last_exec:
         script_data.last_run_status = last_exec.status
         script_data.last_run_at = last_exec.started_at
-    
+
     script_data.next_run_at = scheduler_service.get_next_run_time(script.id)
     script_data.last_alert_at = script.last_alert_at
     script_data.is_managed_by_git = script.is_managed_by_git
-    
+
     return script_data
 
 
@@ -123,18 +123,16 @@ async def create_script(
     existing = await db.execute(select(Script).where(Script.name == data.name))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Script with this name already exists")
-    
+
     # Validate dependencies if provided
     if data.dependencies:
-        is_valid, error_msg, _ = await environment_service.validate_dependencies(
-            data.dependencies
-        )
+        is_valid, error_msg, _ = await environment_service.validate_dependencies(data.dependencies)
         if not is_valid:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid dependencies: {error_msg}",
             )
-    
+
     # Determine script path
     if data.path:
         path = data.path
@@ -143,14 +141,14 @@ async def create_script(
         script_dir = settings.scripts_dir / data.name
         script_dir.mkdir(parents=True, exist_ok=True)
         script_file = script_dir / "script.py"
-        
+
         # Save relative path (without scripts_dir prefix)
         path = f"{data.name}/script.py"
-        
+
         # Write script content
         async with aiofiles.open(script_file, "w") as f:
             await f.write(data.content or "# New script\nprint('Hello from Cronator!')\n")
-    
+
     script = Script(
         name=data.name,
         description=data.description,
@@ -166,11 +164,11 @@ async def create_script(
         working_directory=data.working_directory,
         environment_vars=data.environment_vars,
     )
-    
+
     db.add(script)
     await db.commit()
     await db.refresh(script)
-    
+
     # Setup environment
     if data.dependencies:
         await environment_service.setup_environment(
@@ -178,11 +176,11 @@ async def create_script(
             script.python_version,
             script.dependencies,
         )
-    
+
     # Add to scheduler
     if script.enabled:
         await scheduler_service.add_job(script)
-    
+
     return ScriptRead.model_validate(script)
 
 
@@ -195,36 +193,31 @@ async def update_script(
     """Update a script."""
     result = await db.execute(select(Script).where(Script.id == script_id))
     script = result.scalar_one_or_none()
-    
+
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
-    
+
     # Check if name already exists (when renaming)
     if data.name is not None and data.name != script.name:
         existing = await db.execute(select(Script).where(Script.name == data.name))
         if existing.scalar_one_or_none():
-            raise HTTPException(
-                status_code=400,
-                detail="Script with this name already exists"
-            )
-    
+            raise HTTPException(status_code=400, detail="Script with this name already exists")
+
     # Validate dependencies if provided
     if data.dependencies is not None:
-        is_valid, error_msg, _ = await environment_service.validate_dependencies(
-            data.dependencies
-        )
+        is_valid, error_msg, _ = await environment_service.validate_dependencies(data.dependencies)
         if not is_valid:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid dependencies: {error_msg}",
             )
-    
+
     # Track what changed for environment/scheduler updates
     deps_changed = False
     python_changed = False
     schedule_changed = False
     enabled_changed = False
-    
+
     # Update fields
     for field, value in data.model_dump(exclude_unset=True).items():
         if field == "dependencies" and value != script.dependencies:
@@ -235,9 +228,9 @@ async def update_script(
             schedule_changed = True
         if field == "enabled" and value != script.enabled:
             enabled_changed = True
-        
+
         setattr(script, field, value)
-    
+
     # Update script file if content changed
     if data.content is not None:
         script_path = settings.scripts_dir / script.name / "script.py"
@@ -246,10 +239,10 @@ async def update_script(
             await f.write(data.content)
         # Save relative path (without scripts_dir prefix)
         script.path = f"{script.name}/script.py"
-    
+
     await db.commit()
     await db.refresh(script)
-    
+
     # Rebuild environment if needed
     if deps_changed or python_changed:
         await environment_service.setup_environment(
@@ -257,11 +250,11 @@ async def update_script(
             script.python_version,
             script.dependencies,
         )
-    
+
     # Update scheduler
     if schedule_changed or enabled_changed:
         await scheduler_service.update_job(script)
-    
+
     return ScriptRead.model_validate(script)
 
 
@@ -273,16 +266,16 @@ async def delete_script(
     """Delete a script."""
     result = await db.execute(select(Script).where(Script.id == script_id))
     script = result.scalar_one_or_none()
-    
+
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
-    
+
     # Remove from scheduler
     await scheduler_service.remove_job(script_id)
-    
+
     # Delete environment
     await environment_service.delete_env(script.name)
-    
+
     # Delete script
     await db.delete(script)
     await db.commit()
@@ -298,12 +291,12 @@ async def run_script(
     """Manually trigger a script execution."""
     result = await db.execute(select(Script).where(Script.id == script_id))
     script = result.scalar_one_or_none()
-    
+
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
-    
+
     execution_id = await executor_service.execute_script(script_id, triggered_by="manual")
-    
+
     return {"execution_id": execution_id, "message": "Script execution started"}
 
 
@@ -317,21 +310,19 @@ async def test_script(
     """Run a test execution (marked as test in database)."""
     result = await db.execute(select(Script).where(Script.id == script_id))
     script = result.scalar_one_or_none()
-    
+
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
-    
+
     # Check if script is already running
     if executor_service.is_script_running(script_id):
         raise HTTPException(status_code=409, detail="Script is already running")
-    
+
     # Create execution with is_test=True
     execution_id = await executor_service.execute_script(
-        script_id, 
-        triggered_by="test",
-        is_test=True
+        script_id, triggered_by="test", is_test=True
     )
-    
+
     return {"execution_id": execution_id, "message": "Test execution started"}
 
 
@@ -343,16 +334,16 @@ async def toggle_script(
     """Toggle script enabled/disabled."""
     result = await db.execute(select(Script).where(Script.id == script_id))
     script = result.scalar_one_or_none()
-    
+
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
-    
+
     script.enabled = not script.enabled
     await db.commit()
-    
+
     # Update scheduler
     await scheduler_service.update_job(script)
-    
+
     return {"enabled": script.enabled}
 
 
@@ -366,19 +357,19 @@ async def rebuild_environment(
     """Rebuild the script's virtual environment."""
     result = await db.execute(select(Script).where(Script.id == script_id))
     script = result.scalar_one_or_none()
-    
+
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
-    
+
     success, message = await environment_service.setup_environment(
         script.name,
         script.python_version,
         script.dependencies,
     )
-    
+
     if not success:
         raise HTTPException(status_code=500, detail=message)
-    
+
     return {"message": message}
 
 
@@ -388,18 +379,16 @@ async def validate_dependencies(
 ):
     """Validate dependencies format and resolvability."""
     deps_string = dependencies.get("dependencies", "")
-    
+
     if not deps_string:
         return {
             "valid": True,
             "message": "No dependencies to validate",
             "packages": [],
         }
-    
-    is_valid, error_msg, packages = await environment_service.validate_dependencies(
-        deps_string
-    )
-    
+
+    is_valid, error_msg, packages = await environment_service.validate_dependencies(deps_string)
+
     return {
         "valid": is_valid,
         "message": error_msg if not is_valid else "Dependencies are valid",
@@ -417,41 +406,43 @@ async def validate_script(
     import json
     import tempfile
     from pathlib import Path
-    
+
     code = data.get("code", "")
-    
+
     if not code.strip():
         return {
             "valid": True,
             "errors": [],
             "message": "No code to validate",
         }
-    
+
     errors = []
-    
+
     # Step 1: Check Python syntax
     try:
         ast.parse(code)
     except SyntaxError as e:
-        errors.append({
-            "line": e.lineno or 0,
-            "column": e.offset or 0,
-            "code": "E999",
-            "message": f"SyntaxError: {e.msg}",
-        })
+        errors.append(
+            {
+                "line": e.lineno or 0,
+                "column": e.offset or 0,
+                "code": "E999",
+                "message": f"SyntaxError: {e.msg}",
+            }
+        )
         return {
             "valid": False,
             "errors": errors,
             "message": "Syntax errors found",
         }
-    
+
     # Step 2: Run Ruff for critical errors only
     # E9: Syntax errors, F63: Invalid print, F7: Syntax errors, F82: Undefined names
     try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(code)
             temp_file = f.name
-        
+
         try:
             process = await asyncio.create_subprocess_exec(
                 "ruff",
@@ -463,30 +454,32 @@ async def validate_script(
                 stderr=asyncio.subprocess.PIPE,
             )
             stdout, stderr = await process.communicate()
-            
+
             if stdout:
                 ruff_results = json.loads(stdout.decode())
                 for result in ruff_results:
-                    errors.append({
-                        "line": result.get("location", {}).get("row", 0),
-                        "column": result.get("location", {}).get("column", 0),
-                        "code": result.get("code", ""),
-                        "message": result.get("message", ""),
-                    })
+                    errors.append(
+                        {
+                            "line": result.get("location", {}).get("row", 0),
+                            "column": result.get("location", {}).get("column", 0),
+                            "code": result.get("code", ""),
+                            "message": result.get("message", ""),
+                        }
+                    )
         finally:
             Path(temp_file).unlink(missing_ok=True)
-    
+
     except Exception:
         # If Ruff fails, just return syntax check result
         pass
-    
+
     if errors:
         return {
             "valid": False,
             "errors": errors,
             "message": f"Found {len(errors)} error(s)",
         }
-    
+
     return {
         "valid": True,
         "errors": [],

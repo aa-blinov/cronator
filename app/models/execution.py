@@ -28,28 +28,28 @@ class Execution(Base):
     """Model representing a single script execution."""
 
     __tablename__ = "executions"
-    
+
     # Define composite index for common query pattern
     __table_args__ = (
-        Index('idx_script_started', 'script_id', 'started_at'),
-        Index('idx_status_started', 'status', 'started_at'),
+        Index("idx_script_started", "script_id", "started_at"),
+        Index("idx_status_started", "status", "started_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     script_id: Mapped[int] = mapped_column(
-        Integer, 
+        Integer,
         ForeignKey("scripts.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    
+
     # Execution status
     status: Mapped[str] = mapped_column(
-        String(20), 
+        String(20),
         default=ExecutionStatus.PENDING.value,
         index=True,
     )
-    
+
     # Timing
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -62,26 +62,22 @@ class Execution(Base):
         nullable=True,
     )
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    
+
     # Results
     exit_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
     stdout: Mapped[str] = mapped_column(Text, default="")
     stderr: Mapped[str] = mapped_column(Text, default="")
-    
+
     # Trigger info
     # scheduler, manual, api
-    triggered_by: Mapped[str] = mapped_column(
-        String(50), default="scheduler"
-    )
-    
+    triggered_by: Mapped[str] = mapped_column(String(50), default="scheduler")
+
     # Test execution flag
-    is_test: Mapped[bool] = mapped_column(
-        default=False, server_default="0", nullable=False
-    )
-    
+    is_test: Mapped[bool] = mapped_column(default=False, server_default="0", nullable=False)
+
     # Error details
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    
+
     # Relationships
     script: Mapped["Script"] = relationship("Script", back_populates="executions")
 
@@ -103,7 +99,7 @@ class Execution(Base):
         """Get human-readable duration."""
         if self.duration_ms is None:
             return "-"
-        
+
         seconds = self.duration_ms / 1000
         if seconds < 60:
             return f"{seconds:.1f}s"

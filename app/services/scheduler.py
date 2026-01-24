@@ -36,11 +36,9 @@ class SchedulerService:
         """Reload all jobs from database."""
         # Remove all existing jobs
         self.scheduler.remove_all_jobs()
-        
+
         async with async_session_maker() as db:
-            result = await db.execute(
-                select(Script).where(Script.enabled)
-            )
+            result = await db.execute(select(Script).where(Script.enabled))
             scripts = result.scalars().all()
 
             for script in scripts:
@@ -55,7 +53,7 @@ class SchedulerService:
                 return False
 
             job_id = f"script_{script.id}"
-            
+
             # Remove existing job if present
             if self.scheduler.get_job(job_id):
                 self.scheduler.remove_job(job_id)
@@ -64,8 +62,7 @@ class SchedulerService:
             trigger = self._parse_cron(script.cron_expression)
             if not trigger:
                 logger.error(
-                    f"Invalid cron expression for script {script.name}: "
-                    f"{script.cron_expression}"
+                    f"Invalid cron expression for script {script.name}: {script.cron_expression}"
                 )
                 return False
 
@@ -81,8 +78,7 @@ class SchedulerService:
             )
 
             logger.info(
-                f"Added job for script {script.name} with schedule: "
-                f"{script.cron_expression}"
+                f"Added job for script {script.name} with schedule: {script.cron_expression}"
             )
             return True
 
@@ -115,9 +111,9 @@ class SchedulerService:
             parts = cron_expression.strip().split()
             if len(parts) != 5:
                 return None
-            
+
             minute, hour, day, month, day_of_week = parts
-            
+
             return CronTrigger(
                 minute=minute,
                 hour=hour,
@@ -132,6 +128,7 @@ class SchedulerService:
     async def _execute_script(self, script_id: int) -> None:
         """Execute a script (called by scheduler)."""
         from app.services.executor import executor_service
+
         try:
             await executor_service.execute_script(script_id, triggered_by="scheduler")
         except Exception:
@@ -143,7 +140,7 @@ class SchedulerService:
         job = self.scheduler.get_job(job_id)
         if job:
             # Support both APScheduler 3.x and 4.x
-            return getattr(job, 'next_run_time', None) or getattr(job, 'next_fire_time', None)
+            return getattr(job, "next_run_time", None) or getattr(job, "next_fire_time", None)
         return None
 
     def get_all_jobs_info(self) -> list[dict]:
@@ -151,13 +148,15 @@ class SchedulerService:
         jobs = []
         for job in self.scheduler.get_jobs():
             # Support both APScheduler 3.x and 4.x
-            next_time = getattr(job, 'next_run_time', None) or getattr(job, 'next_fire_time', None)
-            jobs.append({
-                "id": job.id,
-                "name": job.name,
-                "next_run_time": next_time,
-                "trigger": str(job.trigger),
-            })
+            next_time = getattr(job, "next_run_time", None) or getattr(job, "next_fire_time", None)
+            jobs.append(
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run_time": next_time,
+                    "trigger": str(job.trigger),
+                }
+            )
         return jobs
 
 

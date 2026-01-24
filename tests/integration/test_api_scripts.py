@@ -26,10 +26,10 @@ class TestScriptsAPI:
             "cron_expression": "0 * * * *",
             "python_version": "3.11",
         }
-        
+
         response = await test_client.post("/api/scripts", json=script_data)
         assert response.status_code == 201
-        
+
         data = response.json()
         assert data["name"] == "api_test_script"
         assert data["enabled"] is True
@@ -43,7 +43,7 @@ class TestScriptsAPI:
             "content": "print('duplicate')",
             "cron_expression": "0 * * * *",
         }
-        
+
         response = await test_client.post("/api/scripts", json=script_data)
         assert response.status_code == 400
 
@@ -52,7 +52,7 @@ class TestScriptsAPI:
         """Test getting a script by ID."""
         response = await test_client.get(f"/api/scripts/{sample_script.id}")
         assert response.status_code == 200
-        
+
         data = response.json()
         assert data["id"] == sample_script.id
         assert data["name"] == sample_script.name
@@ -73,14 +73,14 @@ class TestScriptsAPI:
             "cron_expression": sample_script.cron_expression,
             "timeout": 7200,
         }
-        
+
         # API uses PUT, not PATCH
         response = await test_client.put(
             f"/api/scripts/{sample_script.id}",
             json=update_data,
         )
         assert response.status_code == 200
-        
+
         data = response.json()
         assert data["description"] == "Updated description"
         assert data["timeout"] == 7200
@@ -89,11 +89,11 @@ class TestScriptsAPI:
     async def test_delete_script(self, test_client: AsyncClient, script_factory):
         """Test deleting a script."""
         script = await script_factory(name="to_delete")
-        
+
         response = await test_client.delete(f"/api/scripts/{script.id}")
         # API returns 204 No Content on successful delete
         assert response.status_code in [200, 204]
-        
+
         # Verify it's deleted
         get_response = await test_client.get(f"/api/scripts/{script.id}")
         assert get_response.status_code == 404
@@ -102,10 +102,10 @@ class TestScriptsAPI:
     async def test_toggle_script(self, test_client: AsyncClient, sample_script):
         """Test toggling script enabled status."""
         original_enabled = sample_script.enabled
-        
+
         response = await test_client.post(f"/api/scripts/{sample_script.id}/toggle")
         assert response.status_code == 200
-        
+
         data = response.json()
         assert data["enabled"] is not original_enabled
 
@@ -115,11 +115,11 @@ class TestScriptsAPI:
         # Create multiple scripts
         for i in range(5):
             await script_factory(name=f"page_test_{i}")
-        
+
         # Get first page with 2 per page
         response = await test_client.get("/api/scripts?per_page=2&page=1")
         assert response.status_code == 200
-        
+
         data = response.json()
         assert len(data["items"]) == 2
         assert data["total"] == 5
@@ -131,11 +131,11 @@ class TestScriptsAPI:
         """Test filtering scripts by enabled status."""
         await script_factory(name="enabled_script", enabled=True)
         await script_factory(name="disabled_script", enabled=False)
-        
+
         # Filter enabled only
         response = await test_client.get("/api/scripts?enabled=true")
         assert response.status_code == 200
-        
+
         data = response.json()
         for item in data["items"]:
             assert item["enabled"] is True
@@ -148,7 +148,7 @@ class TestScriptsAPI:
             json={"code": "print('valid')"},
         )
         assert response.status_code == 200
-        
+
         data = response.json()
         assert data["valid"] is True
 
@@ -160,8 +160,7 @@ class TestScriptsAPI:
             json={"code": "print('invalid"},  # missing closing quote
         )
         assert response.status_code == 200
-        
+
         data = response.json()
         assert data["valid"] is False
         assert "errors" in data
-

@@ -12,22 +12,22 @@ api_router = APIRouter()
 
 # API routes (All require authentication)
 api_router.include_router(
-    scripts_router, 
-    prefix="/api/scripts", 
+    scripts_router,
+    prefix="/api/scripts",
     tags=["scripts"],
-    dependencies=[Depends(verify_credentials)]
+    dependencies=[Depends(verify_credentials)],
 )
 api_router.include_router(
-    executions_router, 
-    prefix="/api/executions", 
+    executions_router,
+    prefix="/api/executions",
     tags=["executions"],
-    dependencies=[Depends(verify_credentials)]
+    dependencies=[Depends(verify_credentials)],
 )
 api_router.include_router(
-    settings_router, 
-    prefix="/api/settings", 
+    settings_router,
+    prefix="/api/settings",
     tags=["settings"],
-    dependencies=[Depends(verify_credentials)]
+    dependencies=[Depends(verify_credentials)],
 )
 
 # Page routes (HTML)

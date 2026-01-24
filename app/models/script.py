@@ -20,35 +20,35 @@ class Script(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     description: Mapped[str] = mapped_column(Text, default="")
-    
+
     # Script content and path
     path: Mapped[str] = mapped_column(String(500), nullable=False)
     content: Mapped[str] = mapped_column(Text, default="")  # For UI-created scripts
-    
+
     # Scheduling
     cron_expression: Mapped[str] = mapped_column(String(100), default="0 * * * *")  # Every hour
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    
+
     # Environment
     python_version: Mapped[str] = mapped_column(String(20), default="3.11")
     dependencies: Mapped[str] = mapped_column(Text, default="")  # One package per line
-    
+
     # Alerting
     alert_on_failure: Mapped[bool] = mapped_column(Boolean, default=True)
     alert_on_success: Mapped[bool] = mapped_column(Boolean, default=False)
-    
+
     # Execution settings
     timeout: Mapped[int] = mapped_column(Integer, default=3600)  # seconds
     misfire_grace_time: Mapped[int] = mapped_column(Integer, default=60)  # seconds
     working_directory: Mapped[str] = mapped_column(String(500), default="")
     environment_vars: Mapped[str] = mapped_column(Text, default="")  # JSON format
-    
+
     # Alert Throttling
     last_alert_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    
+
     # Metadata
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), 
+        DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
     )
@@ -58,10 +58,10 @@ class Script(Base):
         onupdate=func.now(),
         nullable=False,
     )
-    
+
     # Git tracking
     git_commit: Mapped[str | None] = mapped_column(String(40), nullable=True)
-    
+
     # Relationships
     executions: Mapped[list["Execution"]] = relationship(
         "Execution",

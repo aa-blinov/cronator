@@ -33,15 +33,15 @@ class SettingsService:
         """Get encryption cipher using secret key from config."""
         import hashlib
         from base64 import urlsafe_b64encode
-        
+
         env_settings = get_settings()
         # Use secret_key as basis for encryption key
         # Ensure it's 32 bytes URL-safe base64-encoded
-        
+
         # Derive a proper Fernet key from secret_key
         key_material = hashlib.sha256(env_settings.secret_key.encode()).digest()
         fernet_key = urlsafe_b64encode(key_material)
-        
+
         return Fernet(fernet_key)
 
     async def load_from_db(self) -> None:
@@ -49,17 +49,17 @@ class SettingsService:
         async with async_session_maker() as db:
             result = await db.execute(select(Setting))
             settings = result.scalars().all()
-            
+
             self._cache = {s.key: s.value for s in settings}
             self._loaded = True
-            
+
         logger.info(f"Loaded {len(self._cache)} settings from database")
 
     async def get(self, key: str, default: Any = None) -> Any:
         """Get a setting value from database, fallback to env var."""
         if not self._loaded:
             await self.load_from_db()
-        
+
         # Check database cache first
         if key in self._cache:
             value = self._cache[key]
@@ -67,34 +67,34 @@ class SettingsService:
             if key in SENSITIVE_KEYS:
                 value = self._decrypt(value)
             return self._parse_value(value)
-        
+
         # Fallback to env settings
         env_settings = get_settings()
         if hasattr(env_settings, key):
             return getattr(env_settings, key)
-        
+
         return default
 
     async def set(self, key: str, value: Any) -> None:
         """Set a setting value in database."""
         str_value = self._serialize_value(value)
-        
+
         # Encrypt if sensitive
         if key in SENSITIVE_KEYS and str_value:
             str_value = self._encrypt(str_value)
-        
+
         async with async_session_maker() as db:
             result = await db.execute(select(Setting).where(Setting.key == key))
             setting = result.scalar_one_or_none()
-            
+
             if setting:
                 setting.value = str_value
             else:
                 setting = Setting(key=key, value=str_value)
                 db.add(setting)
-            
+
             await db.commit()
-        
+
         # Update cache
         self._cache[key] = str_value
         logger.info(f"Updated setting: {key}={'***' if key in SENSITIVE_KEYS else value}")
@@ -103,14 +103,14 @@ class SettingsService:
         """Get all settings as a dictionary."""
         if not self._loaded:
             await self.load_from_db()
-        
+
         result = {}
         for key, value in self._cache.items():
             # Decrypt if sensitive
             if key in SENSITIVE_KEYS:
                 value = self._decrypt(value)
             result[key] = self._parse_value(value)
-        
+
         return result
 
     async def bulk_set(self, settings: dict[str, Any]) -> None:
@@ -118,25 +118,25 @@ class SettingsService:
         async with async_session_maker() as db:
             for key, value in settings.items():
                 str_value = self._serialize_value(value)
-                
+
                 # Encrypt if sensitive
                 if key in SENSITIVE_KEYS and str_value:
                     str_value = self._encrypt(str_value)
-                
+
                 result = await db.execute(select(Setting).where(Setting.key == key))
                 setting = result.scalar_one_or_none()
-                
+
                 if setting:
                     setting.value = str_value
                 else:
                     setting = Setting(key=key, value=str_value)
                     db.add(setting)
-                
+
                 # Update cache
                 self._cache[key] = str_value
-            
+
             await db.commit()
-        
+
         logger.info(f"Updated {len(settings)} settings")
 
     async def delete(self, key: str) -> bool:
@@ -144,14 +144,14 @@ class SettingsService:
         async with async_session_maker() as db:
             result = await db.execute(select(Setting).where(Setting.key == key))
             setting = result.scalar_one_or_none()
-            
+
             if setting:
                 await db.delete(setting)
                 await db.commit()
                 self._cache.pop(key, None)
                 logger.info(f"Deleted setting: {key}")
                 return True
-        
+
         return False
 
     def _serialize_value(self, value: Any) -> str:
@@ -171,25 +171,25 @@ class SettingsService:
         # Try boolean
         if value.lower() in ("true", "false"):
             return value.lower() == "true"
-        
+
         # Try int
         try:
             return int(value)
         except ValueError:
             pass
-        
+
         # Try float
         try:
             return float(value)
         except ValueError:
             pass
-        
+
         # Try JSON
         try:
             return json.loads(value)
         except (json.JSONDecodeError, ValueError):
             pass
-        
+
         # Return as string
         return value
 
@@ -219,7 +219,7 @@ class SettingsService:
     async def migrate_from_env(self) -> int:
         """Migrate settings from .env to database (one-time migration)."""
         env_settings = get_settings()
-        
+
         settings_to_migrate = {
             "smtp_enabled": env_settings.smtp_enabled,
             "smtp_host": env_settings.smtp_host,
@@ -237,7 +237,7 @@ class SettingsService:
             "git_scripts_subdir": env_settings.git_scripts_subdir,
             "default_timeout": env_settings.default_timeout,
         }
-        
+
         # Only migrate non-empty/non-default values
         to_save = {}
         for key, value in settings_to_migrate.items():
@@ -246,15 +246,15 @@ class SettingsService:
                 continue
             if isinstance(value, bool) and not value:
                 continue
-            
+
             # Check if already exists in DB
             if key not in self._cache:
                 to_save[key] = value
-        
+
         if to_save:
             await self.bulk_set(to_save)
             logger.info(f"Migrated {len(to_save)} settings from .env to database")
-        
+
         return len(to_save)
 
 

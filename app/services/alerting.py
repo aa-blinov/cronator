@@ -31,10 +31,10 @@ class AlertingService:
     async def _get_settings(self) -> dict:
         """Get current settings from DB, fallback to env."""
         from app.services.settings_service import settings_service
-        
+
         smtp_from = await settings_service.get("smtp_from", self.from_addr)
         smtp_user = await settings_service.get("smtp_user", self.user)
-        
+
         return {
             "enabled": await settings_service.get("smtp_enabled", self.enabled),
             "host": await settings_service.get("smtp_host", self.host),
@@ -55,7 +55,7 @@ class AlertingService:
         """Send an email alert."""
         # Get current settings from DB
         cfg = await self._get_settings()
-        
+
         if not cfg["enabled"]:
             logger.debug("Email alerts disabled, skipping")
             return False
@@ -93,7 +93,7 @@ class AlertingService:
     async def send_failure_alert(self, script: Script, execution: Execution) -> bool:
         """Send an alert for a failed execution."""
         subject = f"[Cronator] ✗ Script Failed: {script.name}"
-        
+
         body_html = f"""
         <html>
         <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -116,7 +116,7 @@ class AlertingService:
                     <td style="padding: 8px; border: 1px solid #e5e7eb;
                         font-weight: bold;">Exit Code</td>
                     <td style="padding: 8px; border: 1px solid #e5e7eb;">
-                        {execution.exit_code or 'N/A'}</td>
+                        {execution.exit_code or "N/A"}</td>
                 </tr>
                 <tr>
                     <td style="padding: 8px; border: 1px solid #e5e7eb;
@@ -132,19 +132,27 @@ class AlertingService:
                 </tr>
             </table>
             
-            {f'''
+            {
+            f'''
             <h3>Error Message</h3>
             <pre style="background: #fef2f2; padding: 15px;
 border-radius: 4px; overflow-x: auto;">{execution.error_message}</pre>
-            ''' if execution.error_message else ''}
+            '''
+            if execution.error_message
+            else ""
+        }
             
-            {f'''
+            {
+            f'''
             <h3>Stderr Output</h3>
             <pre style="background: #fef2f2; padding: 15px;
 border-radius: 4px; overflow-x: auto; max-height: 300px;">
 {execution.stderr[:2000]}{'...' if len(execution.stderr) > 2000 else ''}
 </pre>
-            ''' if execution.stderr else ''}
+            '''
+            if execution.stderr
+            else ""
+        }
             
             <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">
                 This alert was sent by Cronator. 
@@ -159,14 +167,14 @@ Script Execution Failed
 
 Script: {script.name}
 Status: {execution.status}
-Exit Code: {execution.exit_code or 'N/A'}
+Exit Code: {execution.exit_code or "N/A"}
 Started At: {execution.started_at}
 Duration: {execution.duration_formatted}
 
-Error: {execution.error_message or 'See stderr'}
+Error: {execution.error_message or "See stderr"}
 
 Stderr:
-{execution.stderr[:1000]}{'...' if len(execution.stderr) > 1000 else ''}
+{execution.stderr[:1000]}{"..." if len(execution.stderr) > 1000 else ""}
         """
 
         return await self.send_email(subject, body_html, body_text)
@@ -174,7 +182,7 @@ Stderr:
     async def send_success_alert(self, script: Script, execution: Execution) -> bool:
         """Send an alert for a successful execution."""
         subject = f"[Cronator] Script Succeeded: {script.name}"
-        
+
         body_html = f"""
         <html>
         <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -220,7 +228,7 @@ Stderr:
         """Test SMTP connection."""
         # Get current settings from DB
         cfg = await self._get_settings()
-        
+
         if not cfg["enabled"]:
             return False, "SMTP is disabled"
 

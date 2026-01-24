@@ -15,11 +15,11 @@ settings = get_settings()
 
 class SettingsResponse(BaseModel):
     """Current settings response."""
-    
+
     app_name: str
     scripts_dir: str
     envs_dir: str
-    
+
     smtp_enabled: bool
     smtp_host: str
     smtp_port: int
@@ -27,19 +27,19 @@ class SettingsResponse(BaseModel):
     smtp_from: str
     smtp_use_tls: bool
     alert_email: str
-    
+
     git_enabled: bool
     git_repo_url: str
     git_branch: str
     git_sync_interval: int
     git_scripts_subdir: str
-    
+
     default_timeout: int
 
 
 class GitStatus(BaseModel):
     """Git sync status."""
-    
+
     enabled: bool
     repo_url: str
     branch: str
@@ -50,7 +50,7 @@ class GitStatus(BaseModel):
 
 class SchedulerStatus(BaseModel):
     """Scheduler status."""
-    
+
     running: bool
     job_count: int
     jobs: list[dict]
@@ -70,14 +70,12 @@ async def get_settings_info() -> SettingsResponse:
     git_enabled = await settings_service.get("git_enabled", settings.git_enabled)
     git_repo_url = await settings_service.get("git_repo_url", settings.git_repo_url)
     git_branch = await settings_service.get("git_branch", settings.git_branch)
-    git_sync_interval = await settings_service.get(
-        "git_sync_interval", settings.git_sync_interval
-    )
+    git_sync_interval = await settings_service.get("git_sync_interval", settings.git_sync_interval)
     git_scripts_subdir = await settings_service.get(
         "git_scripts_subdir", settings.git_scripts_subdir
     )
     default_timeout = await settings_service.get("default_timeout", settings.default_timeout)
-    
+
     return SettingsResponse(
         app_name=settings.app_name,
         scripts_dir=str(settings.scripts_dir),
@@ -109,13 +107,13 @@ async def get_git_status() -> GitStatus:
 async def trigger_git_sync():
     """Manually trigger git sync."""
     success, message = await git_sync_service.sync()
-    
+
     if not success:
         return {"success": False, "message": message}
-    
+
     # Reload scheduler jobs after sync
     await scheduler_service.reload_all_jobs()
-    
+
     return {"success": True, "message": message}
 
 
@@ -134,17 +132,17 @@ async def get_scheduler_status() -> SchedulerStatus:
 async def test_email():
     """Send a test email."""
     success, message = await alerting_service.test_connection()
-    
+
     if not success:
         return {"success": False, "message": message}
-    
+
     # Try sending a real test email
     sent = await alerting_service.send_email(
         subject="[Cronator] Test Email",
         body_html="<h1>Test Email</h1><p>If you received this, email alerts are working!</p>",
         body_text="Test Email\n\nIf you received this, email alerts are working!",
     )
-    
+
     return {"success": sent, "message": "Test email sent" if sent else "Failed to send test email"}
 
 
@@ -163,24 +161,24 @@ async def download_db():
     import time
 
     from fastapi.responses import FileResponse
-    
+
     db_path = settings.database_url.replace("sqlite+aiosqlite:///", "")
     if not os.path.exists(db_path):
-         # Try to find it relative to base_dir
-         db_path = settings.data_dir / "cronator.db"
-    
+        # Try to find it relative to base_dir
+        db_path = settings.data_dir / "cronator.db"
+
     if os.path.exists(db_path):
         return FileResponse(
             path=db_path,
             filename=f"cronator_backup_{int(time.time())}.db",
-            media_type="application/x-sqlite3"
+            media_type="application/x-sqlite3",
         )
     return {"error": "Database file not found"}
 
 
 class UpdateSettingsRequest(BaseModel):
     """Request to update settings."""
-    
+
     smtp_enabled: bool | None = None
     smtp_host: str | None = None
     smtp_port: int | None = None
@@ -189,14 +187,14 @@ class UpdateSettingsRequest(BaseModel):
     smtp_from: str | None = None
     smtp_use_tls: bool | None = None
     alert_email: str | None = None
-    
+
     git_enabled: bool | None = None
     git_repo_url: str | None = None
     git_branch: str | None = None
     git_token: str | None = None
     git_sync_interval: int | None = None
     git_scripts_subdir: str | None = None
-    
+
     default_timeout: int | None = None
 
 
@@ -205,7 +203,7 @@ async def update_settings(request: UpdateSettingsRequest):
     """Update settings in database."""
     # Collect updates
     updates = {}
-    
+
     if request.smtp_enabled is not None:
         updates["smtp_enabled"] = request.smtp_enabled
     if request.smtp_host is not None:
@@ -236,11 +234,11 @@ async def update_settings(request: UpdateSettingsRequest):
         updates["git_scripts_subdir"] = request.git_scripts_subdir
     if request.default_timeout is not None:
         updates["default_timeout"] = request.default_timeout
-    
+
     # Save to database
     await settings_service.bulk_set(updates)
-    
+
     # Reinitialize services with new settings
     # Services will read from settings_service
-    
+
     return {"success": True, "message": "Settings updated successfully"}

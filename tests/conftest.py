@@ -13,7 +13,6 @@ from app.database import Base
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
 
-
 # Test database URL (in-memory SQLite)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -34,15 +33,15 @@ async def test_engine():
         echo=False,
         future=True,
     )
-    
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     yield engine
-    
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
-    
+
     await engine.dispose()
 
 
@@ -54,7 +53,7 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
         class_=AsyncSession,
         expire_on_commit=False,
     )
-    
+
     async with async_session() as session:
         yield session
         await session.rollback()
@@ -64,9 +63,10 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 async def test_client(test_engine, db_session) -> AsyncGenerator[AsyncClient, None]:
     """Create test HTTP client with test database and auth."""
     import base64
+
+    from app.api.dependencies import verify_credentials
     from app.database import get_db
     from app.main import app
-    from app.api.dependencies import verify_credentials
 
     # Override database dependency
     async def override_get_db():
@@ -80,23 +80,24 @@ async def test_client(test_engine, db_session) -> AsyncGenerator[AsyncClient, No
     app.dependency_overrides[verify_credentials] = override_verify_credentials
 
     transport = ASGITransport(app=app)
-    
+
     # Add Basic Auth header for any endpoints that might check it directly
     auth = base64.b64encode(b"admin:admin").decode("ascii")
     headers = {"Authorization": f"Basic {auth}"}
-    
+
     async with AsyncClient(
         transport=transport,
         base_url="http://test",
         headers=headers,
     ) as client:
         yield client
-    
+
     # Clear overrides after test
     app.dependency_overrides.clear()
 
 
 # --- Factory fixtures ---
+
 
 @pytest_asyncio.fixture
 async def script_factory(db_session: AsyncSession):
@@ -167,6 +168,7 @@ async def execution_factory(db_session: AsyncSession):
 
 
 # --- Sample data fixtures ---
+
 
 @pytest_asyncio.fixture
 async def sample_script(script_factory) -> Script:

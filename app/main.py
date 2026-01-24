@@ -31,8 +31,8 @@ logging.basicConfig(
             log_file,
             maxBytes=10 * 1024 * 1024,  # 10MB
             backupCount=5,
-        )
-    ]
+        ),
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -43,46 +43,48 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """Application lifecycle manager."""
     logger.info("Starting Cronator...")
-    
+
     # Ensure directories exist
     settings.ensure_directories()
-    
+
     # Initialize database
     await init_db()
     logger.info("Database initialized")
-    
+
     # Initialize settings service and migrate from .env if needed
     from app.services.settings_service import settings_service
+
     await settings_service.load_from_db()
     migrated = await settings_service.migrate_from_env()
     if migrated > 0:
         logger.info(f"Migrated {migrated} settings from .env to database")
-    
+
     # Start scheduler
     await scheduler_service.start()
     logger.info("Scheduler started")
-    
+
     # Cleanup stale executions
     from app.services.executor import executor_service
+
     await executor_service.cleanup_stale_executions()
     logger.info("Stale executions cleaned up")
-    
+
     # Start git sync if enabled
     if settings.git_enabled:
         await git_sync_service.start()
         logger.info("Git sync started")
-    
+
     logger.info(f"Cronator is running on http://{settings.host}:{settings.port}")
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Cronator...")
-    
+
     await scheduler_service.stop()
     await git_sync_service.stop()
     await close_db()
-    
+
     logger.info("Cronator stopped")
 
 
@@ -119,7 +121,7 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "app.main:app",
         host=settings.host,

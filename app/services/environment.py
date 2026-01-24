@@ -29,6 +29,7 @@ class EnvironmentService:
         env_path = self.get_env_path(script_name)
         # Check platform (not just directory existence)
         import sys
+
         if sys.platform == "win32":
             return env_path / "Scripts" / "python.exe"
         return env_path / "bin" / "python"
@@ -51,14 +52,14 @@ class EnvironmentService:
     ) -> tuple[bool, str]:
         """
         Create a new virtual environment for a script.
-        
+
         Returns:
             Tuple of (success, message)
         """
         lock = self._get_env_lock(script_name)
         async with lock:
             env_path = self.get_env_path(script_name)
-            
+
             try:
                 # Remove existing env if present
                 if env_path.exists():
@@ -103,10 +104,10 @@ class EnvironmentService:
     ) -> tuple[bool, str, list[str]]:
         """
         Validate dependencies format and resolvability.
-        
+
         Args:
             dependencies: Newline-separated list of packages
-            
+
         Returns:
             Tuple of (is_valid, error_message, parsed_packages)
         """
@@ -135,25 +136,25 @@ class EnvironmentService:
             # Basic format validation
             invalid_packages = []
             valid_packages = []
-            
+
             for pkg in packages:
                 # Check for obviously invalid syntax
                 if any(char in pkg for char in [";", "&", "|", "`", "$"]):
                     invalid_packages.append(f"{pkg} (contains shell characters)")
                     continue
-                
+
                 # Check for valid package name format
                 if not pkg or pkg.isspace():
                     invalid_packages.append(f"{pkg} (empty)")
                     continue
-                
+
                 # Basic check for package name structure
                 # Should start with alphanumeric or allow brackets for extras
                 pkg_name = pkg.split("[")[0].split("=")[0].split(">")[0].split("<")[0].split("!")[0]
                 if not pkg_name or not pkg_name[0].isalnum():
                     invalid_packages.append(f"{pkg} (invalid package name)")
                     continue
-                
+
                 valid_packages.append(pkg)
 
             if invalid_packages:
@@ -165,10 +166,11 @@ class EnvironmentService:
 
             # Try to resolve with uv (using temp file to avoid stdin issue on Windows)
             import tempfile
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
                 f.write("\n".join(valid_packages))
                 temp_file = f.name
-                
+
             try:
                 cmd = [
                     self.uv_path,
@@ -185,15 +187,12 @@ class EnvironmentService:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=30.0
-                )
+
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30.0)
 
                 # Check for actual errors (uv writes success messages to stderr too)
                 stderr_text = stderr.decode() if stderr else ""
-                
+
                 # Check for error indicators in stderr
                 if (
                     "No solution found" in stderr_text
@@ -201,7 +200,7 @@ class EnvironmentService:
                 ):
                     logger.warning(f"Dependency resolution failed: {stderr_text}")
                     return False, f"Cannot resolve dependencies:\n{stderr_text}", valid_packages
-                
+
                 if process.returncode != 0 and "Resolved" not in stderr_text:
                     errors = stderr_text or "Unknown error"
                     logger.warning(f"Dependency resolution failed: {errors}")
@@ -213,10 +212,11 @@ class EnvironmentService:
                     f"All {len(valid_packages)} packages are valid and resolvable",
                     valid_packages,
                 )
-                
+
             finally:
                 # Clean up temp file
                 import os
+
                 try:
                     os.unlink(temp_file)
                 except Exception:
@@ -240,11 +240,11 @@ class EnvironmentService:
     ) -> tuple[bool, str]:
         """
         Install dependencies into a script's environment.
-        
+
         Args:
             script_name: Name of the script
             dependencies: Newline-separated list of packages
-            
+
         Returns:
             Tuple of (success, output)
         """
@@ -254,15 +254,15 @@ class EnvironmentService:
         lock = self._get_env_lock(script_name)
         async with lock:
             env_path = self.get_env_path(script_name)
-            
+
             if not env_path.exists():
                 return False, "Environment does not exist"
 
             try:
                 # Parse dependencies
                 packages = [
-                    pkg.strip() 
-                    for pkg in dependencies.strip().split("\n") 
+                    pkg.strip()
+                    for pkg in dependencies.strip().split("\n")
                     if pkg.strip() and not pkg.strip().startswith("#")
                 ]
 
@@ -310,7 +310,7 @@ class EnvironmentService:
     ) -> tuple[bool, str]:
         """
         Create environment and install dependencies.
-        
+
         This is the main method to call for setting up a script's environment.
         """
         # Create environment
@@ -337,7 +337,7 @@ class EnvironmentService:
     async def _install_cronator_lib(self, script_name: str) -> tuple[bool, str]:
         """Install the cronator_lib package into the environment."""
         cronator_lib_path = settings.base_dir / "cronator_lib"
-        
+
         cmd = [
             self.uv_path,
             "pip",
@@ -366,7 +366,7 @@ class EnvironmentService:
     async def delete_env(self, script_name: str) -> tuple[bool, str]:
         """Delete a script's virtual environment."""
         env_path = self.get_env_path(script_name)
-        
+
         try:
             if env_path.exists():
                 shutil.rmtree(env_path)
@@ -380,7 +380,7 @@ class EnvironmentService:
     async def get_installed_packages(self, script_name: str) -> list[str]:
         """Get list of installed packages in an environment."""
         python_path = self.get_python_path(script_name)
-        
+
         if not python_path.exists():
             return []
 

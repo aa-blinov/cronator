@@ -34,7 +34,7 @@ class ExecutionRead(BaseModel):
     triggered_by: str = "scheduler"
     is_test: bool = False
     error_message: str | None = None
-    
+
     # Computed fields
     duration_formatted: str = "-"
     script_name: str | None = None

@@ -27,7 +27,7 @@ class GitSyncService:
         self.token = settings.git_token
         self.sync_interval = settings.git_sync_interval
         self.scripts_subdir = settings.git_scripts_subdir
-        
+
         self._repo: Repo | None = None
         self._sync_task: asyncio.Task | None = None
         self._repo_path = settings.data_dir / "git_repo"
@@ -35,7 +35,7 @@ class GitSyncService:
     async def _get_settings(self) -> dict:
         """Get current settings from DB, fallback to env."""
         from app.services.settings_service import settings_service
-        
+
         return {
             "enabled": await settings_service.get("git_enabled", self.enabled),
             "repo_url": await settings_service.get("git_repo_url", self.repo_url),
@@ -50,23 +50,23 @@ class GitSyncService:
         cfg = await self._get_settings()
         token = cfg["token"]
         repo_url = cfg["repo_url"]
-        
+
         if not token:
             return repo_url
-        
+
         # For HTTPS URLs, inject token
         # Supports: https://github.com/user/repo.git
         # Converts to: https://token@github.com/user/repo.git
         if repo_url.startswith("https://"):
             return repo_url.replace("https://", f"https://{token}@")
-        
+
         # For SSH URLs or other formats, return as-is
         return repo_url
 
     async def start(self) -> None:
         """Start the git sync service."""
         cfg = await self._get_settings()
-        
+
         if not cfg["enabled"]:
             logger.info("Git sync is disabled")
             return
@@ -105,12 +105,12 @@ class GitSyncService:
     async def sync(self) -> tuple[bool, str]:
         """
         Sync scripts from the git repository.
-        
+
         Returns:
             Tuple of (success, message)
         """
         cfg = await self._get_settings()
-        
+
         if not cfg["enabled"] or not cfg["repo_url"]:
             return False, "Git sync is not configured"
 
@@ -139,7 +139,7 @@ class GitSyncService:
             cfg = await self._get_settings()
             auth_url = await self._get_authenticated_url()
             logger.info(f"Cloning repository: {cfg['repo_url']}")
-            
+
             # Run git clone in a thread pool
             loop = asyncio.get_event_loop()
             self._repo = await loop.run_in_executor(
@@ -150,7 +150,7 @@ class GitSyncService:
                     branch=cfg["branch"],
                 ),
             )
-            
+
             return True, "Repository cloned"
 
         except GitError as e:
@@ -161,7 +161,7 @@ class GitSyncService:
         try:
             cfg = await self._get_settings()
             logger.info("Pulling latest changes")
-            
+
             if not self._repo:
                 self._repo = Repo(self._repo_path)
 
@@ -171,7 +171,7 @@ class GitSyncService:
                 self._repo.remotes.origin.set_url(auth_url)
 
             loop = asyncio.get_event_loop()
-            
+
             # Fetch and reset to origin/branch
             await loop.run_in_executor(
                 None,
@@ -239,9 +239,7 @@ class GitSyncService:
                 return
 
             # Check if script exists in database
-            result = await db.execute(
-                select(Script).where(Script.name == script_name)
-            )
+            result = await db.execute(select(Script).where(Script.name == script_name))
             script = result.scalar_one_or_none()
 
             # Read script content
@@ -267,7 +265,7 @@ class GitSyncService:
                 script.timeout = config.get("timeout", script.timeout)
                 script.description = config.get("description", script.description)
                 script.git_commit = commit
-                
+
                 logger.info(f"Updated script from git: {script_name}")
             else:
                 # Create new script
@@ -285,7 +283,7 @@ class GitSyncService:
                     git_commit=commit,
                 )
                 db.add(new_script)
-                
+
                 logger.info(f"Added new script from git: {script_name}")
 
         except Exception as e:
