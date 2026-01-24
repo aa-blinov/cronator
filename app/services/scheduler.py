@@ -142,17 +142,20 @@ class SchedulerService:
         job_id = f"script_{script_id}"
         job = self.scheduler.get_job(job_id)
         if job:
-            return job.next_run_time
+            # Support both APScheduler 3.x and 4.x
+            return getattr(job, 'next_run_time', None) or getattr(job, 'next_fire_time', None)
         return None
 
     def get_all_jobs_info(self) -> list[dict]:
         """Get info about all scheduled jobs."""
         jobs = []
         for job in self.scheduler.get_jobs():
+            # Support both APScheduler 3.x and 4.x
+            next_time = getattr(job, 'next_run_time', None) or getattr(job, 'next_fire_time', None)
             jobs.append({
                 "id": job.id,
                 "name": job.name,
-                "next_run_time": job.next_run_time,
+                "next_run_time": next_time,
                 "trigger": str(job.trigger),
             })
         return jobs

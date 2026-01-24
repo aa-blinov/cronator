@@ -39,8 +39,7 @@ class ExecutionRead(BaseModel):
     duration_formatted: str = "-"
     script_name: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class ExecutionList(BaseModel):

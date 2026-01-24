@@ -45,3 +45,7 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+filterwarnings = [
+    "ignore:SECRET_KEY is using default value:UserWarning",
+    "ignore:ADMIN_PASSWORD is using default value:UserWarning",
+]

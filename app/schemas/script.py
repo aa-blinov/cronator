@@ -131,8 +131,7 @@ class ScriptRead(ScriptBase):
     last_alert_at: datetime | None = None
     is_managed_by_git: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class ScriptList(BaseModel):
