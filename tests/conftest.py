@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.database import Base
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
+from app.models.script_version import ScriptVersion
+from app.models.setting import Setting
 
 # Test database URL (in-memory SQLite)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
