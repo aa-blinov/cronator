@@ -1,4 +1,4 @@
-"""Script model for storing script configurations."""
+﻿"""Script model for storing script configurations."""
 
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -10,6 +10,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.execution import Execution
+    from app.models.script_version import ScriptVersion
 
 
 class Script(Base):
@@ -68,6 +69,13 @@ class Script(Base):
         back_populates="script",
         cascade="all, delete-orphan",
         order_by="desc(Execution.started_at)",
+    )
+    
+    versions: Mapped[list["ScriptVersion"]] = relationship(
+        "ScriptVersion",
+        back_populates="script",
+        cascade="all, delete-orphan",
+        order_by="desc(ScriptVersion.version_number)",
     )
 
     def __repr__(self) -> str:

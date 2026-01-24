@@ -109,7 +109,7 @@
     <div class="glass-card rounded-xl overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-700/50 flex items-center justify-between">
             <h3 class="text-lg font-semibold flex items-center gap-2">
-                <span class="text-green-400">📤</span> Standard Output
+                {{ icons.terminal("w-5 h-5 text-green-400") }} stdout
             </h3>
             <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500">{{ execution.stdout | length }} chars</span>
@@ -132,7 +132,7 @@
     <div class="glass-card rounded-xl overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-700/50 flex items-center justify-between">
             <h3 class="text-lg font-semibold flex items-center gap-2">
-                {{ icons.arrow_down_tray("w-5 h-5 inline text-red-400") }} Standard Error
+                {{ icons.exclamation_triangle("w-5 h-5 text-red-400") }} stderr
             </h3>
             <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500">{{ execution.stderr | length }} chars</span>

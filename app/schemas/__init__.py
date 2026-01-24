@@ -1,4 +1,4 @@
-"""Pydantic schemas package."""
+﻿"""Pydantic schemas package."""
 
 from app.schemas.execution import (
     ExecutionCreate,
@@ -11,6 +11,11 @@ from app.schemas.script import (
     ScriptRead,
     ScriptUpdate,
 )
+from app.schemas.script_version import (
+    ScriptVersionList,
+    ScriptVersionListItem,
+    ScriptVersionRead,
+)
 
 __all__ = [
     "ExecutionCreate",
@@ -20,4 +25,7 @@ __all__ = [
     "ScriptRead",
     "ScriptUpdate",
     "ScriptList",
+    "ScriptVersionRead",
+    "ScriptVersionListItem",
+    "ScriptVersionList",
 ]

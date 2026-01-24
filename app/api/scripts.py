@@ -1,6 +1,7 @@
 """API routes for scripts."""
 
 import asyncio
+import hashlib
 import json
 import logging
 
@@ -21,6 +22,10 @@ from app.schemas.script import (
     ScriptRead,
     ScriptReadWithInstallStatus,
     ScriptUpdate,
+)
+from app.schemas.script_version import (
+    ScriptVersionList,
+    ScriptVersionRead,
 )
 from app.services.environment import environment_service
 from app.services.executor import executor_service
@@ -181,6 +186,9 @@ async def create_script(
     await db.commit()
     await db.refresh(script)
 
+    # Create initial version (v1)
+    await _create_version(db, script, change_summary="Initial version")
+
     # NOTE: Environment setup is now done separately via /scripts/{id}/install
     # to allow streaming of installation logs
 
@@ -261,6 +269,10 @@ async def update_script(
 
     await db.commit()
     await db.refresh(script)
+
+    # Create version snapshot if content/deps/python changed
+    if data.content is not None or deps_changed or python_changed:
+        await _create_version(db, script, data.change_summary)
 
     # NOTE: Environment setup is now done separately via /scripts/{id}/install
     # to allow streaming of installation logs
@@ -616,4 +628,206 @@ async def validate_script(
         "valid": True,
         "errors": [],
         "message": "Code is valid",
+    }
+
+
+# ==================== Script Versioning ====================
+
+
+async def _get_next_version_number(db: AsyncSession, script_id: int) -> int:
+    """Get the next version number for a script."""
+    from app.models.script_version import ScriptVersion
+
+    result = await db.execute(
+        select(func.max(ScriptVersion.version_number)).where(ScriptVersion.script_id == script_id)
+    )
+    max_version = result.scalar()
+    return (max_version or 0) + 1
+
+
+async def _create_version(
+    db: AsyncSession,
+    script: Script,
+    change_summary: str | None = None,
+) -> None:
+    """Create a new version snapshot of the script."""
+    from app.models.script_version import ScriptVersion
+
+    # Calculate hash of current state (content + dependencies + python_version)
+    current_state = f"{script.content}|{script.dependencies or ''}|{script.python_version}"
+    current_hash = hashlib.sha256(current_state.encode()).hexdigest()
+
+    # Get last version to compare hash
+    last_version_result = await db.execute(
+        select(ScriptVersion)
+        .where(ScriptVersion.script_id == script.id)
+        .order_by(ScriptVersion.version_number.desc())
+        .limit(1)
+    )
+    last_version = last_version_result.scalar_one_or_none()
+
+    # If last version exists, check if content actually changed
+    if last_version:
+        last_state = (
+            f"{last_version.content}|"
+            f"{last_version.dependencies or ''}|"
+            f"{last_version.python_version}"
+        )
+        last_hash = hashlib.sha256(last_state.encode()).hexdigest()
+
+        if current_hash == last_hash:
+            # Content hasn't actually changed, skip version creation
+            logging.info(
+                f"Skipping version creation for script {script.id}: content hash unchanged"
+            )
+            return
+
+    version_number = await _get_next_version_number(db, script.id)
+
+    version = ScriptVersion(
+        script_id=script.id,
+        version_number=version_number,
+        content=script.content,
+        dependencies=script.dependencies,
+        python_version=script.python_version,
+        cron_expression=script.cron_expression,
+        timeout=script.timeout,
+        environment_vars=script.environment_vars,
+        created_by="manual",
+        change_summary=change_summary,
+    )
+
+    db.add(version)
+    await db.commit()
+    logging.info(
+        f"Created version {version_number} for script {script.id} (hash: {current_hash[:8]}...)"
+    )
+
+
+@router.get("/{script_id}/versions", response_model=ScriptVersionList)
+async def list_script_versions(
+    script_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all versions of a script."""
+    from app.models.script_version import ScriptVersion
+    from app.schemas.script_version import ScriptVersionListItem
+
+    # Check script exists
+    result = await db.execute(select(Script).where(Script.id == script_id))
+    script = result.scalar_one_or_none()
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+
+    # Get versions
+    versions_result = await db.execute(
+        select(ScriptVersion)
+        .where(ScriptVersion.script_id == script_id)
+        .order_by(ScriptVersion.version_number.desc())
+    )
+    versions = versions_result.scalars().all()
+
+    # Build list items
+    items = []
+    for v in versions:
+        content_preview = v.content[:200] if len(v.content) > 200 else v.content
+        items.append(
+            ScriptVersionListItem(
+                id=v.id,
+                script_id=v.script_id,
+                version_number=v.version_number,
+                created_at=v.created_at,
+                created_by=v.created_by,
+                change_summary=v.change_summary,
+                content_preview=content_preview,
+                content_size=len(v.content.encode("utf-8")),
+            )
+        )
+
+    return ScriptVersionList(items=items, total=len(items))
+
+
+@router.get("/{script_id}/versions/{version_number}", response_model=ScriptVersionRead)
+async def get_script_version(
+    script_id: int,
+    version_number: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a specific version of a script."""
+    from app.models.script_version import ScriptVersion
+
+    result = await db.execute(
+        select(ScriptVersion).where(
+            ScriptVersion.script_id == script_id,
+            ScriptVersion.version_number == version_number,
+        )
+    )
+    version = result.scalar_one_or_none()
+
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    return ScriptVersionRead.model_validate(version)
+
+
+@router.post("/{script_id}/revert/{version_number}")
+async def revert_to_version(
+    script_id: int,
+    version_number: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Revert script to a specific version."""
+    from app.models.script_version import ScriptVersion
+
+    # Get the version to revert to
+    version_result = await db.execute(
+        select(ScriptVersion).where(
+            ScriptVersion.script_id == script_id,
+            ScriptVersion.version_number == version_number,
+        )
+    )
+    version = version_result.scalar_one_or_none()
+
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    # Get the script
+    script_result = await db.execute(select(Script).where(Script.id == script_id))
+    script = script_result.scalar_one_or_none()
+
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+
+    # Track what changed
+    deps_changed = script.dependencies != version.dependencies
+    python_changed = script.python_version != version.python_version
+    needs_install = deps_changed or python_changed
+
+    # Revert the script
+    script.content = version.content
+    script.dependencies = version.dependencies
+    script.python_version = version.python_version
+    script.cron_expression = version.cron_expression
+    script.timeout = version.timeout
+    script.environment_vars = version.environment_vars
+
+    # Update script file
+    script_path = settings.scripts_dir / script.name / "script.py"
+    script_path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(script_path, "w") as f:
+        await f.write(version.content)
+
+    await db.commit()
+    await db.refresh(script)
+
+    # Create new version for the revert
+    await _create_version(
+        db,
+        script,
+        change_summary=f"Reverted to version {version_number}",
+    )
+
+    return {
+        "message": f"Script reverted to version {version_number}",
+        "needs_install": needs_install,
     }

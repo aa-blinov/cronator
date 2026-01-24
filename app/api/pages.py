@@ -14,6 +14,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
+from app.models.script_version import ScriptVersion
 from app.services.executor import executor_service
 from app.services.scheduler import scheduler_service
 
@@ -237,6 +238,45 @@ async def script_edit(
             "script": script,
             "content": content,
             "python_versions": ["3.9", "3.10", "3.11", "3.12", "3.13"],
+        },
+    )
+
+
+@router.get("/scripts/{script_id}/versions/{version_number}", response_class=HTMLResponse)
+async def script_version_detail(
+    request: Request,
+    script_id: int,
+    version_number: int,
+    username: str = Depends(verify_credentials),
+    db: AsyncSession = Depends(get_db),
+):
+    """Script version detail page."""
+    # Get script
+    result = await db.execute(select(Script).where(Script.id == script_id))
+    script = result.scalar_one_or_none()
+
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+
+    # Get version
+    version_result = await db.execute(
+        select(ScriptVersion).where(
+            ScriptVersion.script_id == script_id,
+            ScriptVersion.version_number == version_number,
+        )
+    )
+    version = version_result.scalar_one_or_none()
+
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    return request.app.state.templates.TemplateResponse(
+        "script_version.html",
+        {
+            "request": request,
+            "page_title": f"{script.name} - Version {version_number}",
+            "script": script,
+            "version": version,
         },
     )
 

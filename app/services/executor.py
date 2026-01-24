@@ -264,14 +264,16 @@ class ExecutorService:
                 finally:
                     # Cleanup
                     self.running_processes.pop(execution_id, None)
-                    # Signal end of stream and cleanup queue
+                    # Signal end of stream
+                    # Note: Don't delete the queue here - let the SSE handler clean it up
+                    # after consuming the 'done' message to prevent race condition
                     if execution_id in self.output_queues:
                         try:
+                            # Small delay to ensure DB commit is visible to other sessions
+                            await asyncio.sleep(0.1)
                             await self.output_queues[execution_id].put(("done", None))
                         except Exception:
                             pass
-                        # Always remove queue to prevent memory leak
-                        self.output_queues.pop(execution_id, None)
 
             except Exception as e:
                 logger.exception(f"Error executing script {script_id}")

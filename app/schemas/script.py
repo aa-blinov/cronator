@@ -1,4 +1,4 @@
-"""Pydantic schemas for Script model."""
+﻿"""Pydantic schemas for Script model."""
 
 from datetime import datetime
 
@@ -111,6 +111,7 @@ class ScriptUpdate(BaseModel):
     misfire_grace_time: int | None = Field(default=None, ge=0, le=3600)
     working_directory: str | None = None
     environment_vars: str | None = None
+    change_summary: str | None = None  # Optional description of changes for versioning
 
     @field_validator("name")
     @classmethod

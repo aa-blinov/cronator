@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% import "icons.html" as icons %}
+
+{% block extra_head %}
+<!-- CodeMirror for syntax highlighting -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css">
+<style>
+    .CodeMirror {
+        height: auto;
+        max-height: 500px;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+    }
+    .CodeMirror-scroll {
+        max-height: 500px;
+    }
+</style>
+{% endblock %}
+
+{% block header_actions %}
+<div class="flex items-center gap-2">
+    <a href="/scripts/{{ script.id }}/edit" class="btn btn-ghost btn-sm gap-2">
+        {{ icons.arrow_left("w-4 h-4") }} Back to Editor
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <!-- Version Info -->
+    <div class="lg:col-span-1 space-y-6">
+        <div class="glass-card rounded-xl p-6">
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                {{ icons.clock("w-5 h-5 text-info") }}
+                Version {{ version.version_number }}
+            </h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <p class="text-gray-400 text-sm">Created</p>
+                    <p class="font-medium">{{ version.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                </div>
+                
+                <div>
+                    <p class="text-gray-400 text-sm">Created By</p>
+                    <p class="font-medium">{{ version.created_by or 'Unknown' }}</p>
+                </div>
+                
+                {% if version.change_summary %}
+                <div>
+                    <p class="text-gray-400 text-sm">Description</p>
+                    <p class="font-medium">{{ version.change_summary }}</p>
+                </div>
+                {% endif %}
+                
+                <div class="divider my-2"></div>
+                
+                <div>
+                    <p class="text-gray-400 text-sm">Python Version</p>
+                    <code class="text-sm bg-gray-800 px-2 py-1 rounded">{{ version.python_version }}</code>
+                </div>
+                
+                <div>
+                    <p class="text-gray-400 text-sm">Schedule</p>
+                    <code class="text-sm bg-gray-800 px-2 py-1 rounded">{{ version.cron_expression }}</code>
+                </div>
+                
+                <div>
+                    <p class="text-gray-400 text-sm">Timeout</p>
+                    <p class="font-medium">{{ version.timeout }}s</p>
+                </div>
+                
+                {% if version.dependencies %}
+                <div>
+                    <p class="text-gray-400 text-sm mb-2">Dependencies</p>
+                    <pre class="log-output text-xs p-2 rounded bg-gray-900">{{ version.dependencies }}</pre>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Restore Action -->
+        <div class="glass-card rounded-xl p-6">
+            <h3 class="text-lg font-semibold mb-4">Actions</h3>
+            <button id="restore-btn" class="btn btn-warning w-full gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+                Restore this version
+            </button>
+            <p class="text-xs text-gray-500 mt-2">
+                This will replace the current script content with this version and create a new version snapshot.
+            </p>
+        </div>
+    </div>
+    
+    <!-- Code Preview -->
+    <div class="lg:col-span-2">
+        <div class="glass-card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold flex items-center gap-2">
+                    {{ icons.code("w-5 h-5 text-primary") }}
+                    Code
+                </h3>
+                <span class="badge badge-ghost">{{ version.content|length }} bytes</span>
+            </div>
+            
+            <textarea id="code-viewer">{{ version.content }}</textarea>
+        </div>
+        
+        {% if version.environment_vars %}
+        <div class="glass-card rounded-xl p-6 mt-6">
+            <h3 class="text-lg font-semibold mb-4">Environment Variables</h3>
+            <pre class="log-output text-xs p-3 rounded bg-gray-900">{{ version.environment_vars }}</pre>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/python/python.min.js"></script>
+<script>
+const scriptId = {{ script.id }};
+const versionNumber = {{ version.version_number }};
+
+// Initialize CodeMirror (read-only)
+const editor = CodeMirror.fromTextArea(document.getElementById('code-viewer'), {
+    mode: 'python',
+    theme: 'dracula',
+    lineNumbers: true,
+    readOnly: true,
+    viewportMargin: Infinity,
+});
+
+// Restore button handler
+document.getElementById('restore-btn').addEventListener('click', async () => {
+    if (!confirm(`Restore script to version ${versionNumber}?\n\nThis will:\n- Replace current content with version ${versionNumber}\n- Create a new version with current state\n- Trigger dependency reinstall if needed`)) {
+        return;
+    }
+    
+    const btn = document.getElementById('restore-btn');
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Restoring...';
+    
+    try {
+        const response = await fetch(`/api/scripts/${scriptId}/revert/${versionNumber}`, {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to restore version');
+        }
+        
+        const result = await response.json();
+        window.showToast?.(result.message, 'success');
+        
+        // Redirect to editor
+        setTimeout(() => {
+            window.location.href = `/scripts/${scriptId}/edit`;
+        }, 1500);
+        
+    } catch (err) {
+        window.showToast?.('Failed to restore: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
+});
+</script>
+{% endblock %}

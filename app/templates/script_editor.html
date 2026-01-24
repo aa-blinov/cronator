@@ -124,7 +124,7 @@
                             {{ icons.check_circle("w-4 h-4") }}
                             Validate
                         </button>
-                        <button type="button" id="run-test-btn" class="btn btn-outline btn-success btn-sm gap-2" {% if not script %}disabled title="Save script first"{% endif %}>
+                        <button type="button" id="run-test-btn" class="btn btn-outline btn-success btn-sm gap-2">
                             {{ icons.play("w-4 h-4") }}
                             Run Test
                         </button>
@@ -195,13 +195,30 @@
                     
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">Description</span>
+                            <span class="label-text">Script Description</span>
                         </label>
                         <textarea name="description" 
                                   class="textarea textarea-bordered w-full"
                                   rows="2"
-                                  placeholder="What does this script do?">{{ script.description if script else '' }}</textarea>
+                                  placeholder="What does this script do? (general purpose, stays unchanged)">{{ script.description if script else '' }}</textarea>
+                        <label class="label">
+                            <span class="label-text-alt text-gray-500">Permanent description of the script's purpose</span>
+                        </label>
                     </div>
+                    
+                    {% if script %}
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Version Notes (optional)</span>
+                        </label>
+                        <textarea name="change_summary" id="change-summary" rows="2" 
+                                  class="textarea textarea-bordered w-full text-sm"
+                                  placeholder="e.g., Fixed bug with data parsing, Updated dependencies, Added new feature..."></textarea>
+                        <label class="label">
+                            <span class="label-text-alt text-gray-500">Describe what you changed in this save. Visible in version history.</span>
+                        </label>
+                    </div>
+                    {% endif %}
                     
                     <div class="form-control">
                         <label class="label">
@@ -328,6 +345,24 @@
                     <span>Dependencies install automatically when you save. Use "Install" to force rebuild.</span>
                 </div>
             </div>
+
+            <!-- Version History -->
+            {% if script %}
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Version History
+                    </h3>
+                    <span id="version-count-badge" class="badge badge-info badge-sm">0</span>
+                </div>
+                <div id="versions-list" class="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
+                    <div class="text-sm text-gray-500 italic">Loading versions...</div>
+                </div>
+            </div>
+            {% endif %}
             
             <div class="glass-card rounded-xl p-6">
                 <h3 class="text-lg font-semibold mb-4">Alerts</h3>
@@ -556,13 +591,17 @@
         const depsInput = document.getElementById('dependencies-input');
         const validateBtn = document.getElementById('validate-deps-btn');
         const installBtn = document.getElementById('install-deps-btn');
+        const getPackagesBtn = document.getElementById('get-packages-btn');
         const hasDeps = depsInput.value.trim().length > 0;
         
         validateBtn.disabled = !hasDeps;
         
-        // Install button is disabled if no script exists OR no dependencies
+        // Install and Packages buttons are disabled if no script exists OR no dependencies
         if (installBtn) {
-            installBtn.disabled = !hasDeps;
+            installBtn.disabled = !scriptId || !hasDeps;
+        }
+        if (getPackagesBtn) {
+            getPackagesBtn.disabled = !scriptId;
         }
     }
     
@@ -667,7 +706,6 @@ Packages: ${result.packages.join(', ')}`;
     if (installDepsBtn) {
         installDepsBtn.addEventListener('click', async () => {
         const installBtn = document.getElementById('install-deps-btn');
-        const resultDiv = document.getElementById('validation-result');
         const depsInput = document.getElementById('dependencies-input');
         const dependencies = depsInput.value.trim();
         
@@ -689,29 +727,22 @@ Packages: ${result.packages.join(', ')}`;
                 const validateResult = await validateResponse.json();
                 
                 if (!validateResult.valid) {
-                    // Show validation error
-                    resultDiv.className = 'alert alert-error mt-3';
-                    resultDiv.innerHTML = `
-                        <div class="w-full">
-                            <div class="flex items-start gap-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <div class="flex-1">
-                                    <div class="font-bold">Invalid dependencies!</div>
-                                    <div class="text-sm mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap break-words custom-scrollbar">
-                                        ${validateResult.message}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    resultDiv.classList.remove('hidden');
+                    // Show validation error in console
+                    appendBlockToConsole('Validation Error', validateResult.message, 'error');
+                    setConsoleStatus('Error', 'badge-error');
+                    // Scroll to console
+                    document.getElementById('output-console')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    
+                    // Highlight dependencies input
+                    depsInput.classList.add('textarea-error');
+                    depsInput.addEventListener('input', () => {
+                        depsInput.classList.remove('textarea-error');
+                    }, { once: true });
                     
                     // Reset button
                     installBtn.disabled = false;
                     installBtn.innerHTML = `
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                         </svg>
                         Install
@@ -719,12 +750,12 @@ Packages: ${result.packages.join(', ')}`;
                     return;
                 }
             } catch (err) {
-                resultDiv.className = 'alert alert-error mt-3';
-                resultDiv.innerHTML = `<span>Validation error: ${err.message}</span>`;
-                resultDiv.classList.remove('hidden');
+                appendBlockToConsole('Validation Error', err.message, 'error');
+                setConsoleStatus('Error', 'badge-error');
+                document.getElementById('output-console')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 installBtn.disabled = false;
                 installBtn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
                     Install
@@ -1246,7 +1277,7 @@ ${separator}
     runTestBtn.addEventListener('click', async () => {
         editor.save();
         
-        // Save script first
+        // Collect form data
         const form = document.getElementById('script-form');
         const formData = new FormData(form);
         const data = {
@@ -1264,34 +1295,77 @@ ${separator}
             environment_vars: formData.get('environment_vars'),
         };
         
+        // For new scripts, require a name
+        let currentScriptId = scriptId;
+        
         try {
             runTestBtn.disabled = true;
-            setConsoleStatus('Saving...', 'badge-info');
             
-            // Save script
-            if (!scriptId) {
-                appendBlockToConsole('Test Error', 'Script must be saved before running test', 'error');
-                setConsoleStatus('Error', 'badge-error');
-                runTestBtn.disabled = false;
-                return;
-            }
-            
-            const saveResponse = await fetch(`/api/scripts/${scriptId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-            
-            if (!saveResponse.ok) {
-                const error = await saveResponse.json();
-                throw new Error(error.detail || 'Failed to save script');
+            if (!currentScriptId) {
+                // New script - check if name is provided
+                if (!data.name || !data.name.trim()) {
+                    window.showToast?.('Script name is required', 'error');
+                    runTestBtn.disabled = false;
+                    // Highlight and focus on name field
+                    const nameInput = document.querySelector('input[name="name"]');
+                    if (nameInput) {
+                        nameInput.classList.add('input-error');
+                        nameInput.focus();
+                        // Remove error class after user starts typing
+                        nameInput.addEventListener('input', () => {
+                            nameInput.classList.remove('input-error');
+                        }, { once: true });
+                    }
+                    return;
+                }
+                
+                // Create new script first
+                setConsoleStatus('Creating...', 'badge-info');
+                appendBlockToConsole('Auto-save', 'Creating script before test run...', 'info');
+                
+                const createResponse = await fetch('/api/scripts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+                
+                if (!createResponse.ok) {
+                    const error = await createResponse.json();
+                    throw new Error(error.detail || 'Failed to create script');
+                }
+                
+                const createResult = await createResponse.json();
+                currentScriptId = createResult.id;
+                
+                // Update the form's data-script-id and action for future saves
+                form.dataset.scriptId = currentScriptId;
+                form.action = `/api/scripts/${currentScriptId}`;
+                
+                // Update URL without reload
+                window.history.replaceState({}, '', `/scripts/${currentScriptId}/edit`);
+                
+                appendBlockToConsole('Auto-save', `Script created with ID: ${currentScriptId}`, 'success');
+            } else {
+                // Existing script - save changes
+                setConsoleStatus('Saving...', 'badge-info');
+                
+                const saveResponse = await fetch(`/api/scripts/${currentScriptId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+                
+                if (!saveResponse.ok) {
+                    const error = await saveResponse.json();
+                    throw new Error(error.detail || 'Failed to save script');
+                }
             }
             
             // Start test
             appendToConsole('\n--- Test Started ---', false);
             setConsoleStatus('Running...', 'badge-warning');
             
-            const testResponse = await fetch(`/api/scripts/${scriptId}/test`, {
+            const testResponse = await fetch(`/api/scripts/${currentScriptId}/test`, {
                 method: 'POST',
             });
             
@@ -1403,5 +1477,131 @@ ${separator}
             fetch(`/api/executions/${currentExecutionId}/cancel`, { method: 'POST' }).catch(() => {});
         }
     });
+
+    // ==================== Version History ====================
+    
+    async function loadVersionHistory() {
+        console.log('[Version History] Loading versions for script:', scriptId);
+        const versionsList = document.getElementById('versions-list');
+        const versionBadge = document.getElementById('version-count-badge');
+        
+        if (!scriptId) {
+            console.log('[Version History] No scriptId, skipping load');
+            return;
+        }
+        
+        try {
+            console.log('[Version History] Fetching from:', `/api/scripts/${scriptId}/versions`);
+            const response = await fetch(`/api/scripts/${scriptId}/versions`);
+            if (!response.ok) throw new Error('Failed to load versions');
+            
+            const data = await response.json();
+            console.log('[Version History] Loaded', data.total, 'versions:', data);
+            versionBadge.textContent = data.total;
+            
+            if (data.total === 0) {
+                versionsList.innerHTML = '<div class="text-sm text-gray-500 italic p-3">No versions yet. Versions are created automatically when you save changes.</div>';
+                return;
+            }
+            
+            versionsList.innerHTML = data.items.map(v => {
+                const date = new Date(v.created_at).toLocaleString();
+                const sizeKB = (v.content_size / 1024).toFixed(1);
+                return `
+                    <div class="flex items-center justify-between p-3 bg-base-100 rounded hover:bg-base-300 transition-colors border border-base-300">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="badge badge-sm badge-primary">v${v.version_number}</span>
+                                <span class="text-xs text-gray-500">${date}</span>
+                                <span class="text-xs text-gray-400">${sizeKB} KB</span>
+                            </div>
+                            ${v.change_summary ? `<div class="text-sm mt-1 text-gray-700">${escapeHtml(v.change_summary)}</div>` : '<div class="text-xs mt-1 text-gray-400 italic">No description</div>'}
+                        </div>
+                        <div class="flex gap-2 ml-4">
+                            <a href="/scripts/${scriptId}/versions/${v.version_number}" class="btn btn-sm btn-outline btn-info" title="View version ${v.version_number} content">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                <span class="hidden sm:inline">View</span>
+                            </a>
+                            <button type="button" data-action="restore" data-version="${v.version_number}" class="btn btn-sm btn-outline btn-warning" title="Restore script to version ${v.version_number}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                </svg>
+                                <span class="hidden sm:inline">Restore</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Add event listeners for restore buttons
+            document.querySelectorAll('#versions-list button[data-action="restore"]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const version = parseInt(btn.dataset.version);
+                    revertToVersion(version);
+                });
+            });
+            
+        } catch (err) {
+            console.error('Failed to load versions:', err);
+            versionsList.innerHTML = '<div class="text-sm text-error p-3">Failed to load versions</div>';
+        }
+    }
+    
+    async function revertToVersion(versionNumber) {
+        if (!confirm(`Restore script to version ${versionNumber}?\n\nThis will:\n- Replace current content with version ${versionNumber}\n- Create a new version with current state\n- Trigger dependency reinstall if needed`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/scripts/${scriptId}/revert/${versionNumber}`, {
+                method: 'POST'
+            });
+            
+            if (!response.ok) throw new Error('Failed to revert');
+            
+            const result = await response.json();
+            window.showToast?.(result.message, 'success');
+            
+            // Reload page to show reverted content
+            setTimeout(() => window.location.reload(), 1000);
+            
+        } catch (err) {
+            console.error('Failed to revert:', err);
+            window.showToast?.('Failed to revert to version', 'error');
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Load versions on page load for editing
+    {% if script %}
+    document.addEventListener('DOMContentLoaded', () => {
+        loadVersionHistory();
+    });
+    {% endif %}
+    
+    // Reload versions after save
+    const originalFormSubmit = document.querySelector('form').onsubmit;
+    document.querySelector('form').addEventListener('submit', async function(e) {
+        // Let original handler run first
+        if (originalFormSubmit) {
+            const result = await originalFormSubmit.call(this, e);
+            if (result === false) return false;
+        }
+        // After successful save, reload versions
+        setTimeout(() => {
+            if (scriptId) loadVersionHistory();
+        }, 2000);
+    });
+
 </script>
 {% endblock %}

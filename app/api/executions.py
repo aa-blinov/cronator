@@ -215,12 +215,15 @@ async def stream_execution_output(
                     last_activity = asyncio.get_event_loop().time()
 
                     if stream_type == "done":
-                        # Refresh execution to get final status
-                        await db.refresh(execution)
+                        # Re-fetch execution from DB to get final status
+                        result = await db.execute(
+                            select(Execution).where(Execution.id == execution_id)
+                        )
+                        updated_execution = result.scalar_one_or_none()
                         done_payload = json.dumps(
                             {
-                                "status": execution.status,
-                                "exit_code": execution.exit_code,
+                                "status": updated_execution.status if updated_execution else "unknown",
+                                "exit_code": updated_execution.exit_code if updated_execution else None,
                             }
                         )
                         yield f"event: done\ndata: {done_payload}\n\n"
