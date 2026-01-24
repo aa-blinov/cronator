@@ -69,6 +69,20 @@ async def lifespan(app: FastAPI):
     await executor_service.cleanup_stale_executions()
     logger.info("Stale executions cleaned up")
 
+    # Register all scripts in environment service for coordination
+    from sqlalchemy import select
+
+    from app.database import async_session_maker
+    from app.models.script import Script
+    from app.services.environment import environment_service
+
+    async with async_session_maker() as db:
+        result = await db.execute(select(Script))
+        scripts = result.scalars().all()
+        for script in scripts:
+            environment_service.register_script(script.name, script.id)
+        logger.info(f"Registered {len(scripts)} scripts in environment service")
+
     # Start git sync if enabled
     if settings.git_enabled:
         await git_sync_service.start()

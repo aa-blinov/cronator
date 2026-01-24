@@ -60,13 +60,22 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_client(test_engine, db_session) -> AsyncGenerator[AsyncClient, None]:
+async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[AsyncClient, None]:
     """Create test HTTP client with test database and auth."""
     import base64
 
     from app.api.dependencies import verify_credentials
     from app.database import get_db
-    from app.main import app
+    from app.main import app as fastapi_app
+
+    # Create test session maker
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    async_session = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
 
     # Override database dependency
     async def override_get_db():
@@ -76,10 +85,15 @@ async def test_client(test_engine, db_session) -> AsyncGenerator[AsyncClient, No
     def override_verify_credentials():
         return "test_user"
 
-    app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[verify_credentials] = override_verify_credentials
+    # Patch async_session_maker in services that use it
+    import app.services.executor
 
-    transport = ASGITransport(app=app)
+    monkeypatch.setattr(app.services.executor, "async_session_maker", async_session)
+
+    fastapi_app.dependency_overrides[get_db] = override_get_db
+    fastapi_app.dependency_overrides[verify_credentials] = override_verify_credentials
+
+    transport = ASGITransport(app=fastapi_app)
 
     # Add Basic Auth header for any endpoints that might check it directly
     auth = base64.b64encode(b"admin:admin").decode("ascii")
@@ -93,7 +107,7 @@ async def test_client(test_engine, db_session) -> AsyncGenerator[AsyncClient, No
         yield client
 
     # Clear overrides after test
-    app.dependency_overrides.clear()
+    fastapi_app.dependency_overrides.clear()
 
 
 # --- Factory fixtures ---

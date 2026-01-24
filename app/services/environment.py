@@ -45,6 +45,8 @@ class EnvironmentService:
         # Queues for streaming install output
         self.install_queues: dict[int, asyncio.Queue] = {}
         self._active_installs: dict[int, bool] = {}
+        # Mapping script_name -> script_id for coordination with executor
+        self._script_name_to_id: dict[str, int] = {}
         # Retry configuration
         self.retry_config = {
             "max_attempts": 3,
@@ -67,6 +69,24 @@ class EnvironmentService:
             return env_path / "Scripts" / "python.exe"
         return env_path / "bin" / "python"
 
+    def register_script(self, script_name: str, script_id: int) -> None:
+        """Register script name to ID mapping."""
+        self._script_name_to_id[script_name] = script_id
+
+    def unregister_script(self, script_name: str) -> None:
+        """Unregister script name to ID mapping."""
+        self._script_name_to_id.pop(script_name, None)
+
+    def is_script_running(self, script_name: str) -> bool:
+        """Check if a script is currently running via executor service."""
+        script_id = self._script_name_to_id.get(script_name)
+        if script_id is None:
+            return False
+        
+        # Import here to avoid circular dependency
+        from app.services.executor import executor_service
+        return executor_service.is_script_running(script_id)
+
     def _get_env_lock(self, script_name: str) -> asyncio.Lock:
         """Get or create a lock for a specific environment."""
         if script_name not in self._env_locks:
@@ -86,6 +106,9 @@ class EnvironmentService:
         """
         Create a new virtual environment for a script.
 
+        Note: This method does NOT check if the script is running.
+        Use rebuild_env() for manual rebuilds with safety checks.
+
         Returns:
             Tuple of (success, message)
         """
@@ -95,14 +118,24 @@ class EnvironmentService:
 
             try:
                 # Remove existing env if present
-                # Note: This could potentially interfere with running executions
-                # but we use locks to minimize this risk
                 if env_path.exists():
-                    logger.warning(
-                        f"Removing existing environment for {script_name}. "
-                        "This may cause issues if script is currently executing."
-                    )
-                    shutil.rmtree(env_path)
+                    logger.info(f"Removing existing environment for {script_name}")
+                    try:
+                        shutil.rmtree(env_path)
+                    except PermissionError as e:
+                        # Windows-specific: files may be locked by running process
+                        logger.error(
+                            f"Cannot remove environment for {script_name}: {e}. "
+                            "Files may be in use by running process."
+                        )
+                        return (
+                            False,
+                            "Cannot remove environment: files are in use. "
+                            "Stop the script and try again.",
+                        )
+                    except Exception as e:
+                        logger.error(f"Error removing environment for {script_name}: {e}")
+                        return False, f"Failed to remove existing environment: {str(e)}"
 
                 env_path.mkdir(parents=True, exist_ok=True)
 
@@ -448,13 +481,30 @@ class EnvironmentService:
 
     async def delete_env(self, script_name: str) -> tuple[bool, str]:
         """Delete a script's virtual environment."""
+        # Check if script is running
+        if self.is_script_running(script_name):
+            return False, "Cannot delete environment while script is running"
+
         env_path = self.get_env_path(script_name)
 
         try:
             if env_path.exists():
-                shutil.rmtree(env_path)
-                logger.info(f"Deleted environment for {script_name}")
-                return True, "Environment deleted"
+                try:
+                    shutil.rmtree(env_path)
+                    logger.info(f"Deleted environment for {script_name}")
+                    self.unregister_script(script_name)
+                    return True, "Environment deleted"
+                except PermissionError as e:
+                    logger.error(
+                        f"Cannot delete environment for {script_name}: {e}. "
+                        "Files may be in use."
+                    )
+                    return (
+                        False,
+                        "Cannot delete environment: files are in use. "
+                        "Stop the script and try again.",
+                    )
+            self.unregister_script(script_name)
             return True, "Environment did not exist"
         except Exception as e:
             logger.exception(f"Error deleting environment for {script_name}")

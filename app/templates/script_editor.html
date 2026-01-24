@@ -840,6 +840,9 @@ Packages: ${result.packages.join(', ')}`;
             
             if (!installResponse.ok) {
                 const err = await installResponse.json();
+                if (installResponse.status === 409) {
+                    throw new Error(err.detail || 'Cannot install dependencies while script is running. Stop the execution first.');
+                }
                 throw new Error(err.detail || 'Failed to start installation');
             }
             

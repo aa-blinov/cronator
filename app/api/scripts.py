@@ -186,6 +186,9 @@ async def create_script(
     await db.commit()
     await db.refresh(script)
 
+    # Register script in environment service for coordination
+    environment_service.register_script(script.name, script.id)
+
     # Create initial version (v1)
     await _create_version(db, script, change_summary="Initial version")
 
@@ -239,6 +242,9 @@ async def update_script(
 
     update_data = data.model_dump(exclude_unset=True)
 
+    # Track old name for environment service update
+    old_name = script.name
+
     # Update fields
     for field, value in update_data.items():
         if field == "dependencies":
@@ -255,6 +261,11 @@ async def update_script(
             enabled_changed = True
 
         setattr(script, field, value)
+
+    # Update environment service mapping if name changed
+    if script.name != old_name:
+        environment_service.unregister_script(old_name)
+        environment_service.register_script(script.name, script.id)
 
     needs_install = deps_changed or python_changed
 
@@ -300,11 +311,21 @@ async def delete_script(
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
 
+    # Check if script is currently running
+    if executor_service.is_script_running(script_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete script while it is running. Stop the execution first.",
+        )
+
     # Remove from scheduler
     await scheduler_service.remove_job(script_id)
 
     # Delete environment
-    await environment_service.delete_env(script.name)
+    success, message = await environment_service.delete_env(script.name)
+    if not success:
+        logger.warning(f"Failed to delete environment for {script.name}: {message}")
+        # Continue with script deletion anyway
 
     # Delete script
     await db.delete(script)
@@ -391,6 +412,13 @@ async def rebuild_environment(
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
 
+    # Check if script is currently running
+    if executor_service.is_script_running(script_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot rebuild environment while script is running. Stop the execution first.",
+        )
+
     success, message = await environment_service.setup_environment(
         script.name,
         script.python_version,
@@ -415,6 +443,13 @@ async def start_install(
 
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
+
+    # Check if script is currently running
+    if executor_service.is_script_running(script_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot install dependencies while script is running. Stop the execution first.",
+        )
 
     if environment_service.is_installing(script_id):
         raise HTTPException(status_code=409, detail="Installation already in progress")

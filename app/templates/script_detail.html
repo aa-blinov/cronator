@@ -32,6 +32,10 @@ function deleteScript(scriptId) {
     .then(response => {
         if (response.ok) {
             window.location.href = '/';
+        } else if (response.status === 409) {
+            return response.json().then(data => {
+                window.showToast?.(data.detail || 'Cannot delete script while it is running', 'error');
+            });
         } else {
             return response.json().then(data => {
                 window.showToast?.(`Failed to delete script: ${data.detail || 'Unknown error'}`, 'error');
@@ -272,6 +276,11 @@ document.getElementById('run-now-btn')?.addEventListener('click', async () => {
             // Reload page to show new execution
             window.showToast?.('Script started', 'success');
             setTimeout(() => window.location.reload(), 2800);
+        } else if (response.status === 409) {
+            const error = await response.json();
+            window.showToast?.(error.detail || 'Script is already running', 'warning');
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
         } else {
             const error = await response.json();
             window.showToast?.(error.detail || 'Failed to run script', 'error');
