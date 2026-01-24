@@ -216,15 +216,48 @@
                     
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">Cron Expression</span>
+                            <span class="label-text">Schedule (Cron Expression)</span>
                         </label>
-                        <input type="text" name="cron_expression" 
+                        
+                        <!-- Preset buttons -->
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('* * * * *')">Every minute</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/5 * * * *')">Every 5 mins</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/10 * * * *')">Every 10 mins</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/15 * * * *')">Every 15 mins</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/30 * * * *')">Every 30 mins</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 * * * *')">Hourly</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */2 * * *')">Every 2 hours</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */3 * * *')">Every 3 hours</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */6 * * *')">Every 6 hours</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */12 * * *')">Every 12 hours</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 0 * * *')">Daily midnight</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 12 * * *')">Daily noon</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 9 * * 1-5')">Weekdays 9 AM</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 0 * * 0')">Weekly Sunday</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 0 1 * *')">Monthly 1st</button>
+                        </div>
+                        
+                        <input type="text" name="cron_expression" id="cron-input"
                                value="{{ script.cron_expression if script else '0 * * * *' }}"
                                placeholder="0 * * * *"
-                               class="input input-bordered w-full font-mono"
+                               class="input input-bordered w-full font-mono mb-2"
                                required>
+                        
+                        <!-- Human-readable description -->
+                        <div class="alert alert-info mb-2" style="padding: 0.75rem;">
+                            <div class="flex items-start gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <div class="text-sm">
+                                    <div id="cron-description" class="font-semibold text-gray-900">Loading...</div>
+                                    <div id="cron-next-runs" class="text-xs text-gray-700 mt-1">Next runs: calculating...</div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <label class="label">
-                            <span class="label-text-alt text-gray-500">minute hour day month weekday</span>
+                            <span class="label-text-alt text-gray-700 font-medium">Format: minute hour day month weekday</span>
+                            <a href="https://crontab.guru/" target="_blank" class="label-text-alt link link-primary font-medium">Cron helper</a>
                         </label>
                     </div>
                     
@@ -1552,6 +1585,163 @@ ${separator}
         div.textContent = text;
         return div.innerHTML;
     }
+    
+    // === CRON EXPRESSION HELPER ===
+    function setCron(expression) {
+        const cronInput = document.getElementById('cron-input');
+        if (cronInput) {
+            cronInput.value = expression;
+            updateCronDescription(expression);
+        }
+    }
+    
+    function updateCronDescription(expression) {
+        const descEl = document.getElementById('cron-description');
+        const nextRunsEl = document.getElementById('cron-next-runs');
+        
+        if (!descEl || !nextRunsEl) return;
+        
+        try {
+            const description = parseCronExpression(expression);
+            descEl.textContent = description;
+            descEl.classList.remove('!text-red-900');
+            
+            // Calculate next 3 runs
+            const nextRuns = calculateNextRuns(expression, 3);
+            if (nextRuns.length > 0) {
+                nextRunsEl.textContent = 'Next runs: ' + nextRuns.join(', ');
+            } else {
+                nextRunsEl.textContent = 'Next runs: none found (check expression)';
+            }
+        } catch (err) {
+            descEl.textContent = '⚠️ Invalid cron expression';
+            descEl.classList.add('!text-red-900');
+            nextRunsEl.textContent = '';
+        }
+    }
+    
+    function parseCronExpression(expression) {
+        const parts = expression.trim().split(/\s+/);
+        if (parts.length !== 5) {
+            throw new Error('Invalid cron expression');
+        }
+        
+        const [minute, hour, day, month, weekday] = parts;
+        
+        // Common patterns
+        const patterns = [
+            { regex: /^\* \* \* \* \*$/, desc: 'Every minute' },
+            { regex: /^\*\/(\d+) \* \* \* \*$/, desc: m => `Every ${m[1]} minutes` },
+            { regex: /^0 \* \* \* \*$/, desc: 'Every hour' },
+            { regex: /^0 \*\/(\d+) \* \* \*$/, desc: m => `Every ${m[1]} hours` },
+            { regex: /^0 12 \* \* \*$/, desc: 'Daily at noon (12:00)' },
+            { regex: /^0 0 \* \* \*$/, desc: 'Daily at midnight' },
+            { regex: /^0 (\d+) \* \* \*$/, desc: m => `Daily at ${m[1]}:00` },
+            { regex: /^(\d+) (\d+) \* \* \*$/, desc: m => `Daily at ${m[2]}:${m[1].padStart(2, '0')}` },
+            { regex: /^0 (\d+) \* \* 1-5$/, desc: m => `Weekdays (Mon-Fri) at ${m[1]}:00` },
+            { regex: /^0 0 \* \* 0$/, desc: 'Weekly on Sunday at midnight' },
+            { regex: /^0 0 \* \* (\d)$/, desc: m => `Weekly on ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][m[1]]} at midnight` },
+            { regex: /^0 0 1 \* \*$/, desc: 'Monthly on the 1st at midnight' },
+            { regex: /^0 0 (\d+) \* \*$/, desc: m => `Monthly on the ${m[1]}${getOrdinalSuffix(m[1])} at midnight` },
+        ];
+        
+        for (const pattern of patterns) {
+            const match = expression.match(pattern.regex);
+            if (match) {
+                return typeof pattern.desc === 'function' ? pattern.desc(match) : pattern.desc;
+            }
+        }
+        
+        // Generic description
+        return `At minute ${minute}, hour ${hour}, day ${day}, month ${month}, weekday ${weekday}`;
+    }
+    
+    function getOrdinalSuffix(num) {
+        const j = num % 10, k = num % 100;
+        if (j === 1 && k !== 11) return 'st';
+        if (j === 2 && k !== 12) return 'nd';
+        if (j === 3 && k !== 13) return 'rd';
+        return 'th';
+    }
+    
+    function calculateNextRuns(expression, count = 3) {
+        const parts = expression.trim().split(/\s+/);
+        if (parts.length !== 5) return [];
+        
+        const [minute, hour, day, month, weekday] = parts;
+        const now = new Date();
+        const nextRuns = [];
+        
+        // Simple calculation for common patterns
+        let current = new Date(now);
+        current.setSeconds(0);
+        current.setMilliseconds(0);
+        
+        // Check up to 10 days ahead to handle weekly schedules
+        for (let i = 0; i < 14400 && nextRuns.length < count; i++) {
+            current = new Date(current.getTime() + 60000); // Add 1 minute
+            
+            const m = current.getMinutes();
+            const h = current.getHours();
+            const d = current.getDate();
+            const mo = current.getMonth() + 1;
+            const wd = current.getDay();
+            
+            if (matchesCronPart(minute, m) && 
+                matchesCronPart(hour, h) &&
+                matchesCronPart(day, d) &&
+                matchesCronPart(month, mo) &&
+                matchesCronPart(weekday, wd)) {
+                
+                const timeStr = current.toLocaleString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit'
+                });
+                nextRuns.push(timeStr);
+            }
+        }
+        
+        return nextRuns;
+    }
+    
+    function matchesCronPart(cronPart, value) {
+        if (cronPart === '*') return true;
+        
+        // Handle step values (*/5)
+        if (cronPart.includes('/')) {
+            const [range, step] = cronPart.split('/');
+            if (range === '*') {
+                return value % parseInt(step) === 0;
+            }
+        }
+        
+        // Handle ranges (1-5)
+        if (cronPart.includes('-')) {
+            const [start, end] = cronPart.split('-').map(Number);
+            return value >= start && value <= end;
+        }
+        
+        // Handle lists (1,3,5)
+        if (cronPart.includes(',')) {
+            return cronPart.split(',').map(Number).includes(value);
+        }
+        
+        // Exact match
+        return parseInt(cronPart) === value;
+    }
+    
+    // Initialize cron description on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        const cronInput = document.getElementById('cron-input');
+        if (cronInput) {
+            updateCronDescription(cronInput.value);
+            cronInput.addEventListener('input', (e) => {
+                updateCronDescription(e.target.value);
+            });
+        }
+    });
     
     // Load versions on page load for editing
     {% if script %}

@@ -50,7 +50,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-gray-400 text-sm">Running Now</p>
-                <p class="text-3xl font-bold mt-1 {% if stats.running_now > 0 %}text-blue-400{% endif %}">
+                <p class="text-3xl font-bold mt-1 {% if stats.running_now > 0 %}text-yellow-400{% else %}text-gray-400{% endif %}">
                     {{ stats.running_now }}
                 </p>
             </div>
