@@ -222,8 +222,12 @@ async def stream_execution_output(
                         updated_execution = result.scalar_one_or_none()
                         done_payload = json.dumps(
                             {
-                                "status": updated_execution.status if updated_execution else "unknown",
-                                "exit_code": updated_execution.exit_code if updated_execution else None,
+                                "status": updated_execution.status
+                                if updated_execution
+                                else "unknown",
+                                "exit_code": updated_execution.exit_code
+                                if updated_execution
+                                else None,
                             }
                         )
                         yield f"event: done\ndata: {done_payload}\n\n"

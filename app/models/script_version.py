@@ -1,11 +1,15 @@
-﻿"""Script version model for tracking script history."""
+"""Script version model for tracking script history."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Index, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.script import Script
 
 
 class ScriptVersion(Base):
@@ -32,22 +36,14 @@ class ScriptVersion(Base):
     # Snapshot of script content at this version
     content: Mapped[str] = mapped_column(Text, nullable=False)
     dependencies: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    python_version: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="3.11"
-    )
-    cron_expression: Mapped[str] = mapped_column(
-        String(100), nullable=False, default="0 * * * *"
-    )
+    python_version: Mapped[str] = mapped_column(String(20), nullable=False, default="3.11")
+    cron_expression: Mapped[str] = mapped_column(String(100), nullable=False, default="0 * * * *")
     timeout: Mapped[int] = mapped_column(nullable=False, default=3600)
     environment_vars: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
     # Version metadata
-    created_at: Mapped[datetime] = mapped_column(
-        nullable=False, server_default=func.now()
-    )
-    created_by: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="manual"
-    )
+    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
+    created_by: Mapped[str] = mapped_column(String(50), nullable=False, default="manual")
     change_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships

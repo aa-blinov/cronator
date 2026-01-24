@@ -1,4 +1,4 @@
-﻿"""Pydantic schemas package."""
+"""Pydantic schemas package."""
 
 from app.schemas.execution import (
     ExecutionCreate,

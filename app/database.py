@@ -16,10 +16,28 @@ class Base(DeclarativeBase):
 
 settings = get_settings()
 
+# Create engine with connection pooling
+# For SQLite, pooling options are ignored but don't cause errors
+engine_kwargs = {
+    "echo": settings.debug,
+    "future": True,
+}
+
+# Add pooling settings for production databases (PostgreSQL, MySQL)
+if not settings.database_url.startswith("sqlite"):
+    engine_kwargs.update(
+        {
+            "pool_size": settings.db_pool_size,
+            "max_overflow": settings.db_max_overflow,
+            "pool_timeout": settings.db_pool_timeout,
+            "pool_recycle": settings.db_pool_recycle,
+            "pool_pre_ping": settings.db_pool_pre_ping,
+        }
+    )
+
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,
-    future=True,
+    **engine_kwargs,
 )
 
 async_session_maker = async_sessionmaker(

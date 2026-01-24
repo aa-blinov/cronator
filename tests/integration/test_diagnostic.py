@@ -29,7 +29,7 @@ async def test_script_registration_diagnostic(test_client):
     # Check executor_service instance ID
     from app.api.scripts import executor_service as api_executor_service
 
-    print(f"\n=== DIAGNOSTIC ===")
+    print("\n=== DIAGNOSTIC ===")
     print(f"Script created: ID={script_id}, name={script['name']}")
     print(f"Script name to ID mapping: {environment_service._script_name_to_id}")
     print(f"Is registered: {'diagnostic_script' in environment_service._script_name_to_id}")

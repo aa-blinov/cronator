@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite+aiosqlite:///./data/cronator.db"
 
+    # Database connection pooling (for PostgreSQL/MySQL)
+    db_pool_size: int = 20
+    db_max_overflow: int = 10
+    db_pool_timeout: int = 30
+    db_pool_recycle: int = 3600  # Recycle connections after 1 hour
+    db_pool_pre_ping: bool = True  # Test connections before using
+
     # Directories
     base_dir: Path = Path(__file__).parent.parent
     scripts_dir: Path = Path("./scripts")

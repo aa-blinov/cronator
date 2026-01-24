@@ -82,9 +82,10 @@ class EnvironmentService:
         script_id = self._script_name_to_id.get(script_name)
         if script_id is None:
             return False
-        
+
         # Import here to avoid circular dependency
         from app.services.executor import executor_service
+
         return executor_service.is_script_running(script_id)
 
     def _get_env_lock(self, script_name: str) -> asyncio.Lock:
@@ -496,8 +497,7 @@ class EnvironmentService:
                     return True, "Environment deleted"
                 except PermissionError as e:
                     logger.error(
-                        f"Cannot delete environment for {script_name}: {e}. "
-                        "Files may be in use."
+                        f"Cannot delete environment for {script_name}: {e}. Files may be in use."
                     )
                     return (
                         False,

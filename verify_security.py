@@ -1,14 +1,16 @@
+import sys
+
 import requests
 from requests.auth import HTTPBasicAuth
-import sys
 
 BASE_URL = "http://localhost:8000"
 USER = "admin"
-PASS = "admin" # Default from .env.example
+PASS = "admin"  # Default from .env.example
+
 
 def test_api_auth():
     print("Testing API Authentication...")
-    
+
     # 1. Test without auth
     print("- Testing without auth (should be 401)...")
     try:
@@ -27,9 +29,13 @@ def test_api_auth():
         if r.status_code == 200:
             print("  [PASS] Got 200 OK")
         else:
-            print(f"  [FAIL] Got {r.status_code} instead of 200. Check if server is running and credentials are correct.")
+            print(
+                f"  [FAIL] Got {r.status_code} instead of 200. "
+                "Check if server is running and credentials are correct."
+            )
     except Exception as e:
         print(f"  [ERROR] {e}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

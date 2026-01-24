@@ -8,13 +8,16 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies first (better layer caching)
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
 
 # Copy application code
 COPY . .
@@ -32,8 +35,9 @@ COPY package.json tailwind.config.js ./
 COPY app/static/input.css ./app/static/
 COPY app/templates ./app/templates
 
-# Install dependencies and build CSS
-RUN npm install && \
+# Install dependencies and build CSS with caching
+RUN --mount=type=cache,target=/root/.npm \
+    npm install && \
     npx tailwindcss -i ./app/static/input.css -o ./app/static/output.css --minify
 
 

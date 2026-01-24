@@ -1,4 +1,4 @@
-﻿"""Pydantic schemas for ScriptVersion model."""
+"""Pydantic schemas for ScriptVersion model."""
 
 from datetime import datetime
 

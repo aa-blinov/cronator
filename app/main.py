@@ -3,11 +3,15 @@
 import logging
 import logging.handlers
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import text
 
 from app.api import api_router
 from app.config import get_settings
@@ -110,6 +114,45 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+# Exception handlers for centralized error handling
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Handle all unhandled exceptions."""
+    logger.exception(f"Unhandled exception on {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "detail": "Internal server error",
+            "type": type(exc).__name__,
+            "path": str(request.url.path),
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle validation errors with detailed information."""
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "detail": "Validation error",
+            "errors": exc.errors(),
+            "body": exc.body,
+        },
+    )
+
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    """Handle ValueError as bad request."""
+    logger.warning(f"ValueError on {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": str(exc)},
+    )
+
+
 # Setup templates
 templates_dir = Path(__file__).parent / "templates"
 app.state.templates = Jinja2Templates(directory=str(templates_dir))
@@ -125,12 +168,44 @@ app.include_router(api_router)
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {
+    """Enhanced health check endpoint with detailed status."""
+    from app.database import async_session_maker
+
+    checks = {
         "status": "healthy",
         "app": settings.app_name,
         "version": "0.1.0",
+        "timestamp": datetime.now(UTC).isoformat(),
+        "components": {
+            "database": "unknown",
+            "scheduler": "unknown",
+        },
     }
+
+    # Database check
+    try:
+        async with async_session_maker() as db:
+            await db.execute(text("SELECT 1"))
+        checks["components"]["database"] = "healthy"
+    except Exception as e:
+        checks["components"]["database"] = f"unhealthy: {type(e).__name__}"
+        checks["status"] = "degraded"
+        logger.error(f"Database health check failed: {e}")
+
+    # Scheduler check
+    try:
+        is_running = scheduler_service.scheduler.running
+        checks["components"]["scheduler"] = "running" if is_running else "stopped"
+        if not is_running:
+            checks["status"] = "degraded"
+    except Exception as e:
+        checks["components"]["scheduler"] = f"error: {type(e).__name__}"
+        checks["status"] = "degraded"
+        logger.error(f"Scheduler health check failed: {e}")
+
+    # Return 503 if unhealthy
+    status_code = 200 if checks["status"] == "healthy" else 503
+    return JSONResponse(content=checks, status_code=status_code)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-﻿"""Script model for storing script configurations."""
+"""Script model for storing script configurations."""
 
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -70,7 +70,7 @@ class Script(Base):
         cascade="all, delete-orphan",
         order_by="desc(Execution.started_at)",
     )
-    
+
     versions: Mapped[list["ScriptVersion"]] = relationship(
         "ScriptVersion",
         back_populates="script",
