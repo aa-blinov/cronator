@@ -1,7 +1,12 @@
 """API routes for scripts."""
 
+import asyncio
+import json
+import logging
+
 import aiofiles
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,11 +15,18 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.execution import Execution
 from app.models.script import Script
-from app.schemas.script import ScriptCreate, ScriptList, ScriptRead, ScriptUpdate
+from app.schemas.script import (
+    ScriptCreate,
+    ScriptList,
+    ScriptRead,
+    ScriptReadWithInstallStatus,
+    ScriptUpdate,
+)
 from app.services.environment import environment_service
 from app.services.executor import executor_service
 from app.services.scheduler import scheduler_service
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
 
@@ -113,7 +125,7 @@ async def get_script(
     return script_data
 
 
-@router.post("", response_model=ScriptRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ScriptReadWithInstallStatus, status_code=status.HTTP_201_CREATED)
 async def create_script(
     data: ScriptCreate,
     db: AsyncSession = Depends(get_db),
@@ -169,22 +181,21 @@ async def create_script(
     await db.commit()
     await db.refresh(script)
 
-    # Setup environment
-    if data.dependencies:
-        await environment_service.setup_environment(
-            script.name,
-            script.python_version,
-            script.dependencies,
-        )
+    # NOTE: Environment setup is now done separately via /scripts/{id}/install
+    # to allow streaming of installation logs
 
     # Add to scheduler
     if script.enabled:
         await scheduler_service.add_job(script)
 
-    return ScriptRead.model_validate(script)
+    # Build response with installation status
+    return ScriptReadWithInstallStatus(
+        **ScriptRead.model_validate(script).model_dump(),
+        needs_install=bool(data.dependencies),
+    )
 
 
-@router.put("/{script_id}", response_model=ScriptRead)
+@router.put("/{script_id}", response_model=ScriptReadWithInstallStatus)
 async def update_script(
     script_id: int,
     data: ScriptUpdate,
@@ -218,10 +229,16 @@ async def update_script(
     schedule_changed = False
     enabled_changed = False
 
+    update_data = data.model_dump(exclude_unset=True)
+
     # Update fields
-    for field, value in data.model_dump(exclude_unset=True).items():
-        if field == "dependencies" and value != script.dependencies:
-            deps_changed = True
+    for field, value in update_data.items():
+        if field == "dependencies":
+            # Normalize empty strings and None for comparison
+            old_deps = (script.dependencies or "").strip()
+            new_deps = (value or "").strip()
+            if new_deps != old_deps:
+                deps_changed = True
         if field == "python_version" and value != script.python_version:
             python_changed = True
         if field == "cron_expression" and value != script.cron_expression:
@@ -230,6 +247,8 @@ async def update_script(
             enabled_changed = True
 
         setattr(script, field, value)
+
+    needs_install = deps_changed or python_changed
 
     # Update script file if content changed
     if data.content is not None:
@@ -243,19 +262,18 @@ async def update_script(
     await db.commit()
     await db.refresh(script)
 
-    # Rebuild environment if needed
-    if deps_changed or python_changed:
-        await environment_service.setup_environment(
-            script.name,
-            script.python_version,
-            script.dependencies,
-        )
+    # NOTE: Environment setup is now done separately via /scripts/{id}/install
+    # to allow streaming of installation logs
 
     # Update scheduler
     if schedule_changed or enabled_changed:
         await scheduler_service.update_job(script)
 
-    return ScriptRead.model_validate(script)
+    # Build response with installation status
+    return ScriptReadWithInstallStatus(
+        **ScriptRead.model_validate(script).model_dump(),
+        needs_install=needs_install,
+    )
 
 
 @router.delete("/{script_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -371,6 +389,120 @@ async def rebuild_environment(
         raise HTTPException(status_code=500, detail=message)
 
     return {"message": message}
+
+
+@router.post("/{script_id}/install")
+async def start_install(
+    script_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Start environment setup in background with streaming support."""
+    result = await db.execute(select(Script).where(Script.id == script_id))
+    script = result.scalar_one_or_none()
+
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+
+    if environment_service.is_installing(script_id):
+        raise HTTPException(status_code=409, detail="Installation already in progress")
+
+    # Create queue for streaming
+    environment_service.install_queues[script_id] = asyncio.Queue()
+
+    # Start installation in background
+    background_tasks.add_task(
+        environment_service.setup_environment_streaming,
+        script_id,
+        script.name,
+        script.python_version,
+        script.dependencies or "",
+    )
+
+    return {"message": "Installation started", "script_id": script_id}
+
+
+@router.get("/{script_id}/install-stream")
+async def install_stream(
+    script_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Stream installation logs via SSE."""
+    result = await db.execute(select(Script).where(Script.id == script_id))
+    script = result.scalar_one_or_none()
+
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+
+    queue = environment_service.install_queues.get(script_id)
+    if not queue:
+        # No active installation, return immediately
+        async def no_install():
+            yield 'event: error\ndata: {"message": "No installation in progress"}\n\n'
+
+        return StreamingResponse(
+            no_install(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        )
+
+    async def event_generator():
+        """Generate SSE events from install queue."""
+        try:
+            while True:
+                try:
+                    event_type, message = await asyncio.wait_for(
+                        queue.get(),
+                        timeout=60.0,
+                    )
+
+                    if event_type == "done":
+                        done_payload = json.dumps({"success": True})
+                        yield f"event: done\ndata: {done_payload}\n\n"
+                        break
+                    elif event_type == "error":
+                        yield f"data: {message}\n\n"
+                    else:
+                        yield f"data: {message}\n\n"
+
+                except TimeoutError:
+                    # Keep-alive
+                    yield ": keep-alive\n\n"
+                    continue
+
+        finally:
+            # Cleanup queue
+            if script_id in environment_service.install_queues:
+                del environment_service.install_queues[script_id]
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/{script_id}/packages")
+async def get_script_packages(
+    script_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get list of installed packages in the script's virtual environment."""
+    result = await db.execute(select(Script).where(Script.id == script_id))
+    script = result.scalar_one_or_none()
+
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+
+    packages = await environment_service.get_installed_packages(script.name)
+    return {"packages": packages}
 
 
 @router.post("/validate-dependencies")

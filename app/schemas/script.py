@@ -153,6 +153,15 @@ class ScriptRead(ScriptBase):
     model_config = {"from_attributes": True}
 
 
+class ScriptReadWithInstallStatus(ScriptRead):
+    """Schema for reading a script with installation status flag."""
+
+    needs_install: bool = Field(
+        default=False,
+        description="Whether dependencies or Python version changed and installation is needed",
+    )
+
+
 class ScriptList(BaseModel):
     """Schema for listing scripts with pagination."""
 

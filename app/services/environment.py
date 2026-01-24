@@ -10,6 +10,29 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Retryable network errors for automatic retry
+RETRYABLE_NETWORK_ERRORS = [
+    "failed to download",
+    "connection timed out",
+    "connection refused",
+    "temporary failure",
+    "network is unreachable",
+    "read timed out",
+    "ssl error",
+    "certificate verify failed",
+    "connect timeout",
+    "timeout was reached",
+]
+
+# Non-retryable errors (configuration issues)
+NON_RETRYABLE_ERRORS = [
+    "No solution found",
+    "not found in the package registry",
+    "invalid package name",
+    "does not exist",
+    "No versions",
+]
+
 
 class EnvironmentService:
     """Service for managing virtual environments using uv."""
@@ -19,6 +42,16 @@ class EnvironmentService:
         self.uv_path = settings.uv_path
         self._env_locks: dict[str, asyncio.Lock] = {}
         self._validation_lock = asyncio.Lock()
+        # Queues for streaming install output
+        self.install_queues: dict[int, asyncio.Queue] = {}
+        self._active_installs: dict[int, bool] = {}
+        # Retry configuration
+        self.retry_config = {
+            "max_attempts": 3,
+            "base_delay": 2.0,  # seconds
+            "max_delay": 30.0,  # seconds
+            "backoff_factor": 2.0,  # exponential backoff multiplier
+        }
 
     def get_env_path(self, script_name: str) -> Path:
         """Get the path to a script's virtual environment."""
@@ -62,7 +95,13 @@ class EnvironmentService:
 
             try:
                 # Remove existing env if present
+                # Note: This could potentially interfere with running executions
+                # but we use locks to minimize this risk
                 if env_path.exists():
+                    logger.warning(
+                        f"Removing existing environment for {script_name}. "
+                        "This may cause issues if script is currently executing."
+                    )
                     shutil.rmtree(env_path)
 
                 env_path.mkdir(parents=True, exist_ok=True)
@@ -188,22 +227,43 @@ class EnvironmentService:
                     stderr=asyncio.subprocess.PIPE,
                 )
 
-                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30.0)
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
 
                 # Check for actual errors (uv writes success messages to stderr too)
                 stderr_text = stderr.decode() if stderr else ""
+                stdout_text = stdout.decode() if stdout else ""
 
-                # Check for error indicators in stderr
-                if (
-                    "No solution found" in stderr_text
-                    or "not found in the package registry" in stderr_text
-                ):
-                    logger.warning(f"Dependency resolution failed: {stderr_text}")
-                    return False, f"Cannot resolve dependencies:\n{stderr_text}", valid_packages
+                # Check for error indicators
+                error_indicators = [
+                    "No solution found",
+                    "not found in the package registry",
+                    "No versions",
+                    "error:",
+                    "failed to download",
+                    "Could not find",
+                    "does not exist",
+                ]
 
-                if process.returncode != 0 and "Resolved" not in stderr_text:
-                    errors = stderr_text or "Unknown error"
-                    logger.warning(f"Dependency resolution failed: {errors}")
+                for indicator in error_indicators:
+                    indicator_lower = indicator.lower()
+                    if (
+                        indicator_lower in stderr_text.lower()
+                        or indicator_lower in stdout_text.lower()
+                    ):
+                        error_output = stderr_text or stdout_text
+                        logger.warning(f"Dependency resolution failed: {error_output}")
+                        return (
+                            False,
+                            f"Cannot resolve dependencies:\n{error_output}",
+                            valid_packages,
+                        )
+
+                # Check return code
+                if process.returncode != 0:
+                    errors = stderr_text or stdout_text or "Unknown error"
+                    logger.warning(
+                        f"Dependency resolution failed with code {process.returncode}: {errors}"
+                    )
                     return False, f"Resolution error:\n{errors}", valid_packages
 
                 logger.info("Dependencies validated and resolved successfully")
@@ -226,7 +286,7 @@ class EnvironmentService:
             logger.warning("Dependency validation timed out")
             return (
                 False,
-                "Validation timed out (30s). Try fewer packages or check your network.",
+                "Validation timed out (60s). Try fewer packages or check your network.",
                 [],
             )
         except Exception as e:
@@ -291,9 +351,26 @@ class EnvironmentService:
                 output = stdout.decode() if stdout else ""
                 errors = stderr.decode() if stderr else ""
 
-                if process.returncode != 0:
-                    logger.error(f"Failed to install deps for {script_name}: {errors}")
-                    return False, errors or "Installation failed"
+                # Check for errors even if returncode is 0
+                error_indicators = [
+                    "No solution found",
+                    "not found in the package registry",
+                    "Could not find",
+                    "No versions",
+                    "does not exist",
+                    "error:",
+                    "failed to download",
+                ]
+
+                errors_found = []
+                for indicator in error_indicators:
+                    if indicator.lower() in errors.lower() or indicator.lower() in output.lower():
+                        errors_found.append(indicator)
+
+                if errors_found or process.returncode != 0:
+                    error_msg = errors or output or "Installation failed"
+                    logger.error(f"Failed to install deps for {script_name}: {error_msg}")
+                    return False, error_msg
 
                 logger.info(f"Dependencies installed for {script_name}")
                 return True, output or "Dependencies installed successfully"
@@ -313,6 +390,12 @@ class EnvironmentService:
 
         This is the main method to call for setting up a script's environment.
         """
+        # Validate dependencies first
+        if dependencies.strip():
+            is_valid, error_msg, _ = await self.validate_dependencies(dependencies)
+            if not is_valid:
+                return False, f"Invalid dependencies: {error_msg}"
+
         # Create environment
         success, message = await self.create_env(script_name, python_version)
         if not success:
@@ -408,6 +491,330 @@ class EnvironmentService:
 
         except Exception:
             return []
+
+    # --- Streaming install methods ---
+
+    def is_installing(self, script_id: int) -> bool:
+        """Check if installation is in progress for a script."""
+        return self._active_installs.get(script_id, False)
+
+    async def setup_environment_streaming(
+        self,
+        script_id: int,
+        script_name: str,
+        python_version: str = "3.11",
+        dependencies: str = "",
+    ) -> tuple[bool, str]:
+        """
+        Create environment and install dependencies with streaming output.
+
+        Output is sent to install_queues[script_id].
+        """
+        queue = self.install_queues.get(script_id)
+
+        async def send_log(message: str) -> None:
+            if queue:
+                await queue.put(("log", message))
+
+        async def send_error(message: str) -> None:
+            if queue:
+                await queue.put(("error", message))
+
+        self._active_installs[script_id] = True
+
+        try:
+            # Validate dependencies first
+            if dependencies.strip():
+                await send_log("📋 Validating dependencies...")
+                is_valid, error_msg, packages = await self.validate_dependencies(dependencies)
+                if not is_valid:
+                    await send_error(f"❌ Invalid dependencies: {error_msg}")
+                    return False, f"Invalid dependencies: {error_msg}"
+                await send_log(f"✓ Dependencies valid: {', '.join(packages)}")
+
+            # Create environment
+            await send_log(f"🔧 Creating virtual environment (Python {python_version})...")
+            success, message = await self._create_env_streaming(
+                script_id, script_name, python_version
+            )
+            if not success:
+                await send_error(f"❌ Failed to create environment: {message}")
+                return False, f"Failed to create environment: {message}"
+            await send_log("✓ Environment created")
+
+            # Install cronator_lib
+            cronator_lib_path = settings.base_dir / "cronator_lib"
+            if cronator_lib_path.exists():
+                await send_log("📦 Installing cronator_lib...")
+                success, output = await self._install_cronator_lib_streaming(script_id, script_name)
+                if success:
+                    await send_log("✓ cronator_lib installed")
+                else:
+                    await send_log(f"⚠ Warning: cronator_lib install failed: {output}")
+
+            # Install user dependencies
+            if dependencies.strip():
+                await send_log("📦 Installing dependencies...")
+                success, output = await self._install_dependencies_streaming(
+                    script_id, script_name, dependencies
+                )
+                if not success:
+                    await send_error(f"❌ Failed to install dependencies: {output}")
+                    return False, f"Failed to install dependencies: {output}"
+                await send_log("✓ Dependencies installed successfully")
+
+            await send_log("🎉 Environment setup complete!")
+            return True, "Environment setup complete"
+
+        except Exception as e:
+            await send_error(f"❌ Error: {str(e)}")
+            return False, str(e)
+        finally:
+            self._active_installs[script_id] = False
+            if queue:
+                await queue.put(("done", ""))
+
+    async def _create_env_streaming(
+        self,
+        script_id: int,
+        script_name: str,
+        python_version: str,
+    ) -> tuple[bool, str]:
+        """Create environment with streaming output."""
+        queue = self.install_queues.get(script_id)
+        lock = self._get_env_lock(script_name)
+
+        async with lock:
+            env_path = self.get_env_path(script_name)
+
+            try:
+                if env_path.exists():
+                    shutil.rmtree(env_path)
+                env_path.mkdir(parents=True, exist_ok=True)
+
+                cmd = [
+                    self.uv_path,
+                    "venv",
+                    str(env_path),
+                    "--python",
+                    python_version,
+                ]
+
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+
+                # Stream stderr (uv outputs to stderr)
+                async def read_stream(stream, prefix=""):
+                    while True:
+                        line = await stream.readline()
+                        if not line:
+                            break
+                        text = line.decode().rstrip()
+                        if queue and text:
+                            await queue.put(("log", f"  {prefix}{text}"))
+
+                await asyncio.gather(
+                    read_stream(process.stdout),
+                    read_stream(process.stderr),
+                )
+
+                await process.wait()
+
+                if process.returncode != 0:
+                    return False, f"uv venv failed with code {process.returncode}"
+
+                return True, "Environment created"
+
+            except Exception as e:
+                return False, str(e)
+
+    async def _install_cronator_lib_streaming(
+        self,
+        script_id: int,
+        script_name: str,
+    ) -> tuple[bool, str]:
+        """Install cronator_lib with streaming output."""
+        queue = self.install_queues.get(script_id)
+        cronator_lib_path = settings.base_dir / "cronator_lib"
+
+        cmd = [
+            self.uv_path,
+            "pip",
+            "install",
+            "--python",
+            str(self.get_python_path(script_name)),
+            "-e",
+            str(cronator_lib_path),
+        ]
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            async def read_stream(stream):
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
+                    text = line.decode().rstrip()
+                    if queue and text:
+                        await queue.put(("log", f"  {text}"))
+
+            await asyncio.gather(
+                read_stream(process.stdout),
+                read_stream(process.stderr),
+            )
+
+            await process.wait()
+
+            if process.returncode != 0:
+                return False, f"pip install failed with code {process.returncode}"
+            return True, "cronator_lib installed"
+
+        except Exception as e:
+            return False, str(e)
+
+    async def _install_dependencies_streaming(
+        self,
+        script_id: int,
+        script_name: str,
+        dependencies: str,
+    ) -> tuple[bool, str]:
+        """Install dependencies with streaming output and automatic retry on network errors."""
+        queue = self.install_queues.get(script_id)
+        lock = self._get_env_lock(script_name)
+
+        async with lock:
+            env_path = self.get_env_path(script_name)
+
+            if not env_path.exists():
+                return False, "Environment does not exist"
+
+            try:
+                packages = [
+                    pkg.strip()
+                    for pkg in dependencies.strip().split("\n")
+                    if pkg.strip() and not pkg.strip().startswith("#")
+                ]
+
+                if not packages:
+                    return True, "No packages to install"
+
+                cmd = [
+                    self.uv_path,
+                    "pip",
+                    "install",
+                    "--python",
+                    str(self.get_python_path(script_name)),
+                    *packages,
+                ]
+
+                # Retry loop for network errors
+                max_attempts = self.retry_config["max_attempts"]
+                base_delay = self.retry_config["base_delay"]
+                backoff_factor = self.retry_config["backoff_factor"]
+                max_delay = self.retry_config["max_delay"]
+
+                last_error = ""
+
+                for attempt in range(1, max_attempts + 1):
+                    if attempt > 1 and queue:
+                        await queue.put(("log", f"\\n🔄 Retry attempt {attempt}/{max_attempts}..."))
+
+                    process = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+
+                    # Collect output for error checking
+                    stdout_lines = []
+                    stderr_lines = []
+
+                    async def read_stream(stream, lines_list):
+                        while True:
+                            line = await stream.readline()
+                            if not line:
+                                break
+                            text = line.decode().rstrip()
+                            lines_list.append(text)
+                            if queue and text:
+                                await queue.put(("log", f"  {text}"))
+
+                    await asyncio.gather(
+                        read_stream(process.stdout, stdout_lines),
+                        read_stream(process.stderr, stderr_lines),
+                    )
+
+                    await process.wait()
+
+                    # Success case
+                    if process.returncode == 0:
+                        logger.info(
+                            f"Dependencies installed for {script_name} "
+                            f"(attempt {attempt}/{max_attempts})"
+                        )
+                        return True, "Dependencies installed"
+
+                    # Failed - check if retryable
+                    all_output = "\\n".join(stdout_lines + stderr_lines).lower()
+                    last_error = f"pip install failed with code {process.returncode}"
+
+                    # Check for retryable network errors
+                    is_retryable = any(
+                        error_indicator in all_output
+                        for error_indicator in RETRYABLE_NETWORK_ERRORS
+                    )
+
+                    # Check for non-retryable errors (config issues)
+                    is_non_retryable = any(
+                        error_indicator.lower() in all_output
+                        for error_indicator in NON_RETRYABLE_ERRORS
+                    )
+
+                    if is_non_retryable:
+                        logger.warning(f"Non-retryable error for {script_name}: {last_error}")
+                        if queue:
+                            error_msg = (
+                                "\\n❌ Installation failed with configuration error (not retrying)"
+                            )
+                            await queue.put(("log", error_msg))
+                        return False, last_error
+
+                    if not is_retryable or attempt == max_attempts:
+                        # Last attempt or not retryable
+                        logger.error(
+                            f"Installation failed for {script_name} after {attempt} attempt(s): "
+                            f"{last_error}"
+                        )
+                        return False, last_error
+
+                    # Calculate delay with exponential backoff
+                    delay = min(base_delay * (backoff_factor ** (attempt - 1)), max_delay)
+
+                    if queue:
+                        await queue.put(
+                            ("log", f"⚠️  Network error detected. Retrying in {delay:.1f}s...")
+                        )
+
+                    logger.info(
+                        f"Retrying installation for {script_name} in {delay:.1f}s "
+                        f"(attempt {attempt}/{max_attempts})"
+                    )
+                    await asyncio.sleep(delay)
+
+                # This should not be reached, but for safety
+                return False, last_error or "Installation failed"
+
+            except Exception as e:
+                logger.exception(f"Error installing dependencies for {script_name}")
+                return False, str(e)
 
 
 # Global instance

@@ -38,11 +38,59 @@
         scrollbar-width: thin;
         scrollbar-color: rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0.1);
     }
+    
+    /* Dependency diff styles */
+    .diff-line-added {
+        background-color: rgba(34, 197, 94, 0.1);
+        color: rgb(34, 197, 94);
+        border-left: 2px solid rgb(34, 197, 94);
+        padding-left: 0.5rem;
+        padding-top: 0.25rem;
+        padding-bottom: 0.25rem;
+    }
+    
+    .diff-line-removed {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: rgb(239, 68, 68);
+        border-left: 2px solid rgb(239, 68, 68);
+        padding-left: 0.5rem;
+        padding-top: 0.25rem;
+        padding-bottom: 0.25rem;
+    }
+    
+    .diff-line-modified {
+        background-color: rgba(251, 191, 36, 0.1);
+        color: rgb(251, 191, 36);
+        border-left: 2px solid rgb(251, 191, 36);
+        padding-left: 0.5rem;
+        padding-top: 0.25rem;
+        padding-bottom: 0.25rem;
+    }
+    
+    .diff-line-added::before {
+        content: '+ ';
+        font-weight: bold;
+    }
+    
+    .diff-line-removed::before {
+        content: '- ';
+        font-weight: bold;
+    }
+    
+    .diff-line-modified::before {
+        content: '~ ';
+        font-weight: bold;
+    }
+    
+    /* Hide collapse checkbox */
+    #deps-diff-container input[type="checkbox"] {
+        display: none;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<form method="POST" action="{% if script %}/api/scripts/{{ script.id }}{% else %}/api/scripts{% endif %}" id="script-form">
+<form method="POST" action="{% if script %}/api/scripts/{{ script.id }}{% else %}/api/scripts{% endif %}" id="script-form" data-script-id="{% if script %}{{ script.id }}{% endif %}">
     <div class="flex items-center justify-between mb-6">
         <h2 class="text-2xl font-bold">{{ page_title }}</h2>
         <div class="flex gap-2">
@@ -114,7 +162,7 @@
                         <button type="button" id="download-output-btn" class="btn btn-outline btn-xs">
                             Download
                         </button>
-                        <button type="button" id="clear-output-btn" class="btn btn-outline btn-sm btn-xs">
+                        <button type="button" id="clear-output-btn" class="btn btn-outline btn-xs">
                             Clear
                         </button>
                     </div>
@@ -227,15 +275,58 @@
                         <span class="label-text-alt text-gray-500">One package per line (pip format)</span>
                     </label>
                 </div>
-                <div class="mt-3">
-                    <button type="button" id="validate-deps-btn" class="btn btn-sm btn-outline btn-info w-full">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                
+                <!-- Inline Diff Container -->
+                <div id="deps-diff-container" class="collapse collapse-arrow bg-base-200 rounded-lg mt-2" style="display: none;">
+                    <input type="checkbox" id="deps-diff-toggle" />
+                    <div class="collapse-title text-sm font-medium flex items-center justify-between pr-4">
+                        <span class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Pending Changes
+                        </span>
+                        <span id="deps-diff-badge" class="badge badge-warning badge-sm">0</span>
+                    </div>
+                    <div class="collapse-content text-xs font-mono">
+                        <div class="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+                            <div id="deps-diff-added" class="space-y-1"></div>
+                            <div id="deps-diff-removed" class="space-y-1"></div>
+                            <div id="deps-diff-modified" class="space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3 flex gap-2">
+                    <button type="button" id="validate-deps-btn" class="btn btn-sm btn-outline btn-info flex-1" title="Validate format and resolvability">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        Validate Dependencies
+                        Validate
+                    </button>
+                    <button type="button" id="get-packages-btn" class="btn btn-sm btn-outline btn-warning flex-1" {% if not script %}disabled{% endif %} title="Get currently installed packages">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                        </svg>
+                        Packages
+                    </button>
+                    <button type="button" id="install-deps-btn" class="btn btn-sm btn-outline btn-success flex-1" {% if not script %}disabled{% endif %} title="{% if not script %}Save script first{% else %}Rebuild environment and reinstall all dependencies{% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                        Install
+                    </button>
+                    <button type="button" id="retry-install-btn" class="btn btn-sm btn-outline btn-warning" {% if not script %}disabled{% endif %} style="display: none;" title="Retry the last failed installation">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
                     </button>
                 </div>
-                <div id="validation-result" class="mt-3 hidden"></div>
+                <!-- Validation results now go to Output Console below -->
+                <div class="alert alert-info mt-3 text-xs py-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>Dependencies install automatically when you save. Use "Install" to force rebuild.</span>
+                </div>
             </div>
             
             <div class="glass-card rounded-xl p-6">
@@ -288,6 +379,10 @@
 
 {% block extra_scripts %}
 <script>
+    // Script ID for API calls (read from form data attribute)
+    const scriptForm = document.getElementById('script-form');
+    const scriptId = scriptForm ? (scriptForm.dataset.scriptId || null) : null;
+    
     // Initialize CodeMirror
     const textarea = document.getElementById('code-editor');
     const editor = CodeMirror.fromTextArea(textarea, {
@@ -302,18 +397,190 @@
         autoCloseBrackets: true,
     });
     
+    // === INLINE DIFF LOGIC ===
+    let originalDeps = {{ (script.dependencies if script else "") | tojson }};
+    let diffTimeout = null;
+    let lastInstallFailed = false;
+
+    const depsInput = document.getElementById('dependencies-input');
+    const diffContainer = document.getElementById('deps-diff-container');
+    const diffToggle = document.getElementById('deps-diff-toggle');
+    const diffBadge = document.getElementById('deps-diff-badge');
+    const diffAdded = document.getElementById('deps-diff-added');
+    const diffRemoved = document.getElementById('deps-diff-removed');
+    const diffModified = document.getElementById('deps-diff-modified');
+    const retryBtn = document.getElementById('retry-install-btn');
+
+    // Parse dependencies into array of {name, version, raw}
+    function parseDependencies(depsText) {
+        return depsText.split('\\n')
+            .map(line => line.trim())
+            .filter(line => line && !line.startsWith('#'))
+            .map(line => {
+                // Match package name and optional version specifier
+                const match = line.match(/^([a-zA-Z0-9_.-]+)([>=<~!].*)?$/);
+                if (!match) return { name: line, version: '', raw: line, invalid: true };
+                return { 
+                    name: match[1].toLowerCase().replace(/_/g, '-'),
+                    version: match[2] || '', 
+                    raw: line 
+                };
+            });
+    }
+
+    // Compute diff between old and new dependencies
+    function computeDiff(oldText, newText) {
+        const oldDeps = parseDependencies(oldText);
+        const newDeps = parseDependencies(newText);
+        
+        const oldMap = new Map(oldDeps.map(d => [d.name, d]));
+        const newMap = new Map(newDeps.map(d => [d.name, d]));
+        
+        const added = [];
+        const removed = [];
+        const modified = [];
+        
+        // Check for added and modified
+        for (const [name, newDep] of newMap) {
+            if (!oldMap.has(name)) {
+                added.push(newDep.raw);
+            } else if (oldMap.get(name).version !== newDep.version) {
+                modified.push({
+                    name: newDep.name,
+                    old: oldMap.get(name).raw,
+                    new: newDep.raw
+                });
+            }
+        }
+        
+        // Check for removed
+        for (const [name, oldDep] of oldMap) {
+            if (!newMap.has(name)) {
+                removed.push(oldDep.raw);
+            }
+        }
+        
+        return { added, removed, modified };
+    }
+
+    // Render diff in UI
+    function renderDiff(diff) {
+        const totalChanges = diff.added.length + diff.removed.length + diff.modified.length;
+        
+        if (totalChanges === 0) {
+            diffContainer.style.display = 'none';
+            return;
+        }
+        
+        // Show container
+        diffContainer.style.display = 'block';
+        diffBadge.textContent = totalChanges;
+        
+        // Clear previous diff
+        diffAdded.innerHTML = '';
+        diffRemoved.innerHTML = '';
+        diffModified.innerHTML = '';
+        
+        // Render added
+        if (diff.added.length > 0) {
+            diff.added.forEach(pkg => {
+                const div = document.createElement('div');
+                div.className = 'diff-line-added';
+                div.textContent = pkg;
+                diffAdded.appendChild(div);
+            });
+        }
+        
+        // Render removed
+        if (diff.removed.length > 0) {
+            diff.removed.forEach(pkg => {
+                const div = document.createElement('div');
+                div.className = 'diff-line-removed';
+                div.textContent = pkg;
+                diffRemoved.appendChild(div);
+            });
+        }
+        
+        // Render modified (show old → new)
+        if (diff.modified.length > 0) {
+            diff.modified.forEach(change => {
+                const div = document.createElement('div');
+                div.className = 'diff-line-modified';
+                const oldSpan = document.createElement('span');
+                oldSpan.style.textDecoration = 'line-through';
+                oldSpan.style.opacity = '0.6';
+                oldSpan.textContent = change.old;
+                div.appendChild(oldSpan);
+                div.appendChild(document.createTextNode(' → ' + change.new));
+                diffModified.appendChild(div);
+            });
+        }
+        
+        // Auto-expand on first change
+        if (!diffToggle.checked && totalChanges > 0) {
+            diffToggle.checked = true;
+        }
+    }
+
+    // Handle input with debounce
+    depsInput.addEventListener('input', () => {
+        clearTimeout(diffTimeout);
+        diffTimeout = setTimeout(() => {
+            const currentDeps = depsInput.value;
+            const diff = computeDiff(originalDeps, currentDeps);
+            renderDiff(diff);
+        }, 500);
+    });
+    
+    // Make collapse title clickable
+    const diffCollapseTitle = diffContainer?.querySelector('.collapse-title');
+    if (diffCollapseTitle) {
+        diffCollapseTitle.style.cursor = 'pointer';
+        diffCollapseTitle.addEventListener('click', () => {
+            if (diffToggle) {
+                diffToggle.checked = !diffToggle.checked;
+            }
+        });
+    }
+
+    // === RETRY BUTTON LOGIC ===
+    retryBtn.addEventListener('click', () => {
+        if (lastInstallFailed) {
+            // Trigger install button click
+            document.getElementById('install-deps-btn').click();
+        }
+    });
+    
+    // Update dependency buttons state based on input
+    function updateDependencyButtonsState() {
+        const depsInput = document.getElementById('dependencies-input');
+        const validateBtn = document.getElementById('validate-deps-btn');
+        const installBtn = document.getElementById('install-deps-btn');
+        const hasDeps = depsInput.value.trim().length > 0;
+        
+        validateBtn.disabled = !hasDeps;
+        
+        // Install button is disabled if no script exists OR no dependencies
+        if (installBtn) {
+            installBtn.disabled = !hasDeps;
+        }
+    }
+    
+    // Initialize button states and add input listener
+    document.addEventListener('DOMContentLoaded', () => {
+        updateDependencyButtonsState();
+        document.getElementById('dependencies-input').addEventListener('input', updateDependencyButtonsState);
+    });
+    
     // Validate dependencies
     document.getElementById('validate-deps-btn').addEventListener('click', async () => {
         const depsInput = document.getElementById('dependencies-input');
         const validateBtn = document.getElementById('validate-deps-btn');
-        const resultDiv = document.getElementById('validation-result');
         
         const dependencies = depsInput.value;
         
         if (!dependencies.trim()) {
-            resultDiv.className = 'alert alert-info mt-3';
-            resultDiv.innerHTML = '<span>No dependencies to validate</span>';
-            resultDiv.classList.remove('hidden');
+            appendBlockToConsole('Validation', 'No dependencies to validate', 'info');
             return;
         }
         
@@ -336,73 +603,296 @@
             const result = await response.json();
             
             if (result.valid) {
-                resultDiv.className = 'alert alert-success mt-3';
-                resultDiv.innerHTML = `
-                    <div class="w-full">
-                        <div class="flex items-start gap-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <div class="flex-1">
-                                <div class="font-bold">Dependencies are valid!</div>
-                                <div class="text-sm mt-1">${result.message}</div>
-                                <div class="text-xs mt-2 opacity-75">
-                                    Packages: ${result.packages.join(', ')}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                const content = `Dependencies are valid!
+Message: ${result.message}
+Packages: ${result.packages.join(', ')}`;
+                appendBlockToConsole('Validation Success', content, 'success');
             } else {
-                resultDiv.className = 'alert alert-error mt-3';
-                resultDiv.innerHTML = `
-                    <div class="w-full">
-                        <div class="flex items-start gap-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <div class="flex-1">
-                                <div class="font-bold">Invalid dependencies!</div>
-                                <div class="text-sm mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap break-words custom-scrollbar">
-                                    ${result.message}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                appendBlockToConsole('Validation Error', result.message, 'error');
             }
             
-            resultDiv.classList.remove('hidden');
-            
         } catch (err) {
-            resultDiv.className = 'alert alert-error mt-3';
-            resultDiv.innerHTML = `
-                <div class="w-full">
-                    <div class="flex items-start gap-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <div class="flex-1">
-                            <div class="font-bold">Validation error</div>
-                            <div class="text-sm mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap break-words custom-scrollbar">
-                                ${err.message}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            resultDiv.classList.remove('hidden');
+            appendBlockToConsole('Validation Error', `Failed to validate: ${err.message}`, 'error');
         } finally {
             // Reset button state
             validateBtn.disabled = false;
             validateBtn.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Validate Dependencies
+                Validate
             `;
         }
     });
+
+    // Get currently installed packages
+    const getPackagesBtn = document.getElementById('get-packages-btn');
+    if (getPackagesBtn) {
+        getPackagesBtn.addEventListener('click', async () => {
+        const btn = document.getElementById('get-packages-btn');
+        const originalHtml = btn.innerHTML;
+        
+        btn.disabled = true;
+        btn.innerHTML = `
+            <span class="loading loading-spinner loading-xs"></span>
+            Loading...
+        `;
+        
+        try {
+            const response = await fetch(`/api/scripts/${scriptId}/packages`);
+            const result = await response.json();
+            
+            if (response.ok) {
+                if (result.packages && result.packages.length > 0) {
+                    const content = result.packages.join('\n');
+                    appendBlockToConsole('Installed Packages', content, 'info');
+                    window.showToast?.('Current packages list shown in Output Console', 'info');
+                } else {
+                    appendBlockToConsole('Installed Packages', 'No packages found in current environment', 'info');
+                }
+            } else {
+                throw new Error(result.detail || 'Failed to get packages');
+            }
+        } catch (err) {
+            appendBlockToConsole('Packages Error', err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+        });
+    }
+    
+    // Install dependencies
+    const installDepsBtn = document.getElementById('install-deps-btn');
+    if (installDepsBtn) {
+        installDepsBtn.addEventListener('click', async () => {
+        const installBtn = document.getElementById('install-deps-btn');
+        const resultDiv = document.getElementById('validation-result');
+        const depsInput = document.getElementById('dependencies-input');
+        const dependencies = depsInput.value.trim();
+        
+        // Step 1: Validate dependencies first
+        if (dependencies) {
+            installBtn.disabled = true;
+            installBtn.innerHTML = `
+                <span class="loading loading-spinner loading-xs"></span>
+                Validating...
+            `;
+            
+            try {
+                const validateResponse = await fetch('/api/scripts/validate-dependencies', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dependencies }),
+                });
+                
+                const validateResult = await validateResponse.json();
+                
+                if (!validateResult.valid) {
+                    // Show validation error
+                    resultDiv.className = 'alert alert-error mt-3';
+                    resultDiv.innerHTML = `
+                        <div class="w-full">
+                            <div class="flex items-start gap-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div class="flex-1">
+                                    <div class="font-bold">Invalid dependencies!</div>
+                                    <div class="text-sm mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap break-words custom-scrollbar">
+                                        ${validateResult.message}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    resultDiv.classList.remove('hidden');
+                    
+                    // Reset button
+                    installBtn.disabled = false;
+                    installBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                        Install
+                    `;
+                    return;
+                }
+            } catch (err) {
+                resultDiv.className = 'alert alert-error mt-3';
+                resultDiv.innerHTML = `<span>Validation error: ${err.message}</span>`;
+                resultDiv.classList.remove('hidden');
+                installBtn.disabled = false;
+                installBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Install
+                `;
+                return;
+            }
+        }
+        
+        if (!confirm('This will rebuild the virtual environment and install all dependencies. This may take a few minutes. Continue?')) {
+            installBtn.disabled = false;
+            installBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Install
+            `;
+            return;
+        }
+        
+        // Step 2: Save script first to use current dependencies
+        installBtn.innerHTML = `
+            <span class="loading loading-spinner loading-xs"></span>
+            Saving...
+        `;
+        
+        try {
+            editor.save();
+            const form = document.getElementById('script-form');
+            const formData = new FormData(form);
+            const data = {
+                name: formData.get('name'),
+                description: formData.get('description'),
+                content: formData.get('content'),
+                cron_expression: formData.get('cron_expression'),
+                python_version: formData.get('python_version'),
+                timeout: parseInt(formData.get('timeout')),
+                misfire_grace_time: parseInt(formData.get('misfire_grace_time')),
+                enabled: formData.get('enabled') === 'true',
+                dependencies: formData.get('dependencies'),
+                alert_on_failure: formData.get('alert_on_failure') === 'true',
+                alert_on_success: formData.get('alert_on_success') === 'true',
+                environment_vars: formData.get('environment_vars'),
+            };
+            
+            const saveResponse = await fetch(`/api/scripts/${scriptId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            
+            if (!saveResponse.ok) {
+                const error = await saveResponse.json();
+                throw new Error(error.detail || 'Failed to save script');
+            }
+        } catch (err) {
+            resultDiv.className = 'alert alert-error mt-3';
+            resultDiv.innerHTML = `<span>Save error: ${err.message}</span>`;
+            resultDiv.classList.remove('hidden');
+            installBtn.disabled = false;
+            installBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Install
+            `;
+            return;
+        }
+        
+        // Step 3: Now rebuild environment (using SSE)
+        installBtn.innerHTML = `
+            <span class="loading loading-spinner loading-xs"></span>
+            Preparing...
+        `;
+        
+        // Use Output Console for full progress
+        outputConsole.innerHTML = '';
+        logBuffer = [];
+        setConsoleStatus('Installing', 'badge-info');
+        appendBlockToConsole('Environment Setup', 'Starting environment rebuild and dependency installation...', 'info');
+        
+        try {
+            // Start installation
+            const installResponse = await fetch(`/api/scripts/${scriptId}/install`, {
+                method: 'POST',
+            });
+            
+            if (!installResponse.ok) {
+                const err = await installResponse.json();
+                throw new Error(err.detail || 'Failed to start installation');
+            }
+            
+            // Connect to SSE stream
+            const eventSource = new EventSource(`/api/scripts/${scriptId}/install-stream`);
+            
+            eventSource.onmessage = (event) => {
+                appendToConsole(event.data, true);
+            };
+            
+            eventSource.addEventListener('done', (event) => {
+                eventSource.close();
+                const data = JSON.parse(event.data);
+                if (data.success) {
+                    setConsoleStatus('Complete', 'badge-success');
+                    appendBlockToConsole('Installation Complete', 'Dependencies installed successfully!', 'success');
+                    window.showToast?.('Dependencies installed successfully', 'success');
+                    lastInstallFailed = false;
+                    retryBtn.style.display = 'none';
+                } else {
+                    setConsoleStatus('Failed', 'badge-error');
+                    appendBlockToConsole('Installation Failed', 'Check logs for details', 'error');
+                    window.showToast?.('Installation failed', 'error');
+                    lastInstallFailed = true;
+                    retryBtn.style.display = 'inline-flex';
+                }
+                
+                installBtn.disabled = false;
+                installBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Install
+                `;
+            });
+            
+            eventSource.addEventListener('error', (event) => {
+                setConsoleStatus('Error', 'badge-error');
+                appendBlockToConsole('Connection Error', 'SSE stream disconnected prematurely', 'error');
+                eventSource.close();
+                lastInstallFailed = true;
+                retryBtn.style.display = 'inline-flex';
+                installBtn.disabled = false;
+                installBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Install
+                `;
+            });
+            
+            eventSource.onerror = (error) => {
+                if (eventSource.readyState === EventSource.CLOSED) return;
+                setConsoleStatus('Error', 'badge-error');
+                appendBlockToConsole('Stream Error', 'An error occurred while streaming logs', 'error');
+                eventSource.close();
+                lastInstallFailed = true;
+                retryBtn.style.display = 'inline-flex';
+                installBtn.disabled = false;
+                installBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Install
+                `;
+            };
+            
+        } catch (err) {
+            setConsoleStatus('Error', 'badge-error');
+            appendBlockToConsole('Setup Error', err.message, 'error');
+            installBtn.disabled = false;
+            installBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Install
+            `;
+        }
+    });
+    }
     
     // Handle form submission
     document.getElementById('script-form').addEventListener('submit', async (e) => {
@@ -413,6 +903,16 @@
         
         const form = e.target;
         const formData = new FormData(form);
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalBtnHtml = submitBtn.innerHTML;
+        const hasDeps = formData.get('dependencies')?.trim();
+        
+        // Show loading state on button
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `
+            <span class="loading loading-spinner loading-sm"></span>
+            ${hasDeps ? 'Saving & Installing dependencies...' : 'Saving...'}
+        `;
         
         // Convert form data to JSON
         const data = {
@@ -445,13 +945,109 @@
             
             if (response.ok) {
                 const result = await response.json();
-                window.location.href = '/scripts/' + result.id;
+                console.log('Save result:', result);
+                console.log('needs_install:', result.needs_install);
+                
+                // Check if installation is needed
+                if (result.needs_install) {
+                    // Update button to show installing state
+                    submitBtn.innerHTML = `
+                        <span class="loading loading-spinner loading-sm"></span>
+                        Installing dependencies...
+                    `;
+                    
+                    // Clear and prepare console
+                    outputConsole.innerHTML = '';
+                    logBuffer = [];
+                    setConsoleStatus('Installing', 'badge-info');
+                    appendBlockToConsole('Environment Setup', 'Starting environment rebuild and dependency installation after save...', 'info');
+                    
+                    // Start installation
+                    const installResponse = await fetch(`/api/scripts/${result.id}/install`, {
+                        method: 'POST',
+                    });
+                    
+                    if (!installResponse.ok) {
+                        const err = await installResponse.json();
+                        throw new Error(err.detail || 'Failed to start installation');
+                    }
+                    
+                    // Connect to SSE stream
+                    const eventSource = new EventSource(`/api/scripts/${result.id}/install-stream`);
+                    
+                    eventSource.onmessage = (event) => {
+                        appendToConsole(event.data, true);
+                    };
+                    
+                    eventSource.addEventListener('done', (event) => {
+                        eventSource.close();
+                        const data = JSON.parse(event.data);
+                        if (data.success) {
+                            setConsoleStatus('Complete', 'badge-success');
+                            appendBlockToConsole('Installation Complete', 'Dependencies installed successfully!', 'success');
+                            window.showToast?.('Script saved and dependencies installed', 'success');
+                            // Update originalDeps to new value on success
+                            originalDeps = depsInput.value;
+                            diffContainer.style.display = 'none';
+                            lastInstallFailed = false;
+                            retryBtn.style.display = 'none';
+                            setTimeout(() => {
+                                window.location.href = '/scripts/' + result.id;
+                            }, 1500);
+                        } else {
+                            setConsoleStatus('Failed', 'badge-error');
+                            appendBlockToConsole('Installation Failed', 'Check logs for details', 'error');
+                            window.showToast?.('Installation failed', 'error');
+                            lastInstallFailed = true;
+                            retryBtn.style.display = 'inline-flex';
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalBtnHtml;
+                        }
+                    });
+                    
+                    eventSource.addEventListener('error', (event) => {
+                        setConsoleStatus('Error', 'badge-error');
+                        appendBlockToConsole('Connection Error', 'SSE stream disconnected prematurely', 'error');
+                        eventSource.close();
+                        lastInstallFailed = true;
+                        retryBtn.style.display = 'inline-flex';
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnHtml;
+                    });
+                    
+                    eventSource.onerror = (error) => {
+                        // Connection closed normally after 'done' event is fine
+                        if (eventSource.readyState === EventSource.CLOSED) {
+                            return;
+                        }
+                        setConsoleStatus('Error', 'badge-error');
+                        appendBlockToConsole('Stream Error', 'An error occurred while streaming logs', 'error');
+                        eventSource.close();
+                        lastInstallFailed = true;
+                        retryBtn.style.display = 'inline-flex';
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnHtml;
+                    };
+                } else {
+                    // No installation needed, redirect immediately
+                    console.log('No installation needed, redirecting...');
+                    // Update originalDeps to new value
+                    originalDeps = depsInput.value;
+                    diffContainer.style.display = 'none';
+                    window.location.href = '/scripts/' + result.id;
+                }
             } else {
                 const error = await response.json();
                 window.showToast?.('Error: ' + (error.detail || 'Failed to save script'), 'error');
+                // Reset button
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
             }
         } catch (err) {
             window.showToast?.('Error: ' + err.message, 'error');
+            // Reset button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
         }
     });
     
@@ -502,6 +1098,24 @@
         // Format and render
         const formatted = formatLogData(text);
         renderLogLine(formatted, animate);
+    }
+
+    function appendBlockToConsole(title, content, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const separator = '—'.repeat(20);
+        const icon = type === 'success' ? '✅' : (type === 'error' ? '❌' : 'ℹ️');
+        
+        const block = `
+${separator}
+${icon} ${title.toUpperCase()} [${timestamp}]
+${separator}
+${content}
+${separator}
+`;
+        appendToConsole(block, true);
+        
+        // Auto-scroll and focus
+        outputConsole.parentElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
     
     function renderLogLine(text, animate = true) {
@@ -655,7 +1269,13 @@
             setConsoleStatus('Saving...', 'badge-info');
             
             // Save script
-            const scriptId = {{ script.id if script else 'null' }};
+            if (!scriptId) {
+                appendBlockToConsole('Test Error', 'Script must be saved before running test', 'error');
+                setConsoleStatus('Error', 'badge-error');
+                runTestBtn.disabled = false;
+                return;
+            }
+            
             const saveResponse = await fetch(`/api/scripts/${scriptId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
