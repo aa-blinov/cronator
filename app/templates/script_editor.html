@@ -149,10 +149,6 @@
                             <span class="label-text text-xs">Auto-scroll</span>
                             <input type="checkbox" id="auto-scroll-toggle" class="toggle toggle-xs" checked>
                         </label>
-                        <label class="label cursor-pointer gap-2 py-0">
-                            <span class="label-text text-xs">Raw</span>
-                            <input type="checkbox" id="raw-logs-toggle" class="toggle toggle-xs">
-                        </label>
                         <button type="button" id="reconnect-btn" class="btn btn-outline btn-warning btn-xs" style="display: none;">
                             Reconnect
                         </button>
@@ -1093,39 +1089,26 @@ Packages: ${result.packages.join(', ')}`;
     const stopTestBtn = document.getElementById('stop-test-btn');
     const reconnectBtn = document.getElementById('reconnect-btn');
     const autoScrollToggle = document.getElementById('auto-scroll-toggle');
-    const rawLogsToggle = document.getElementById('raw-logs-toggle');
+
     
     let currentEventSource = null;
     let currentExecutionId = null;
     let autoScrollEnabled = true;
-    let showRawLogs = false;
-    let logBuffer = []; // Store raw log data for re-rendering
+
 
     // Persist console preferences
     try {
         autoScrollEnabled = localStorage.getItem('consoleAutoScroll') !== 'false';
-        showRawLogs = localStorage.getItem('consoleRawLogs') === 'true';
     } catch (e) {}
     autoScrollToggle.checked = autoScrollEnabled;
-    rawLogsToggle.checked = showRawLogs;
 
     autoScrollToggle.addEventListener('change', (e) => {
         autoScrollEnabled = !!e.target.checked;
         try { localStorage.setItem('consoleAutoScroll', String(autoScrollEnabled)); } catch (err) {}
     });
-    rawLogsToggle.addEventListener('change', (e) => {
-        showRawLogs = !!e.target.checked;
-        try { localStorage.setItem('consoleRawLogs', String(showRawLogs)); } catch (err) {}
-        window.showToast?.(showRawLogs ? 'Raw logs enabled' : 'Parsed logs enabled', 'info');
-        
-        // Re-render all logs with new format
-        rerenderLogs();
-    });
+
     
     function appendToConsole(text, animate = true) {
-        // Store raw data for re-rendering
-        logBuffer.push(text);
-        
         // Format and render
         const formatted = formatLogData(text);
         renderLogLine(formatted, animate);
@@ -1173,22 +1156,9 @@ ${separator}
         }
     }
     
-    function rerenderLogs() {
-        // Clear console
-        outputConsole.innerHTML = '';
-        
-        // Re-render all logs with current format
-        logBuffer.forEach(rawData => {
-            const formatted = formatLogData(rawData);
-            renderLogLine(formatted, false);
-        });
-    }
+
     
     function formatLogData(data) {
-        if (showRawLogs) {
-            return data;
-        }
-        
         // Try to parse as JSON (cronator_lib logs)
         try {
             const logData = JSON.parse(data);
