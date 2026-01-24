@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Background circle -->
+  <circle cx="12" cy="12" r="11" fill="#1a1a2e"/>
+  
+  <!-- Clock circle and hands (same as in icons.html) -->
+  <g stroke="#22c55e" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+  </g>
+</svg>
