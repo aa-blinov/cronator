@@ -194,6 +194,45 @@ for i, item in enumerate(items):
 log.with_data("Processed", count=100, duration_ms=1234)
 ```
 
+## Тестирование
+
+Проект включает комплексный набор тестов: unit тесты, integration тесты API.
+
+### Запуск тестов
+
+```bash
+# Установить dev зависимости
+uv pip install -e .[dev]
+
+# Запустить все тесты
+uv run pytest tests/ -v
+
+# Запустить с отчётом о покрытии
+uv run pytest tests/ --cov=app --cov-report=html
+
+# Запустить только unit тесты
+uv run pytest tests/unit/ -v
+
+# Запустить только integration тесты
+uv run pytest tests/integration/ -v
+```
+
+### Структура тестов
+
+```
+tests/
+├── conftest.py              # Фикстуры и test database
+├── unit/
+│   ├── test_models.py       # Тесты моделей Script, Execution
+│   └── services/
+│       ├── test_scheduler.py    # Тесты SchedulerService
+│       └── test_executor.py     # Тесты ExecutorService
+└── integration/
+    ├── test_api_scripts.py      # API /api/scripts
+    ├── test_api_executions.py   # API /api/executions
+    └── test_api_settings.py     # API /api/settings
+```
+
 ## Безопасность
 
 ⚠️ **Важные рекомендации по безопасности:**
