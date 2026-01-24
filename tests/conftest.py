@@ -68,8 +68,12 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
     from app.api.dependencies import verify_credentials
+    from app.api.rate_limit import clear_rate_limits
     from app.database import get_db
     from app.main import app as fastapi_app
+
+    # Clear rate limits before each test
+    clear_rate_limits()
 
     async_session = async_sessionmaker(
         test_engine,
