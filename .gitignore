@@ -67,7 +67,7 @@ scripts/*/
 
 # UV
 .uv/
-uv.lock
+# uv.lock  <-- Removed from ignore to allow commits
 
 # Node.js
 node_modules/
