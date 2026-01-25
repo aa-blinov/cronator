@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.database import Base
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
-from app.models.script_version import ScriptVersion
-from app.models.setting import Setting
+from app.models.script_version import (
+    ScriptVersion,  # noqa: F401 - needed for Base.metadata registration
+)
+from app.models.setting import Setting  # noqa: F401 - needed for Base.metadata registration
 
 # Test database URL (in-memory SQLite)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -65,7 +67,6 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[AsyncClient, None]:
     """Create test HTTP client with test database and auth."""
     import base64
-    import os
 
     # Skip Alembic migrations in tests (prevents subprocess calls during test setup)
     monkeypatch.setenv("SKIP_ALEMBIC_MIGRATIONS", "1")
