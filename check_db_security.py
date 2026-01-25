@@ -31,7 +31,7 @@ async def check_database_security():
 
     print("📋 Settings in database:\n")
 
-    sensitive_keys = {"smtp_password", "git_token"}
+    sensitive_keys = {"smtp_password"}
     encrypted_count = 0
     plaintext_count = 0
 

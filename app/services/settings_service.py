@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 # List of sensitive keys that should be encrypted
 SENSITIVE_KEYS = {
     "smtp_password",
-    "git_token",
     "admin_password",  # If we ever store it in DB
 }
 
@@ -229,12 +228,6 @@ class SettingsService:
             "smtp_from": env_settings.smtp_from,
             "smtp_use_tls": env_settings.smtp_use_tls,
             "alert_email": env_settings.alert_email,
-            "git_enabled": env_settings.git_enabled,
-            "git_repo_url": env_settings.git_repo_url,
-            "git_branch": env_settings.git_branch,
-            "git_token": env_settings.git_token,
-            "git_sync_interval": env_settings.git_sync_interval,
-            "git_scripts_subdir": env_settings.git_scripts_subdir,
             "default_timeout": env_settings.default_timeout,
         }
 

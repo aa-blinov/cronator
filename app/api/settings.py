@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 from app.config import get_settings
 from app.services.alerting import alerting_service
-from app.services.git_sync import git_sync_service
 from app.services.scheduler import scheduler_service
 from app.services.settings_service import settings_service
 
@@ -28,24 +27,7 @@ class SettingsResponse(BaseModel):
     smtp_use_tls: bool
     alert_email: str
 
-    git_enabled: bool
-    git_repo_url: str
-    git_branch: str
-    git_sync_interval: int
-    git_scripts_subdir: str
-
     default_timeout: int
-
-
-class GitStatus(BaseModel):
-    """Git sync status."""
-
-    enabled: bool
-    repo_url: str
-    branch: str
-    current_commit: str | None
-    sync_interval: int
-    repo_cloned: bool
 
 
 class SchedulerStatus(BaseModel):
@@ -67,13 +49,6 @@ async def get_settings_info() -> SettingsResponse:
     smtp_from = await settings_service.get("smtp_from", settings.smtp_from)
     smtp_use_tls = await settings_service.get("smtp_use_tls", settings.smtp_use_tls)
     alert_email = await settings_service.get("alert_email", settings.alert_email)
-    git_enabled = await settings_service.get("git_enabled", settings.git_enabled)
-    git_repo_url = await settings_service.get("git_repo_url", settings.git_repo_url)
-    git_branch = await settings_service.get("git_branch", settings.git_branch)
-    git_sync_interval = await settings_service.get("git_sync_interval", settings.git_sync_interval)
-    git_scripts_subdir = await settings_service.get(
-        "git_scripts_subdir", settings.git_scripts_subdir
-    )
     default_timeout = await settings_service.get("default_timeout", settings.default_timeout)
 
     return SettingsResponse(
@@ -87,34 +62,8 @@ async def get_settings_info() -> SettingsResponse:
         smtp_from=smtp_from,
         smtp_use_tls=smtp_use_tls,
         alert_email=alert_email,
-        git_enabled=git_enabled,
-        git_repo_url=git_repo_url,
-        git_branch=git_branch,
-        git_sync_interval=git_sync_interval,
-        git_scripts_subdir=git_scripts_subdir,
         default_timeout=default_timeout,
     )
-
-
-@router.get("/git-status")
-async def get_git_status() -> GitStatus:
-    """Get git sync status."""
-    status = git_sync_service.get_status()
-    return GitStatus(**status)
-
-
-@router.post("/git-sync")
-async def trigger_git_sync():
-    """Manually trigger git sync."""
-    success, message = await git_sync_service.sync()
-
-    if not success:
-        return {"success": False, "message": message}
-
-    # Reload scheduler jobs after sync
-    await scheduler_service.reload_all_jobs()
-
-    return {"success": True, "message": message}
 
 
 @router.get("/scheduler-status")
@@ -188,13 +137,6 @@ class UpdateSettingsRequest(BaseModel):
     smtp_use_tls: bool | None = None
     alert_email: str | None = None
 
-    git_enabled: bool | None = None
-    git_repo_url: str | None = None
-    git_branch: str | None = None
-    git_token: str | None = None
-    git_sync_interval: int | None = None
-    git_scripts_subdir: str | None = None
-
     default_timeout: int | None = None
 
 
@@ -220,18 +162,6 @@ async def update_settings(request: UpdateSettingsRequest):
         updates["smtp_use_tls"] = request.smtp_use_tls
     if request.alert_email is not None:
         updates["alert_email"] = request.alert_email
-    if request.git_enabled is not None:
-        updates["git_enabled"] = request.git_enabled
-    if request.git_repo_url is not None:
-        updates["git_repo_url"] = request.git_repo_url
-    if request.git_branch is not None:
-        updates["git_branch"] = request.git_branch
-    if request.git_token is not None:
-        updates["git_token"] = request.git_token
-    if request.git_sync_interval is not None:
-        updates["git_sync_interval"] = request.git_sync_interval
-    if request.git_scripts_subdir is not None:
-        updates["git_scripts_subdir"] = request.git_scripts_subdir
     if request.default_timeout is not None:
         updates["default_timeout"] = request.default_timeout
 

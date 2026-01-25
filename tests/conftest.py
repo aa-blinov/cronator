@@ -116,7 +116,6 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
     import app.database
     import app.main
     import app.services.executor
-    import app.services.git_sync
     import app.services.scheduler
     import app.services.settings_service
 
@@ -124,7 +123,6 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
         app.database,
         app.main,
         app.services.executor,
-        app.services.git_sync,
         app.services.scheduler,
         app.services.settings_service,
     ]

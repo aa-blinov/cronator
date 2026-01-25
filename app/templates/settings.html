@@ -68,45 +68,6 @@
         </div>
     </div>
     
-    <!-- Git Sync -->
-    <div class="glass-card rounded-xl p-6">
-        <h3 class="text-lg font-semibold mb-4">Git Sync</h3>
-        
-        <div class="space-y-4">
-            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Git Sync</span>
-                {% if git_status.enabled %}
-                    <span class="badge badge-success">Enabled</span>
-                {% else %}
-                    <span class="badge badge-ghost">Disabled</span>
-                {% endif %}
-            </div>
-            {% if git_status.enabled %}
-            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Repository</span>
-                <code class="text-xs truncate max-w-[200px]">{{ git_status.repo_url }}</code>
-            </div>
-            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Branch</span>
-                <code>{{ git_status.branch }}</code>
-            </div>
-            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Current Commit</span>
-                <code class="text-xs">{{ git_status.current_commit[:8] if git_status.current_commit else 'N/A' }}</code>
-            </div>
-            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Sync Interval</span>
-                <span>{{ git_status.sync_interval }}s</span>
-            </div>
-            <div class="mt-4">
-                <button onclick="syncGit()" class="btn btn-sm btn-outline gap-2">
-                    {{ icons.arrow_path("w-4 h-4") }} Sync Now
-                </button>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    
     <!-- Maintenance & Backups -->
     <div class="glass-card rounded-xl p-6">
         <h3 class="text-lg font-semibold mb-4">Backups & Maintenance</h3>
@@ -174,37 +135,6 @@
                 </div>
             </div>
             
-            <!-- Git Settings -->
-            <div class="border border-base-300 rounded-lg p-4">
-                <h4 class="font-semibold mb-3">Git Sync</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <label class="form-control">
-                        <span class="label-text">Git Enabled</span>
-                        <input type="checkbox" name="git_enabled" class="toggle toggle-primary" {% if git_status.enabled %}checked{% endif %}>
-                    </label>
-                    <label class="form-control">
-                        <span class="label-text">Repository URL</span>
-                        <input type="text" name="git_repo_url" value="{{ git_status.repo_url }}" class="input input-bordered input-sm">
-                    </label>
-                    <label class="form-control">
-                        <span class="label-text">Branch</span>
-                        <input type="text" name="git_branch" value="{{ git_status.branch }}" class="input input-bordered input-sm">
-                    </label>
-                    <label class="form-control">
-                        <span class="label-text">Personal Access Token (optional)</span>
-                        <input type="password" name="git_token" placeholder="••••••••" class="input input-bordered input-sm">
-                    </label>
-                    <label class="form-control">
-                        <span class="label-text">Sync Interval (seconds)</span>
-                        <input type="number" name="git_sync_interval" value="{{ git_status.sync_interval }}" class="input input-bordered input-sm">
-                    </label>
-                    <label class="form-control col-span-2">
-                        <span class="label-text">Scripts Subdirectory (optional)</span>
-                        <input type="text" name="git_scripts_subdir" value="{{ settings.git_scripts_subdir }}" class="input input-bordered input-sm">
-                    </label>
-                </div>
-            </div>
-            
             <!-- Execution Settings -->
             <div class="border border-base-300 rounded-lg p-4">
                 <h4 class="font-semibold mb-3">Execution</h4>
@@ -248,7 +178,6 @@
         // Checkboxes
         data.smtp_enabled = formData.get('smtp_enabled') === 'on';
         data.smtp_use_tls = formData.get('smtp_use_tls') === 'on';
-        data.git_enabled = formData.get('git_enabled') === 'on';
         
         // Text fields
         if (formData.get('smtp_host')) data.smtp_host = formData.get('smtp_host');
@@ -257,12 +186,6 @@
         if (formData.get('smtp_password')) data.smtp_password = formData.get('smtp_password');
         if (formData.get('smtp_from')) data.smtp_from = formData.get('smtp_from');
         if (formData.get('alert_email')) data.alert_email = formData.get('alert_email');
-        
-        if (formData.get('git_repo_url')) data.git_repo_url = formData.get('git_repo_url');
-        if (formData.get('git_branch')) data.git_branch = formData.get('git_branch');
-        if (formData.get('git_token')) data.git_token = formData.get('git_token');
-        if (formData.get('git_sync_interval')) data.git_sync_interval = parseInt(formData.get('git_sync_interval'));
-        if (formData.get('git_scripts_subdir')) data.git_scripts_subdir = formData.get('git_scripts_subdir');
         
         if (formData.get('default_timeout')) data.default_timeout = parseInt(formData.get('default_timeout'));
         
@@ -294,19 +217,6 @@
             window.showToast?.(data.message || 'Test email sent', data.success ? 'success' : 'warning');
         } catch (err) {
             window.showToast?.(err.message || 'Failed to send test email', 'error');
-        }
-    }
-    
-    async function syncGit() {
-        try {
-            const response = await fetch('/api/settings/git-sync', { method: 'POST' });
-            const data = await response.json();
-            window.showToast?.(data.message || 'Git sync complete', data.success ? 'success' : 'warning');
-            if (data.success) {
-                setTimeout(() => location.reload(), 2800);
-            }
-        } catch (err) {
-            window.showToast?.(err.message || 'Failed to sync git', 'error');
         }
     }
     

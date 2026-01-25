@@ -60,9 +60,6 @@ class Script(Base):
         nullable=False,
     )
 
-    # Git tracking
-    git_commit: Mapped[str | None] = mapped_column(String(40), nullable=True)
-
     # Relationships
     executions: Mapped[list["Execution"]] = relationship(
         "Execution",
@@ -80,8 +77,3 @@ class Script(Base):
 
     def __repr__(self) -> str:
         return f"<Script(id={self.id}, name='{self.name}', enabled={self.enabled})>"
-
-    @property
-    def is_managed_by_git(self) -> bool:
-        """Check if the script is managed by git."""
-        return self.git_commit is not None

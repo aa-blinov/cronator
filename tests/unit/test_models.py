@@ -47,21 +47,6 @@ class TestScript:
         assert script.timeout == 3600  # default
 
     @pytest.mark.asyncio
-    async def test_is_managed_by_git_false(self, script_factory):
-        """Test is_managed_by_git property when not managed."""
-        script = await script_factory(name="local_script", git_commit=None)
-        assert script.is_managed_by_git is False
-
-    @pytest.mark.asyncio
-    async def test_is_managed_by_git_true(self, script_factory):
-        """Test is_managed_by_git property when managed."""
-        script = await script_factory(
-            name="git_script",
-            git_commit="abc123def456789012345678901234567890abcd",
-        )
-        assert script.is_managed_by_git is True
-
-    @pytest.mark.asyncio
     async def test_script_repr(self, script_factory):
         """Test script string representation."""
         script = await script_factory(name="repr_test")

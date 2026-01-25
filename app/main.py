@@ -16,7 +16,6 @@ from sqlalchemy import text
 from app.api import api_router
 from app.config import get_settings
 from app.database import close_db
-from app.services.git_sync import git_sync_service
 from app.services.scheduler import scheduler_service
 
 settings = get_settings()
@@ -108,11 +107,6 @@ async def lifespan(app: FastAPI):
             environment_service.register_script(script.name, script.id)
         logger.info(f"Registered {len(scripts)} scripts in environment service")
 
-    # Start git sync if enabled
-    if settings.git_enabled:
-        await git_sync_service.start()
-        logger.info("Git sync started")
-
     logger.info(f"Cronator is running on http://{settings.host}:{settings.port}")
 
     yield
@@ -121,7 +115,6 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down Cronator...")
 
     await scheduler_service.stop()
-    await git_sync_service.stop()
     await close_db()
 
     logger.info("Cronator stopped")

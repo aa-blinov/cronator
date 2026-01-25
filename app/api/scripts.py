@@ -125,7 +125,6 @@ async def get_script(
 
     script_data.next_run_at = scheduler_service.get_next_run_time(script.id)
     script_data.last_alert_at = script.last_alert_at
-    script_data.is_managed_by_git = script.is_managed_by_git
 
     return script_data
 

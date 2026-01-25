@@ -42,7 +42,7 @@ services:
       - ./.env:/app/.env
       # Scripts directory - add your scripts here
       - ./scripts:/app/scripts
-      # Data directory - git repo and temporary files
+      # Data directory - temporary files
       - ./data:/app/data
       # Virtual environments - cached between restarts
       - ./envs:/app/envs

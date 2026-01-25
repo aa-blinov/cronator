@@ -87,14 +87,6 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     alert_email: str = ""
 
-    # Git sync
-    git_enabled: bool = False
-    git_repo_url: str = ""
-    git_branch: str = "main"
-    git_token: str = ""  # Personal access token for private repos
-    git_sync_interval: int = 300  # seconds
-    git_scripts_subdir: str = ""  # subdirectory in repo for scripts
-
     # Execution
     default_timeout: int = 3600  # 1 hour default timeout
     max_log_size: int = 1_000_000  # 1MB max stdout/stderr per execution

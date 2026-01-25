@@ -142,14 +142,12 @@ class ScriptRead(ScriptBase):
     content: str
     created_at: datetime
     updated_at: datetime
-    git_commit: str | None = None
 
     # Computed fields for UI
     last_run_status: str | None = None
     last_run_at: datetime | None = None
     next_run_at: datetime | None = None
     last_alert_at: datetime | None = None
-    is_managed_by_git: bool = False
 
     model_config = {"from_attributes": True}
 

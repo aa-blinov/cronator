@@ -369,15 +369,12 @@ async def settings_page(
     username: str = Depends(verify_credentials),
 ):
     """Settings page."""
-    from app.services.git_sync import git_sync_service
-
     return request.app.state.templates.TemplateResponse(
         "settings.html",
         {
             "request": request,
             "page_title": "Settings",
             "settings": settings,
-            "git_status": git_sync_service.get_status(),
             "scheduler_jobs": scheduler_service.get_all_jobs_info(),
         },
     )
