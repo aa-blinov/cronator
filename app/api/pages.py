@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic
 from sqlalchemy import func, select
@@ -285,20 +285,28 @@ async def script_version_detail(
 async def executions_list(
     request: Request,
     page: int = 1,
-    script_id: int | None = None,
-    status_filter: str | None = None,
+    script_id: str | None = Query(None),
+    status: str | None = Query(None),
     username: str = Depends(verify_credentials),
     db: AsyncSession = Depends(get_db),
 ):
     """Executions list page."""
     per_page = 50
 
+    # Parse script_id if provided
+    parsed_script_id = None
+    if script_id and script_id.strip():
+        try:
+            parsed_script_id = int(script_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="script_id must be a valid integer")
+
     query = select(Execution).options(joinedload(Execution.script))
 
-    if script_id:
-        query = query.where(Execution.script_id == script_id)
-    if status_filter:
-        query = query.where(Execution.status == status_filter)
+    if parsed_script_id:
+        query = query.where(Execution.script_id == parsed_script_id)
+    if status and status.strip():
+        query = query.where(Execution.status == status)
 
     # Count
     count_query = select(func.count()).select_from(query.subquery())
@@ -323,8 +331,8 @@ async def executions_list(
             "executions": executions,
             "scripts": scripts,
             "filters": {
-                "script_id": script_id,
-                "status": status_filter,
+                "script_id": parsed_script_id,
+                "status": status if status and status.strip() else None,
             },
             "pagination": {
                 "page": page,

@@ -4,7 +4,7 @@ import asyncio
 import json
 from datetime import UTC
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,15 +22,23 @@ router = APIRouter()
 async def list_executions(
     page: int = 1,
     per_page: int = 50,
-    script_id: int | None = None,
-    status: str | None = None,
+    script_id: str | None = Query(None),
+    status: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """List executions with pagination and filtering."""
     query = select(Execution).options(joinedload(Execution.script))
 
-    if script_id is not None:
-        query = query.where(Execution.script_id == script_id)
+    # Parse script_id if provided
+    parsed_script_id = None
+    if script_id and script_id.strip():
+        try:
+            parsed_script_id = int(script_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="script_id must be a valid integer")
+
+    if parsed_script_id is not None:
+        query = query.where(Execution.script_id == parsed_script_id)
 
     if status:
         query = query.where(Execution.status == status)
@@ -64,13 +72,21 @@ async def list_executions(
 
 @router.get("/stats", response_model=ExecutionStats)
 async def get_execution_stats(
-    script_id: int | None = None,
+    script_id: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Get execution statistics."""
+    # Parse script_id if provided
+    parsed_script_id = None
+    if script_id and script_id.strip():
+        try:
+            parsed_script_id = int(script_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="script_id must be a valid integer")
+
     base_query = select(Execution)
-    if script_id:
-        base_query = base_query.where(Execution.script_id == script_id)
+    if parsed_script_id:
+        base_query = base_query.where(Execution.script_id == parsed_script_id)
 
     # Total
     total_query = select(func.count()).select_from(base_query.subquery())
@@ -93,8 +109,8 @@ async def get_execution_stats(
 
     # Average duration
     avg_query = select(func.avg(Execution.duration_ms)).where(Execution.duration_ms.isnot(None))
-    if script_id:
-        avg_query = avg_query.where(Execution.script_id == script_id)
+    if parsed_script_id:
+        avg_query = avg_query.where(Execution.script_id == parsed_script_id)
     avg_duration = await db.scalar(avg_query)
 
     return ExecutionStats(
@@ -286,11 +302,19 @@ async def delete_execution(
 @router.delete("")
 async def clear_old_executions(
     days: int = 30,
-    script_id: int | None = None,
+    script_id: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete executions older than specified days."""
     from datetime import datetime, timedelta
+
+    # Parse script_id if provided
+    parsed_script_id = None
+    if script_id and script_id.strip():
+        try:
+            parsed_script_id = int(script_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="script_id must be a valid integer")
 
     cutoff = datetime.now(UTC) - timedelta(days=days)
 
@@ -299,8 +323,8 @@ async def clear_old_executions(
         Execution.status != ExecutionStatus.RUNNING.value,
     )
 
-    if script_id:
-        query = query.where(Execution.script_id == script_id)
+    if parsed_script_id:
+        query = query.where(Execution.script_id == parsed_script_id)
 
     result = await db.execute(query)
     executions = result.scalars().all()

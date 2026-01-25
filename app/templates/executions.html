@@ -4,7 +4,7 @@
 {% block content %}
 <!-- Filters -->
 <div class="glass-card rounded-xl p-4 mb-6">
-    <form method="GET" action="/executions" class="flex flex-wrap items-center gap-4">
+    <form method="GET" action="/executions" class="flex flex-wrap items-center gap-4" onsubmit="removeEmptyParams(event)">
         <div class="form-control">
             <select name="script_id" class="select select-bordered select-sm">
                 <option value="">All Scripts</option>
@@ -31,6 +31,18 @@
         <a href="/executions" class="btn btn-ghost btn-sm">Reset</a>
     </form>
 </div>
+
+<script>
+function removeEmptyParams(event) {
+    const form = event.target;
+    const inputs = form.querySelectorAll('select, input');
+    inputs.forEach(input => {
+        if (!input.value?.trim()) {
+            input.removeAttribute('name');
+        }
+    });
+}
+</script>
 
 <!-- Executions Table -->
 <div class="glass-card rounded-xl overflow-hidden">
@@ -96,22 +108,27 @@
             Showing {{ (pagination.page - 1) * pagination.per_page + 1 }} - {{ [pagination.page * pagination.per_page, pagination.total] | min }} of {{ pagination.total }}
         </p>
         <div class="join">
+            {% set filter_params = [] %}
+            {% if filters.script_id %}{% set _ = filter_params.append('script_id=' ~ filters.script_id) %}{% endif %}
+            {% if filters.status %}{% set _ = filter_params.append('status=' ~ filters.status) %}{% endif %}
+            {% set filter_query = '&' ~ filter_params|join('&') if filter_params else '' %}
+            
             {% if pagination.page > 1 %}
-            <a href="?page={{ pagination.page - 1 }}{% if filters.script_id %}&script_id={{ filters.script_id }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}" class="join-item btn btn-sm">«</a>
+            <a href="?page={{ pagination.page - 1 }}{{ filter_query }}" class="join-item btn btn-sm">«</a>
             {% endif %}
             
             {% for p in range(1, pagination.pages + 1) %}
                 {% if p == pagination.page %}
                     <button class="join-item btn btn-sm btn-active">{{ p }}</button>
                 {% elif p <= 3 or p > pagination.pages - 2 or (p >= pagination.page - 1 and p <= pagination.page + 1) %}
-                    <a href="?page={{ p }}{% if filters.script_id %}&script_id={{ filters.script_id }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}" class="join-item btn btn-sm">{{ p }}</a>
+                    <a href="?page={{ p }}{{ filter_query }}" class="join-item btn btn-sm">{{ p }}</a>
                 {% elif p == 4 or p == pagination.pages - 2 %}
                     <button class="join-item btn btn-sm btn-disabled">...</button>
                 {% endif %}
             {% endfor %}
             
             {% if pagination.page < pagination.pages %}
-            <a href="?page={{ pagination.page + 1 }}{% if filters.script_id %}&script_id={{ filters.script_id }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}" class="join-item btn btn-sm">»</a>
+            <a href="?page={{ pagination.page + 1 }}{{ filter_query }}" class="join-item btn btn-sm">»</a>
             {% endif %}
         </div>
     </div>
