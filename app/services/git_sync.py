@@ -275,7 +275,7 @@ class GitSyncService:
                     path=str(script_path),
                     content=content,
                     cron_expression=config.get("schedule", "0 * * * *"),
-                    python_version=config.get("python", "3.11"),
+                    python_version=config.get("python", "3.12"),
                     dependencies=dependencies,
                     enabled=config.get("enabled", True),
                     timeout=config.get("timeout", 3600),

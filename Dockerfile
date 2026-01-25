@@ -1,5 +1,5 @@
 # Build stage
-FROM python:3.11-slim AS builder
+FROM python:3.12-slim AS builder
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -42,7 +42,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 
 # Runtime stage
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Install uv for script environments and git for git sync
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -61,6 +61,8 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/app /app/app
 COPY --from=builder /app/cronator_lib /app/cronator_lib
 COPY --from=builder /app/pyproject.toml /app/
+COPY --from=builder /app/alembic /app/alembic
+COPY --from=builder /app/alembic.ini /app/
 
 # Copy built CSS from css-builder
 COPY --from=css-builder /app/app/static/output.css /app/app/static/output.css

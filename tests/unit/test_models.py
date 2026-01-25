@@ -43,7 +43,7 @@ class TestScript:
         assert script.id is not None
         assert script.name == "test_script"
         assert script.enabled is True  # default
-        assert script.python_version == "3.11"  # default
+        assert script.python_version == "3.12"  # default
         assert script.timeout == 3600  # default
 
     @pytest.mark.asyncio

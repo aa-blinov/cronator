@@ -3,7 +3,7 @@ name = "cronator"
 version = "0.1.0"
 description = "Python Script Scheduler with Web UI"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
@@ -11,6 +11,8 @@ dependencies = [
     "python-multipart>=0.0.6",
     "sqlalchemy[asyncio]>=2.0.0",
     "aiosqlite>=0.19.0",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
     "apscheduler>=3.10.0",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
@@ -38,7 +40,7 @@ packages = ["app", "cronator_lib"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]

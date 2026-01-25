@@ -37,6 +37,11 @@ logs/
 *.db
 *.sqlite
 
+# Backups
+backups/*.sql.gz
+backups/*.sql
+!backups/.gitkeep
+
 # IDE
 .idea/
 .vscode/

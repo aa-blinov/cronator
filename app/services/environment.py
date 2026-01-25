@@ -102,7 +102,7 @@ class EnvironmentService:
     async def create_env(
         self,
         script_name: str,
-        python_version: str = "3.11",
+        python_version: str = "3.12",
     ) -> tuple[bool, str]:
         """
         Create a new virtual environment for a script.
@@ -416,7 +416,7 @@ class EnvironmentService:
     async def setup_environment(
         self,
         script_name: str,
-        python_version: str = "3.11",
+        python_version: str = "3.12",
         dependencies: str = "",
     ) -> tuple[bool, str]:
         """
@@ -552,7 +552,7 @@ class EnvironmentService:
         self,
         script_id: int,
         script_name: str,
-        python_version: str = "3.11",
+        python_version: str = "3.12",
         dependencies: str = "",
     ) -> tuple[bool, str]:
         """

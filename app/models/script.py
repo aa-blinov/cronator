@@ -31,7 +31,7 @@ class Script(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Environment
-    python_version: Mapped[str] = mapped_column(String(20), default="3.11")
+    python_version: Mapped[str] = mapped_column(String(20), default="3.12")
     dependencies: Mapped[str] = mapped_column(Text, default="")  # One package per line
 
     # Alerting

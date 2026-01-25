@@ -1,4 +1,22 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: cronator-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=cronator
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-cronator_dev_password}
+      - POSTGRES_DB=cronator
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cronator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cronator-network
+
   cronator:
     build: .
     container_name: cronator
@@ -12,6 +30,8 @@ services:
       --reload-dir /app/cronator_lib
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://cronator:${POSTGRES_PASSWORD:-cronator_dev_password}@db:5432/cronator
     ports:
       - "8080:8080"
     volumes:
@@ -22,38 +42,69 @@ services:
       - ./.env:/app/.env
       # Scripts directory - add your scripts here
       - ./scripts:/app/scripts
-      # Data directory - database and git repo
+      # Data directory - git repo and temporary files
       - ./data:/app/data
       # Virtual environments - cached between restarts
       - ./envs:/app/envs
       # Logs
       - ./logs:/app/logs
-    
+      # Alembic migrations
+      - ./alembic:/app/alembic
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 30s
+    networks:
+      - cronator-network
 
-# Optional: For production with PostgreSQL
-# services:
-#   cronator:
-#     ...
-#     environment:
-#       - DATABASE_URL=postgresql+asyncpg://cronator:password@db:5432/cronator
-#     depends_on:
-#       - db
-#   
-#   db:
-#     image: postgres:16-alpine
-#     restart: unless-stopped
-#     volumes:
-#       - postgres_data:/var/lib/postgresql/data
-#     environment:
-#       - POSTGRES_USER=cronator
-#       - POSTGRES_PASSWORD=password
-#       - POSTGRES_DB=cronator
-# 
-# volumes:
-#   postgres_data:
+  # PostgreSQL backup service - runs daily at 2 AM
+  db-backup:
+    image: postgres:16-alpine
+    container_name: cronator-backup
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=cronator
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-cronator_dev_password}
+      - POSTGRES_DB=cronator
+      - PGHOST=db
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Backup service started. Waiting for 2 AM to perform daily backups (retention: $${BACKUP_RETENTION_DAYS} days)..."
+        while true; do
+          # Wait until 2 AM
+          current_hour=$$(date +%H)
+          if [ "$$current_hour" = "02" ]; then
+            echo "Starting backup at $$(date)"
+            timestamp=$$(date +%Y%m%d_%H%M%S)
+            pg_dump -U cronator -h db cronator | gzip > /backups/cronator_$$timestamp.sql.gz
+            # Delete backups older than BACKUP_RETENTION_DAYS
+            find /backups -name "cronator_*.sql.gz" -mtime +$${BACKUP_RETENTION_DAYS} -delete
+            echo "Backup completed: cronator_$$timestamp.sql.gz"
+            # Sleep until next day
+            sleep 86400
+          else
+            # Check every hour
+            sleep 3600
+          fi
+        done
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cronator-network
+
+networks:
+  cronator-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

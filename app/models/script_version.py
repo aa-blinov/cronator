@@ -36,7 +36,7 @@ class ScriptVersion(Base):
     # Snapshot of script content at this version
     content: Mapped[str] = mapped_column(Text, nullable=False)
     dependencies: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    python_version: Mapped[str] = mapped_column(String(20), nullable=False, default="3.11")
+    python_version: Mapped[str] = mapped_column(String(20), nullable=False, default="3.12")
     cron_expression: Mapped[str] = mapped_column(String(100), nullable=False, default="0 * * * *")
     timeout: Mapped[int] = mapped_column(nullable=False, default=3600)
     environment_vars: Mapped[str] = mapped_column(Text, nullable=False, default="")

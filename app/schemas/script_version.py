@@ -11,7 +11,7 @@ class ScriptVersionBase(BaseModel):
     version_number: int
     content: str
     dependencies: str = Field(default="")
-    python_version: str = Field(default="3.11")
+    python_version: str = Field(default="3.12")
     cron_expression: str = Field(default="0 * * * *")
     timeout: int = Field(default=3600)
     environment_vars: str = Field(default="")

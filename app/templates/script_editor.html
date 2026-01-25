@@ -267,7 +267,7 @@
                         </label>
                         <select name="python_version" class="select select-bordered w-full">
                             {% for ver in python_versions %}
-                            <option value="{{ ver }}" {% if script and script.python_version == ver %}selected{% elif not script and ver == '3.11' %}selected{% endif %}>
+                            <option value="{{ ver }}" {% if script and script.python_version == ver %}selected{% elif not script and ver == '3.12' %}selected{% endif %}>
                                 Python {{ ver }}
                             </option>
                             {% endfor %}

@@ -65,6 +65,10 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[AsyncClient, None]:
     """Create test HTTP client with test database and auth."""
     import base64
+    import os
+
+    # Skip Alembic migrations in tests (prevents subprocess calls during test setup)
+    monkeypatch.setenv("SKIP_ALEMBIC_MIGRATIONS", "1")
 
     # Create test session maker
     from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -99,16 +103,13 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
     fastapi_app.dependency_overrides[get_db] = override_get_db
     fastapi_app.dependency_overrides[verify_credentials] = override_verify_credentials
 
-    transport = ASGITransport(app=fastapi_app)
-
     # Add Basic Auth header for any endpoints that might check it directly
     auth = base64.b64encode(b"admin:admin").decode("ascii")
     headers = {"Authorization": f"Basic {auth}"}
 
+    transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(
-        transport=transport,
-        base_url="http://test",
-        headers=headers,
+        transport=transport, base_url="http://test", headers=headers
     ) as client:
         yield client
 
@@ -131,7 +132,7 @@ async def script_factory(db_session: AsyncSession):
         content: str = "print('Hello, World!')",
         cron_expression: str = "0 * * * *",
         enabled: bool = True,
-        python_version: str = "3.11",
+        python_version: str = "3.12",
         timeout: int = 3600,
         **kwargs: Any,
     ) -> Script:

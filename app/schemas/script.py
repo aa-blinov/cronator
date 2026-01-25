@@ -12,7 +12,7 @@ class ScriptBase(BaseModel):
     description: str = Field(default="")
     cron_expression: str = Field(default="0 * * * *")
     enabled: bool = Field(default=True)
-    python_version: str = Field(default="3.11")
+    python_version: str = Field(default="3.12")
     dependencies: str = Field(default="")
     alert_on_failure: bool = Field(default=True)
     alert_on_success: bool = Field(default=False)

@@ -46,13 +46,34 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifecycle manager."""
+    import os
+    
     logger.info("Starting Cronator...")
 
     # Ensure directories exist
     settings.ensure_directories()
 
-    # Initialize database
-    await init_db()
+    # Run database migrations with Alembic (skip in tests)
+    if not os.getenv("SKIP_ALEMBIC_MIGRATIONS"):
+        logger.info("Running database migrations...")
+        import subprocess
+        import sys
+
+        try:
+            # Run alembic upgrade head
+            result = subprocess.run(
+                [sys.executable, "-m", "alembic", "upgrade", "head"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            logger.info(f"Migrations completed: {result.stdout}")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Migration failed: {e.stderr}")
+            raise
+    else:
+        logger.info("Skipping database migrations (SKIP_ALEMBIC_MIGRATIONS is set)")
+
     logger.info("Database initialized")
 
     # Initialize settings service and migrate from .env if needed
