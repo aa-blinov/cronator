@@ -70,3 +70,8 @@ async def init_db() -> None:
 async def close_db() -> None:
     """Close database connection."""
     await engine.dispose()
+
+
+# Import all models to register them with Base.metadata
+# This ensures tables are created when using Base.metadata.create_all()
+from app.models import Execution, Script, ScriptVersion, Setting  # noqa: F401, E402
