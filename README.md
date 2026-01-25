@@ -1,10 +1,32 @@
 # Cronator
 
-**Python Script Scheduler with Web UI**
-
 Cronator — это self-hosted планировщик Python-скриптов с веб-интерфейсом, изолированными окружениями для каждого скрипта и email-алертами.
 
-![Dashboard Preview](https://via.placeholder.com/800x400?text=Cronator+Dashboard)
+## Скриншоты
+
+### Dashboard
+
+![Dashboard](docs/screenshots/dashboard.png)
+*Главная страница с последними выполнениями скриптов*
+
+### Executions
+
+![Executions](docs/screenshots/executions.png)
+*История всех выполнений с фильтрацией и поиском*
+
+### New Script
+
+![New Script Editor](docs/screenshots/editor.png)
+*Редактор для создания и настройки скриптов с подсветкой синтаксиса*
+
+### Settings
+
+![Settings](docs/screenshots/settings.png)
+*Управление настройками приложения и email-алертами*
+
+> **Примечание:** Для обновления скриншотов запустите `docker compose up -d` и сделайте снимки страниц:
+> Dashboard (`/`), Executions (`/executions`), New Script (`/scripts/new`), Settings (`/settings`).
+> Сохраните в `docs/screenshots/` с именами: `dashboard.png`, `executions.png`, `editor.png`, `settings.png`
 
 ## Особенности
 
@@ -42,6 +64,7 @@ open http://localhost:8080
 По умолчанию: `admin` / `admin` (измените в .env!)
 
 **Что включено:**
+
 - PostgreSQL 16 с автоматическими миграциями
 - Ежедневные бэкапы БД в 2 AM (хранятся 7 дней)
 - Persistent volumes для данных
@@ -63,37 +86,6 @@ uv run alembic upgrade head
 uv run python -m uvicorn app.main:app --reload --port 8080
 ```
 
-### Docker (старый метод, только для разработки)
-
-```bash
-# Клонировать репозиторий
-git clone https://github.com/yourusername/cronator.git
-cd cronator
-
-# Скопировать конфигурацию
-cp .env.example .env
-# Отредактировать .env, изменить ADMIN_PASSWORD и SECRET_KEY
-
-# Запустить
-docker-compose up -d
-
-# Открыть в браузере
-open http://localhost:8080
-```
-
-### Локально (для разработки)
-
-```bash
-# Установить uv если ещё не установлен
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Установить зависимости
-uv sync
-
-# Запустить
-uv run python -m uvicorn app.main:app --reload --port 8080
-```
-
 ## Структура скриптов
 
 ### Через UI
@@ -107,7 +99,7 @@ uv run python -m uvicorn app.main:app --reload --port 8080
 
 Создайте папку в `scripts/` с файлом `cronator.yaml`:
 
-```
+```plain
 scripts/
 └── my-task/
     ├── cronator.yaml
@@ -170,7 +162,7 @@ cp .env.example .env
 ### Основные настройки
 
 | Переменная | Описание | По умолчанию |
-|------------|----------|--------------|
+| --- | --- | --- |
 | `ADMIN_USERNAME` | Логин администратора | `admin` |
 | `ADMIN_PASSWORD` | Пароль администратора | `admin` |
 | `SECRET_KEY` | Секретный ключ (для шифрования) | `change-me` |
@@ -239,7 +231,8 @@ uv run alembic history --verbose
 ```
 
 **Структура миграций:**
-```
+
+```plain
 alembic/
 ├── versions/
 │   └── 7a45991c91e2_initial_schema_with_all_tables.py
@@ -347,6 +340,7 @@ log.with_data("Processed", count=100, duration_ms=1234)
 Вы можете запускать тесты локально (SQLite) или в изолированном контейнере (PostgreSQL):
 
 #### Локально (SQLite)
+
 ```bash
 # Установить dev зависимости
 uv sync --all-extras
@@ -356,18 +350,22 @@ uv run pytest tests/ -v
 ```
 
 #### В Docker (PostgreSQL) — Рекомендуется
+
 Этот метод гарантирует полную идентичность окружения с production и тестирует работу с реальной БД PostgreSQL.
+
 ```bash
 npm run test:docker
 ```
+
 Или вручную:
+
 ```bash
 docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
 ```
 
 ### Структура тестов
 
-```
+```plain
 tests/
 ├── conftest.py              # Фикстуры и настройка тестовой БД
 ├── unit/
@@ -382,13 +380,14 @@ tests/
 ```
 
 **Важно:**
+
 - При локальном запуске используется файл `test_app.db` (SQLite), который удаляется после тестов.
 - При запуске в Docker используется отдельный контейнер `db-test` (PostgreSQL 16).
 - Во всех тестах автоматически устанавливается `SKIP_ALEMBIC_MIGRATIONS=1`, схема БД создается напрямую из моделей SQLAlchemy для скорости.
 
 ## Безопасность
 
-⚠️ **Важные рекомендации по безопасности:**
+ **Важные рекомендации по безопасности:**
 
 - **Всегда меняйте** `ADMIN_PASSWORD`, `POSTGRES_PASSWORD` и `SECRET_KEY` в production
 - **Используйте сильный SECRET_KEY** (минимум 32 символа) - он используется для шифрования чувствительных данных
@@ -401,14 +400,7 @@ tests/
 
 ### Шифрование данных
 
-Все чувствительные настройки (пароли SMTP, Git токены) **автоматически шифруются** перед сохранением в БД:
+Все чувствительные настройки **автоматически шифруются** перед сохранением в БД:
 
 - Алгоритм: Fernet (симметричное шифрование)
 - Ключ: производный от `SECRET_KEY` из `.env`
-- Проверка: запустите `python check_db_security.py`
-
-Подробнее см. [SECURITY.md](SECURITY.md)
-
-## Лицензия
-
-MIT
