@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "build:css": "tailwindcss -i ./app/static/input.css -o ./app/static/output.css --minify",
-    "watch:css": "tailwindcss -i ./app/static/input.css -o ./app/static/output.css --watch"
+    "watch:css": "tailwindcss -i ./app/static/input.css -o ./app/static/output.css --watch",
+    "test:docker": "docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests"
   },
   "devDependencies": {
     "daisyui": "^4.4.24",

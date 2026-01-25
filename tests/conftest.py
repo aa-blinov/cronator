@@ -17,8 +17,12 @@ from app.models.script_version import (
 )
 from app.models.setting import Setting  # noqa: F401 - needed for Base.metadata registration
 
-# Test database URL (in-memory SQLite)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+import os
+
+# Test database URL
+# Default to file-based SQLite for local development
+# Use TEST_DATABASE_URL environment variable if provided (e.g., for containerized tests)
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite+aiosqlite:///./test_app.db")
 
 
 @pytest.fixture(scope="session")
@@ -47,6 +51,18 @@ async def test_engine():
         await conn.run_sync(Base.metadata.drop_all)
 
     await engine.dispose()
+
+    # Cleanup test database file if it was SQLite
+    import os
+
+    if "sqlite" in TEST_DATABASE_URL:
+        db_file = TEST_DATABASE_URL.replace("sqlite+aiosqlite:///", "")
+        if os.path.exists(db_file):
+            try:
+                os.remove(db_file)
+            except PermissionError:
+                # File might still be locked
+                pass
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -96,10 +112,28 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
     def override_verify_credentials():
         return "test_user"
 
-    # Patch async_session_maker in services that use it
+    # Patch async_session_maker in all locations where it's already imported
+    import app.database
+    import app.main
     import app.services.executor
+    import app.services.git_sync
+    import app.services.scheduler
+    import app.services.settings_service
 
-    monkeypatch.setattr(app.services.executor, "async_session_maker", async_session)
+    modules_to_patch = [
+        app.database,
+        app.main,
+        app.services.executor,
+        app.services.git_sync,
+        app.services.scheduler,
+        app.services.settings_service,
+    ]
+
+    for mod in modules_to_patch:
+        if hasattr(mod, "async_session_maker"):
+            monkeypatch.setattr(mod, "async_session_maker", async_session)
+        if hasattr(mod, "engine"):
+            monkeypatch.setattr(mod, "engine", test_engine)
 
     fastapi_app.dependency_overrides[get_db] = override_get_db
     fastapi_app.dependency_overrides[verify_credentials] = override_verify_credentials
@@ -109,9 +143,7 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
     headers = {"Authorization": f"Basic {auth}"}
 
     transport = ASGITransport(app=fastapi_app)
-    async with AsyncClient(
-        transport=transport, base_url="http://test", headers=headers
-    ) as client:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as client:
         yield client
 
     # Clear overrides after test

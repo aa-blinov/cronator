@@ -47,7 +47,7 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """Application lifecycle manager."""
     import os
-    
+
     logger.info("Starting Cronator...")
 
     # Ensure directories exist

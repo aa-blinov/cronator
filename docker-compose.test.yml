@@ -1,0 +1,27 @@
+services:
+  db-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: cronator_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d cronator_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  tests:
+    build:
+      context: .
+      target: builder
+      args:
+        INSTALL_DEV: "true"
+    depends_on:
+      db-test:
+        condition: service_healthy
+    environment:
+      TEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@db-test:5432/cronator_test
+      SKIP_ALEMBIC_MIGRATIONS: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    command: ["uv", "run", "pytest", "tests/", "-v"]

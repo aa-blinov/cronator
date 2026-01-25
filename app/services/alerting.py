@@ -147,7 +147,7 @@ border-radius: 4px; overflow-x: auto;">{execution.error_message}</pre>
             <h3>Stderr Output</h3>
             <pre style="background: #fef2f2; padding: 15px;
 border-radius: 4px; overflow-x: auto; max-height: 300px;">
-{execution.stderr[:2000]}{'...' if len(execution.stderr) > 2000 else ''}
+{execution.stderr[:2000]}{"..." if len(execution.stderr) > 2000 else ""}
 </pre>
             '''
             if execution.stderr

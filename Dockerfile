@@ -1,7 +1,10 @@
 # Build stage
 FROM python:3.12-slim AS builder
 
-# Install uv
+# Install uv & git (needed for GitPython in tests)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Set environment variables
@@ -14,16 +17,27 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Argument to control including dev dependencies
+ARG INSTALL_DEV=false
+
 # Install dependencies first (better layer caching)
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+    if [ "$INSTALL_DEV" = "true" ]; then \
+        uv sync --frozen --all-extras --no-install-project; \
+    else \
+        uv sync --frozen --no-dev --no-install-project; \
+    fi
 
 # Copy application code
 COPY . .
 
 # Install the project
-RUN uv sync --frozen --no-dev
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
+        uv sync --frozen --all-extras; \
+    else \
+        uv sync --frozen --no-dev; \
+    fi
 
 # Build CSS stage
 FROM node:20-slim AS css-builder

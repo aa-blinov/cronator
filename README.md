@@ -362,32 +362,36 @@ log.with_data("Processed", count=100, duration_ms=1234)
 
 ## Тестирование
 
-Проект включает комплексный набор тестов: unit тесты, integration тесты API.
+Проект включает комплексный набор тестов: unit-тесты и интеграционные тесты API.
 
 ### Запуск тестов
 
+Вы можете запускать тесты локально (SQLite) или в изолированном контейнере (PostgreSQL):
+
+#### Локально (SQLite)
 ```bash
 # Установить dev зависимости
-uv pip install -e .[dev]
+uv sync --all-extras
 
 # Запустить все тесты
 uv run pytest tests/ -v
+```
 
-# Запустить с отчётом о покрытии
-uv run pytest tests/ --cov=app --cov-report=html
-
-# Запустить только unit тесты
-uv run pytest tests/unit/ -v
-
-# Запустить только integration тесты
-uv run pytest tests/integration/ -v
+#### В Docker (PostgreSQL) — Рекомендуется
+Этот метод гарантирует полную идентичность окружения с production и тестирует работу с реальной БД PostgreSQL.
+```bash
+npm run test:docker
+```
+Или вручную:
+```bash
+docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
 ```
 
 ### Структура тестов
 
 ```
 tests/
-├── conftest.py              # Фикстуры и test database
+├── conftest.py              # Фикстуры и настройка тестовой БД
 ├── unit/
 │   ├── test_models.py       # Тесты моделей Script, Execution
 │   └── services/
@@ -399,7 +403,10 @@ tests/
     └── test_api_settings.py     # API /api/settings
 ```
 
-**Важно:** Тесты используют in-memory SQLite (`sqlite+aiosqlite:///:memory:`) и автоматически устанавливают переменную окружения `SKIP_ALEMBIC_MIGRATIONS=1`, чтобы не запускать миграции Alembic в тестовом окружении. Это обеспечивает быструю изоляцию и независимость тестов.
+**Важно:**
+- При локальном запуске используется файл `test_app.db` (SQLite), который удаляется после тестов.
+- При запуске в Docker используется отдельный контейнер `db-test` (PostgreSQL 16).
+- Во всех тестах автоматически устанавливается `SKIP_ALEMBIC_MIGRATIONS=1`, схема БД создается напрямую из моделей SQLAlchemy для скорости.
 
 ## Безопасность
 
