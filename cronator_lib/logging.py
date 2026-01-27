@@ -13,7 +13,6 @@ import json
 import logging
 import os
 import re
-import shutil
 import sys
 import tempfile
 import time
@@ -201,7 +200,7 @@ def save_artifact(filename: str, data: str | bytes, max_size_mb: int = 10) -> st
     if not artifacts_dir:
         # Fallback to temp dir for local development/testing
         artifacts_dir = os.path.join(tempfile.gettempdir(), "cronator_artifacts")
-    
+
     artifacts_path = Path(artifacts_dir)
     artifacts_path.mkdir(parents=True, exist_ok=True)
 
@@ -209,7 +208,7 @@ def save_artifact(filename: str, data: str | bytes, max_size_mb: int = 10) -> st
     def sanitize_filename(name: str) -> str:
         name = os.path.basename(name)
         name = name.replace(" ", "_")
-        safe_name = re.sub(r'[^a-zA-Z0-9._-]', '', name)
+        safe_name = re.sub(r"[^a-zA-Z0-9._-]", "", name)
         if not safe_name:
             raise ValueError(f"Invalid filename: {name}")
         return safe_name
@@ -238,21 +237,17 @@ def save_artifact(filename: str, data: str | bytes, max_size_mb: int = 10) -> st
     # Save file atomically
     try:
         with tempfile.NamedTemporaryFile(
-            mode='wb',
-            dir=artifacts_path,
-            delete=False,
-            prefix='.tmp_',
-            suffix=suffix
+            mode="wb", dir=artifacts_path, delete=False, prefix=".tmp_", suffix=suffix
         ) as tmp_file:
             tmp_file.write(data)
             tmp_path = Path(tmp_file.name)
-        
+
         tmp_path.replace(target_path)
     except Exception as e:
-        if 'tmp_path' in locals() and tmp_path.exists():
+        if "tmp_path" in locals() and tmp_path.exists():
             try:
                 tmp_path.unlink()
-            except:
+            except Exception:
                 pass
         raise OSError(f"Failed to save artifact '{filename}': {e}")
 

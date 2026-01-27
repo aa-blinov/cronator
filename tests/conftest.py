@@ -1,6 +1,7 @@
 """Pytest configuration and fixtures for Cronator tests."""
 
 import asyncio
+import os
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -12,11 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.database import Base
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
-from app.models.script_version import ScriptVersion
-from app.models.artifact import Artifact
-from app.models.setting import Setting
-
-import os
 
 # Test database URL
 # Default to file-based SQLite for local development
@@ -112,14 +108,14 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
         return "test_user"
 
     # Patch async_session_maker in all locations where it's already imported
+    import app.api.executions
+    import app.api.scripts
+    import app.api.settings
     import app.database
     import app.main
     import app.services.executor
     import app.services.scheduler
     import app.services.settings_service
-    import app.api.settings
-    import app.api.scripts
-    import app.api.executions
 
     modules_to_patch = [
         app.database,

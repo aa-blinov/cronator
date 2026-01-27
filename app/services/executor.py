@@ -167,14 +167,15 @@ class ExecutorService:
                 env["CRONATOR_SCRIPT_ID"] = str(script_id)
                 env["CRONATOR_EXECUTION_ID"] = str(execution_id)
                 env["CRONATOR_SCRIPT_NAME"] = script.name
-                
-                # Add cronator_lib to PYTHONPATH so scripts can import it even if not installed in venv
+
+                # Add cronator_lib to PYTHONPATH so scripts can import it
+                # even if not installed in venv
                 cronator_lib_parent = str(settings.base_dir)
                 if "PYTHONPATH" in env:
                     env["PYTHONPATH"] = f"{cronator_lib_parent}{os.pathsep}{env['PYTHONPATH']}"
                 else:
                     env["PYTHONPATH"] = cronator_lib_parent
-                
+
                 # Create artifacts directory for this execution
                 execution_artifacts_dir = settings.artifacts_dir / str(execution_id)
                 execution_artifacts_dir.mkdir(parents=True, exist_ok=True)
@@ -233,27 +234,28 @@ class ExecutorService:
                                         # Format: ARTIFACT_SAVED:{filename}:{size}:{original_name}
                                         # First try to parse as JSON (from CronatorFormatter)
                                         message = decoded.strip()
-                                        if message.startswith('{'):
+                                        if message.startswith("{"):
                                             try:
                                                 log_entry = json.loads(message)
-                                                message = log_entry.get('message', message)
+                                                message = log_entry.get("message", message)
                                             except json.JSONDecodeError:
                                                 pass
-                                        
+
                                         # Now extract artifact info from message
                                         match = re.search(
-                                            r"ARTIFACT_SAVED:([^:]+):(\d+):([^\"}\n]+)",
-                                            message
+                                            r"ARTIFACT_SAVED:([^:]+):(\d+):([^\"}\n]+)", message
                                         )
                                         if match:
                                             filename = match.group(1).strip()
                                             size_bytes = int(match.group(2))
                                             original_name = match.group(3).strip()
-                                            artifacts_metadata.append({
-                                                "filename": filename,
-                                                "size_bytes": size_bytes,
-                                                "original_filename": original_name,
-                                            })
+                                            artifacts_metadata.append(
+                                                {
+                                                    "filename": filename,
+                                                    "size_bytes": size_bytes,
+                                                    "original_filename": original_name,
+                                                }
+                                            )
                                             logger.info(
                                                 f"Detected artifact: {original_name} "
                                                 f"(saved as {filename}, {size_bytes} bytes)"

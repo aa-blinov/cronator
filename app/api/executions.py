@@ -5,7 +5,6 @@ import json
 import os
 import shutil
 from datetime import UTC
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
@@ -312,6 +311,7 @@ async def delete_execution(
         except Exception as e:
             # Log but don't fail if cleanup fails
             import logging
+
             logging.warning(f"Failed to delete artifacts directory {artifacts_dir}: {e}")
 
     return {"message": "Execution deleted"}
@@ -349,7 +349,7 @@ async def clear_old_executions(
 
     count = len(executions)
     execution_ids = [exc.id for exc in executions]
-    
+
     for exc in executions:
         await db.delete(exc)
 
@@ -365,12 +365,13 @@ async def clear_old_executions(
                 deleted_artifacts += 1
             except Exception as e:
                 import logging
+
                 logging.warning(f"Failed to delete artifacts directory {artifacts_dir}: {e}")
 
     return {
         "deleted": count,
         "deleted_artifacts": deleted_artifacts,
-        "message": f"Deleted {count} executions older than {days} days"
+        "message": f"Deleted {count} executions older than {days} days",
     }
 
 
@@ -429,7 +430,7 @@ async def download_artifact(
 
     # Construct safe file path
     artifacts_dir = settings.artifacts_dir / str(execution_id)
-    
+
     # Security: only use basename to prevent path traversal
     safe_filename = os.path.basename(artifact.filename)
     file_path = artifacts_dir / safe_filename
@@ -478,6 +479,7 @@ async def delete_artifact(
             file_path.unlink()
         except Exception as e:
             import logging
+
             logging.warning(f"Failed to delete artifact file {file_path}: {e}")
 
     # Delete from database
@@ -487,7 +489,7 @@ async def delete_artifact(
     # Update execution counters
     result = await db.execute(select(Execution).where(Execution.id == execution_id))
     execution = result.scalar_one_or_none()
-    
+
     if execution:
         execution.artifacts_count = max(0, execution.artifacts_count - 1)
         execution.artifacts_size_bytes = max(0, execution.artifacts_size_bytes - size_bytes)

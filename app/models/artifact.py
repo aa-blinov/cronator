@@ -15,16 +15,16 @@ class Artifact(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     execution_id = Column(Integer, ForeignKey("executions.id", ondelete="CASCADE"), nullable=False)
-    
+
     # Stored filename (unique timestamped name on disk)
     filename = Column(String(255), nullable=False)
-    
+
     # Original filename provided by user
     original_filename = Column(String(255), nullable=False)
-    
+
     # File size in bytes
     size_bytes = Column(Integer, nullable=False, default=0)
-    
+
     # When the artifact was created
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
@@ -38,4 +38,8 @@ class Artifact(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Artifact(id={self.id}, execution_id={self.execution_id}, filename='{self.filename}')>"
+        return (
+            f"<Artifact(id={self.id}, "
+            f"execution_id={self.execution_id}, "
+            f"filename='{self.filename}')>"
+        )

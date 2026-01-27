@@ -5,26 +5,27 @@ Revises: f3d04be66245
 Create Date: 2026-01-25 12:42:30.570248
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'b629d2878149'
-down_revision: Union[str, Sequence[str], None] = 'f3d04be66245'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "b629d2878149"
+down_revision: str | Sequence[str] | None = "f3d04be66245"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     """Upgrade schema."""
     # Drop git_commit column from scripts table
-    op.drop_column('scripts', 'git_commit')
+    op.drop_column("scripts", "git_commit")
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # Re-add git_commit column to scripts table
-    op.add_column('scripts', sa.Column('git_commit', sa.VARCHAR(length=40), nullable=True))
+    op.add_column("scripts", sa.Column("git_commit", sa.VARCHAR(length=40), nullable=True))

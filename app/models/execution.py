@@ -83,8 +83,12 @@ class Execution(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Artifacts tracking
-    artifacts_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
-    artifacts_size_bytes: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    artifacts_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    artifacts_size_bytes: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
 
     # Relationships
     script: Mapped["Script"] = relationship("Script", back_populates="executions")
