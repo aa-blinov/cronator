@@ -12,10 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.database import Base
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
-from app.models.script_version import (
-    ScriptVersion,  # noqa: F401 - needed for Base.metadata registration
-)
-from app.models.setting import Setting  # noqa: F401 - needed for Base.metadata registration
+from app.models.script_version import ScriptVersion
+from app.models.artifact import Artifact
+from app.models.setting import Setting
 
 import os
 
@@ -118,6 +117,9 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
     import app.services.executor
     import app.services.scheduler
     import app.services.settings_service
+    import app.api.settings
+    import app.api.scripts
+    import app.api.executions
 
     modules_to_patch = [
         app.database,
@@ -125,6 +127,9 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
         app.services.executor,
         app.services.scheduler,
         app.services.settings_service,
+        app.api.settings,
+        app.api.scripts,
+        app.api.executions,
     ]
 
     for mod in modules_to_patch:

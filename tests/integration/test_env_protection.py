@@ -5,16 +5,28 @@ import asyncio
 import pytest
 
 
+async def wait_for_script_finish(test_client, script_id, timeout=30):
+    """Wait for a script execution to finish by polling its status."""
+    for _ in range(timeout):
+        await asyncio.sleep(1)
+        response = await test_client.get(f"/api/scripts/{script_id}")
+        if response.status_code == 200:
+            status = response.json().get("last_run_status")
+            if status != "running":
+                return True
+    return False
+
+
 @pytest.mark.asyncio
 async def test_cannot_delete_script_while_running(test_client):
     """Test that deleting a script during execution is blocked."""
     # Create a long-running script
     script_data = {
         "name": "test_long_runner",
-        "description": "Test script that runs for 10 seconds",
-        "content": "import time\ntime.sleep(10)\nprint('Done')",
+        "description": "Test script that runs for a few seconds",
+        "content": "import time\ntime.sleep(5)\nprint('Done')",
         "cron_expression": "0 0 * * *",
-        "python_version": "3.11",
+        "python_version": "3.12",
         "enabled": False,
     }
 
@@ -38,14 +50,15 @@ async def test_cannot_delete_script_while_running(test_client):
         assert "running" in response.json()["detail"].lower()
 
         # Wait for script to finish
-        await asyncio.sleep(11)
+        assert await wait_for_script_finish(test_client, script_id), "Script did not finish in time"
 
         # Now deletion should work
         response = await test_client.delete(f"/api/scripts/{script_id}")
         assert response.status_code == 204
 
     except Exception:
-        # Cleanup
+        # Emergency cleanup - wait a bit more then try to delete
+        await asyncio.sleep(10)
         await test_client.delete(f"/api/scripts/{script_id}")
         raise
 
@@ -56,10 +69,10 @@ async def test_cannot_install_dependencies_while_running(test_client):
     # Create a long-running script
     script_data = {
         "name": "test_install_blocker",
-        "description": "Test script that runs for 10 seconds",
-        "content": "import time\ntime.sleep(10)\nprint('Done')",
+        "description": "Test script that runs for a few seconds",
+        "content": "import time\ntime.sleep(5)\nprint('Done')",
         "cron_expression": "0 0 * * *",
-        "python_version": "3.11",
+        "python_version": "3.12",
         "enabled": False,
         "dependencies": "requests",
     }
@@ -84,7 +97,7 @@ async def test_cannot_install_dependencies_while_running(test_client):
         assert "running" in response.json()["detail"].lower()
 
         # Wait for script to finish
-        await asyncio.sleep(11)
+        await wait_for_script_finish(test_client, script_id)
 
     finally:
         # Cleanup
@@ -97,10 +110,10 @@ async def test_cannot_rebuild_env_while_running(test_client):
     # Create a long-running script
     script_data = {
         "name": "test_rebuild_blocker",
-        "description": "Test script that runs for 10 seconds",
-        "content": "import time\ntime.sleep(10)\nprint('Done')",
+        "description": "Test script that runs for a few seconds",
+        "content": "import time\ntime.sleep(5)\nprint('Done')",
         "cron_expression": "0 0 * * *",
-        "python_version": "3.11",
+        "python_version": "3.12",
         "enabled": False,
     }
 
@@ -124,7 +137,7 @@ async def test_cannot_rebuild_env_while_running(test_client):
         assert "running" in response.json()["detail"].lower()
 
         # Wait for script to finish
-        await asyncio.sleep(11)
+        await wait_for_script_finish(test_client, script_id)
 
     finally:
         # Cleanup
@@ -138,18 +151,18 @@ async def test_can_run_multiple_different_scripts(test_client):
     script1_data = {
         "name": "test_concurrent_1",
         "description": "First concurrent script",
-        "content": "import time\ntime.sleep(5)\nprint('Script 1 done')",
+        "content": "import time\ntime.sleep(2)\nprint('Script 1 done')",
         "cron_expression": "0 0 * * *",
-        "python_version": "3.11",
+        "python_version": "3.12",
         "enabled": False,
     }
 
     script2_data = {
         "name": "test_concurrent_2",
         "description": "Second concurrent script",
-        "content": "import time\ntime.sleep(5)\nprint('Script 2 done')",
+        "content": "import time\ntime.sleep(2)\nprint('Script 2 done')",
         "cron_expression": "0 0 * * *",
-        "python_version": "3.11",
+        "python_version": "3.12",
         "enabled": False,
     }
 
@@ -174,7 +187,8 @@ async def test_can_run_multiple_different_scripts(test_client):
         await asyncio.sleep(1)
 
         # Wait for completion
-        await asyncio.sleep(6)
+        await wait_for_script_finish(test_client, script1_id)
+        await wait_for_script_finish(test_client, script2_id)
 
     finally:
         # Cleanup

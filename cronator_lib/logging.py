@@ -12,8 +12,13 @@ Usage:
 import json
 import logging
 import os
+import re
+import shutil
 import sys
+import tempfile
+import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 
@@ -117,7 +122,7 @@ class CronatorLogger(logging.Logger):
         percent = (current / total * 100) if total > 0 else 0
         bar_length = 20
         filled = int(bar_length * current / total) if total > 0 else 0
-        bar = "█" * filled + "░" * (bar_length - filled)
+        bar = "" * filled + "" * (bar_length - filled)
 
         msg = f"[{bar}] {percent:.1f}% ({current}/{total})"
         if task:
@@ -173,3 +178,85 @@ def setup_logging(level: int = logging.INFO) -> CronatorLogger:
     logger = get_logger()
     logger.setLevel(level)
     return logger
+
+
+def save_artifact(filename: str, data: str | bytes, max_size_mb: int = 10) -> str:
+    """
+    Save a file artifact for the current execution.
+
+    Args:
+        filename: Desired filename (will be sanitized and timestamped)
+        data: File content (str or bytes)
+        max_size_mb: Maximum file size in MB
+
+    Returns:
+        str: The unique filename that was saved
+    """
+    # Convert string to bytes if needed
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+
+    # Get artifacts directory from environment
+    artifacts_dir = os.environ.get("CRONATOR_ARTIFACTS_DIR")
+    if not artifacts_dir:
+        # Fallback to temp dir for local development/testing
+        artifacts_dir = os.path.join(tempfile.gettempdir(), "cronator_artifacts")
+    
+    artifacts_path = Path(artifacts_dir)
+    artifacts_path.mkdir(parents=True, exist_ok=True)
+
+    # Sanitize filename
+    def sanitize_filename(name: str) -> str:
+        name = os.path.basename(name)
+        name = name.replace(" ", "_")
+        safe_name = re.sub(r'[^a-zA-Z0-9._-]', '', name)
+        if not safe_name:
+            raise ValueError(f"Invalid filename: {name}")
+        return safe_name
+
+    sanitized = sanitize_filename(filename)
+    path_obj = Path(sanitized)
+    stem = path_obj.stem
+    suffix = path_obj.suffix
+
+    # Check for dangerous extensions
+    DANGEROUS_EXTENSIONS = {".exe", ".bat", ".sh", ".cmd", ".com", ".pif", ".scr", ".vbs", ".ps1"}
+    if suffix.lower() in DANGEROUS_EXTENSIONS:
+        raise ValueError(f"Forbidden extension: {suffix}")
+
+    # Validate file size
+    data_size_bytes = len(data)
+    max_size_bytes = max_size_mb * 1024 * 1024
+    if data_size_bytes > max_size_bytes:
+        raise ValueError(f"File too large: {data_size_bytes} bytes")
+
+    # Generate unique filename
+    timestamp = int(time.time())
+    unique_filename = f"{stem}_{timestamp}{suffix}"
+    target_path = artifacts_path / unique_filename
+
+    # Save file atomically
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode='wb',
+            dir=artifacts_path,
+            delete=False,
+            prefix='.tmp_',
+            suffix=suffix
+        ) as tmp_file:
+            tmp_file.write(data)
+            tmp_path = Path(tmp_file.name)
+        
+        tmp_path.replace(target_path)
+    except Exception as e:
+        if 'tmp_path' in locals() and tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except:
+                pass
+        raise OSError(f"Failed to save artifact '{filename}': {e}")
+
+    # Emit marker for the executor to catch
+    print(f"ARTIFACT_SAVED:{unique_filename}:{data_size_bytes}:{filename}")
+
+    return unique_filename

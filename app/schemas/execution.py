@@ -35,6 +35,10 @@ class ExecutionRead(BaseModel):
     is_test: bool = False
     error_message: str | None = None
 
+    # Artifacts tracking
+    artifacts_count: int = 0
+    artifacts_size_bytes: int = 0
+
     # Computed fields
     duration_formatted: str = "-"
     script_name: str | None = None

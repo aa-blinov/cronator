@@ -93,7 +93,14 @@ function removeEmptyParams(event) {
                         <span class="badge badge-ghost badge-sm">{{ exec.triggered_by }}</span>
                     </td>
                     <td>
-                        <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">View Logs</a>
+                        <div class="flex items-center gap-2">
+                            <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">View Logs</a>
+                            {% if exec.artifacts_count > 0 %}
+                            <span class="badge badge-sm gap-1 flex items-center" title="{{ exec.artifacts_count }} artifact(s)">
+                                {{ icons.archive_box("w-3 h-3") }} {{ exec.artifacts_count }}
+                            </span>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}

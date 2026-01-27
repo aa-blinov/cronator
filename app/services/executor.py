@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import async_session_maker
+from app.models.artifact import Artifact
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
 from app.services.environment import environment_service
@@ -165,6 +167,18 @@ class ExecutorService:
                 env["CRONATOR_SCRIPT_ID"] = str(script_id)
                 env["CRONATOR_EXECUTION_ID"] = str(execution_id)
                 env["CRONATOR_SCRIPT_NAME"] = script.name
+                
+                # Add cronator_lib to PYTHONPATH so scripts can import it even if not installed in venv
+                cronator_lib_parent = str(settings.base_dir)
+                if "PYTHONPATH" in env:
+                    env["PYTHONPATH"] = f"{cronator_lib_parent}{os.pathsep}{env['PYTHONPATH']}"
+                else:
+                    env["PYTHONPATH"] = cronator_lib_parent
+                
+                # Create artifacts directory for this execution
+                execution_artifacts_dir = settings.artifacts_dir / str(execution_id)
+                execution_artifacts_dir.mkdir(parents=True, exist_ok=True)
+                env["CRONATOR_ARTIFACTS_DIR"] = str(execution_artifacts_dir)
 
                 # Determine working directory
                 if script.working_directory:
@@ -200,6 +214,7 @@ class ExecutorService:
                     # Collect output and stream to queue
                     stdout_lines = []
                     stderr_lines = []
+                    artifacts_metadata = []  # Track artifacts created during execution
 
                     async def read_stream(stream, is_stderr=False):
                         """Read stream line by line and add to queue."""
@@ -212,6 +227,39 @@ class ExecutorService:
                                 stderr_lines.append(decoded)
                             else:
                                 stdout_lines.append(decoded)
+                                # Parse for artifact markers
+                                if "ARTIFACT_SAVED:" in decoded:
+                                    try:
+                                        # Format: ARTIFACT_SAVED:{filename}:{size}:{original_name}
+                                        # First try to parse as JSON (from CronatorFormatter)
+                                        message = decoded.strip()
+                                        if message.startswith('{'):
+                                            try:
+                                                log_entry = json.loads(message)
+                                                message = log_entry.get('message', message)
+                                            except json.JSONDecodeError:
+                                                pass
+                                        
+                                        # Now extract artifact info from message
+                                        match = re.search(
+                                            r"ARTIFACT_SAVED:([^:]+):(\d+):([^\"}\n]+)",
+                                            message
+                                        )
+                                        if match:
+                                            filename = match.group(1).strip()
+                                            size_bytes = int(match.group(2))
+                                            original_name = match.group(3).strip()
+                                            artifacts_metadata.append({
+                                                "filename": filename,
+                                                "size_bytes": size_bytes,
+                                                "original_filename": original_name,
+                                            })
+                                            logger.info(
+                                                f"Detected artifact: {original_name} "
+                                                f"(saved as {filename}, {size_bytes} bytes)"
+                                            )
+                                    except Exception as e:
+                                        logger.warning(f"Failed to parse artifact metadata: {e}")
                             # Add to queue for streaming
                             await output_queue.put(("stderr" if is_stderr else "stdout", decoded))
 
@@ -248,6 +296,7 @@ class ExecutorService:
                             stdout=stdout_text,
                             stderr=stderr_text,
                             start_time=start_time,
+                            artifacts_metadata=artifacts_metadata,
                         )
 
                     except TimeoutError:
@@ -308,6 +357,7 @@ class ExecutorService:
         stderr: str = "",
         error_message: str | None = None,
         start_time: datetime | None = None,
+        artifacts_metadata: list[dict] | None = None,
     ) -> None:
         """Update execution with final status."""
         end_time = datetime.now(UTC)
@@ -322,11 +372,53 @@ class ExecutorService:
         if start_time:
             execution.duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
+        # Process artifacts if any were created
+        if artifacts_metadata:
+            try:
+                artifacts_dir = settings.artifacts_dir / str(execution.id)
+                total_size = 0
+                created_count = 0
+
+                for artifact_info in artifacts_metadata:
+                    # Verify file exists on disk
+                    artifact_path = artifacts_dir / artifact_info["filename"]
+                    if artifact_path.exists():
+                        # Create artifact record in database
+                        artifact = Artifact(
+                            execution_id=execution.id,
+                            filename=artifact_info["filename"],
+                            original_filename=artifact_info["original_filename"],
+                            size_bytes=artifact_info["size_bytes"],
+                            created_at=datetime.now(UTC),
+                        )
+                        db.add(artifact)
+                        total_size += artifact_info["size_bytes"]
+                        created_count += 1
+                    else:
+                        logger.warning(
+                            f"Artifact file not found: {artifact_path} "
+                            f"(reported by script but missing on disk)"
+                        )
+
+                # Update execution with artifact totals
+                execution.artifacts_count = created_count
+                execution.artifacts_size_bytes = total_size
+
+                logger.info(
+                    f"Processed {created_count} artifacts for execution {execution.id}, "
+                    f"total size: {total_size} bytes"
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to process artifacts for execution {execution.id}: {e}")
+                # Don't fail the execution, just log the error
+
         await db.commit()
 
         logger.info(
             f"Execution {execution.id} finished: status={status.value}, "
-            f"exit_code={exit_code}, duration={execution.duration_ms}ms"
+            f"exit_code={exit_code}, duration={execution.duration_ms}ms, "
+            f"artifacts={execution.artifacts_count}"
         )
 
         # Trigger alerting if needed

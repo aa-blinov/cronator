@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     envs_dir: Path = Path("./envs")
     logs_dir: Path = Path("./logs")
     data_dir: Path = Path("./data")
+    artifacts_dir: Path = Path("./data/artifacts")
 
     @model_validator(mode="after")
     def make_paths_absolute(self) -> "Settings":
@@ -49,6 +50,8 @@ class Settings(BaseSettings):
             self.logs_dir = self.base_dir / self.logs_dir
         if not self.data_dir.is_absolute():
             self.data_dir = self.base_dir / self.data_dir
+        if not self.artifacts_dir.is_absolute():
+            self.artifacts_dir = self.base_dir / self.artifacts_dir
 
         # Validate production secrets ONLY in non-debug mode
         # In development (DEBUG=True), default values are acceptable
@@ -91,12 +94,23 @@ class Settings(BaseSettings):
     default_timeout: int = 3600  # 1 hour default timeout
     max_log_size: int = 1_000_000  # 1MB max stdout/stderr per execution
 
+    # Artifacts
+    max_artifact_size_mb: int = 10  # Maximum size per artifact file
+    min_free_space_mb: int = 100  # Minimum free disk space required
+    max_filename_length: int = 200  # Maximum filename length
+
     # UV settings
     uv_path: str = "uv"  # path to uv executable
 
     def ensure_directories(self) -> None:
         """Create required directories if they don't exist."""
-        for dir_path in [self.scripts_dir, self.envs_dir, self.logs_dir, self.data_dir]:
+        for dir_path in [
+            self.scripts_dir,
+            self.envs_dir,
+            self.logs_dir,
+            self.data_dir,
+            self.artifacts_dir,
+        ]:
             dir_path.mkdir(parents=True, exist_ok=True)
 
 

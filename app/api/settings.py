@@ -1,9 +1,15 @@
 """API routes for settings."""
 
+import shutil
+
 from fastapi import APIRouter
 from pydantic import BaseModel
+from sqlalchemy import func, select
 
 from app.config import get_settings
+from app.database import async_session_maker
+from app.models.artifact import Artifact
+from app.models.execution import Execution
 from app.services.alerting import alerting_service
 from app.services.scheduler import scheduler_service
 from app.services.settings_service import settings_service
@@ -172,3 +178,95 @@ async def update_settings(request: UpdateSettingsRequest):
     # Services will read from settings_service
 
     return {"success": True, "message": "Settings updated successfully"}
+
+
+@router.get("/artifacts-stats")
+async def get_artifacts_stats():
+    """Get statistics about artifacts storage."""
+    async with async_session_maker() as db:
+        # Total artifacts count and size
+        result = await db.execute(
+            select(
+                func.count(Artifact.id).label("total_artifacts"),
+                func.sum(Artifact.size_bytes).label("total_size_bytes"),
+            )
+        )
+        row = result.one()
+        total_artifacts = row.total_artifacts or 0
+        total_size_bytes = row.total_size_bytes or 0
+
+        # Count executions with artifacts
+        result = await db.execute(
+            select(func.count(Execution.id)).where(Execution.artifacts_count > 0)
+        )
+        executions_with_artifacts = result.scalar() or 0
+
+    # Get disk usage
+    artifacts_dir = settings.artifacts_dir
+    try:
+        stat = shutil.disk_usage(artifacts_dir if artifacts_dir.exists() else settings.data_dir)
+        free_space_bytes = stat.free
+        total_space_bytes = stat.total
+    except Exception:
+        free_space_bytes = 0
+        total_space_bytes = 0
+
+    return {
+        "total_artifacts": total_artifacts,
+        "total_size_bytes": total_size_bytes,
+        "total_size_mb": round(total_size_bytes / (1024 * 1024), 2),
+        "executions_with_artifacts": executions_with_artifacts,
+        "free_space_bytes": free_space_bytes,
+        "free_space_mb": round(free_space_bytes / (1024 * 1024), 2),
+        "total_space_bytes": total_space_bytes,
+        "total_space_mb": round(total_space_bytes / (1024 * 1024), 2),
+    }
+
+
+@router.post("/clear-artifacts")
+async def clear_all_artifacts():
+    """Delete all artifacts from database and filesystem."""
+    import logging
+
+    async with async_session_maker() as db:
+        # Get count before deletion
+        result = await db.execute(select(func.count(Artifact.id)))
+        artifacts_count = result.scalar() or 0
+
+        # Delete all artifacts from database
+        result = await db.execute(select(Artifact))
+        artifacts = result.scalars().all()
+
+        for artifact in artifacts:
+            await db.delete(artifact)
+
+        # Reset all execution counters
+        result = await db.execute(select(Execution).where(Execution.artifacts_count > 0))
+        executions = result.scalars().all()
+
+        for execution in executions:
+            execution.artifacts_count = 0
+            execution.artifacts_size_bytes = 0
+
+        await db.commit()
+
+    # Delete artifacts directory from filesystem
+    artifacts_dir = settings.artifacts_dir
+    deleted_dirs = 0
+
+    if artifacts_dir.exists():
+        try:
+            # Delete all subdirectories
+            for subdir in artifacts_dir.iterdir():
+                if subdir.is_dir():
+                    shutil.rmtree(subdir)
+                    deleted_dirs += 1
+        except Exception as e:
+            logging.error(f"Failed to delete artifacts directory: {e}")
+
+    return {
+        "success": True,
+        "message": f"Deleted {artifacts_count} artifacts from {deleted_dirs} executions",
+        "deleted_artifacts": artifacts_count,
+        "deleted_directories": deleted_dirs,
+    }

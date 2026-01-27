@@ -5,11 +5,15 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
+
+if TYPE_CHECKING:
+    from app.models.artifact import Artifact
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 if TYPE_CHECKING:
+    from app.models.artifact import Artifact
     from app.models.script import Script
 
 
@@ -78,8 +82,17 @@ class Execution(Base):
     # Error details
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Artifacts tracking
+    artifacts_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    artifacts_size_bytes: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+
     # Relationships
     script: Mapped["Script"] = relationship("Script", back_populates="executions")
+    artifacts: Mapped[list["Artifact"]] = relationship(
+        "Artifact",
+        back_populates="execution",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<Execution(id={self.id}, script_id={self.script_id}, status='{self.status}')>"

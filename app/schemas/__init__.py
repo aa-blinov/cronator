@@ -1,5 +1,9 @@
 """Pydantic schemas package."""
 
+from app.schemas.artifact import (
+    ArtifactList,
+    ArtifactRead,
+)
 from app.schemas.execution import (
     ExecutionCreate,
     ExecutionList,
@@ -18,6 +22,8 @@ from app.schemas.script_version import (
 )
 
 __all__ = [
+    "ArtifactRead",
+    "ArtifactList",
     "ExecutionCreate",
     "ExecutionRead",
     "ExecutionList",

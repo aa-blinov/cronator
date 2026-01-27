@@ -171,6 +171,29 @@ async def value_error_handler(request: Request, exc: ValueError):
 templates_dir = Path(__file__).parent / "templates"
 app.state.templates = Jinja2Templates(directory=str(templates_dir))
 
+# Add custom Jinja2 filters
+def filesizeformat(value):
+    """Convert bytes to human-readable file size."""
+    try:
+        bytes_value = int(value)
+    except (ValueError, TypeError):
+        return "0 B"
+    
+    if bytes_value == 0:
+        return "0 B"
+    
+    units = ['B', 'KB', 'MB', 'GB', 'TB']
+    k = 1024
+    i = 0
+    
+    while bytes_value >= k and i < len(units) - 1:
+        bytes_value /= k
+        i += 1
+    
+    return f"{bytes_value:.2f} {units[i]}"
+
+app.state.templates.env.filters['filesizeformat'] = filesizeformat
+
 # Setup static files (if needed)
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():

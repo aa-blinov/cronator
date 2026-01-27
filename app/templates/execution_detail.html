@@ -151,6 +151,38 @@
         </div>
     </div>
 </div>
+
+<!-- Artifacts Section -->
+<div class="glass-card rounded-xl overflow-hidden mt-6">
+    <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
+        <h3 class="text-lg font-semibold flex items-center gap-2">
+            {{ icons.archive_box("w-5 h-5") }} Artifacts
+            <span id="artifacts-count-badge" class="badge badge-sm badge-ghost">0</span>
+        </h3>
+    </div>
+    <div id="artifacts-container" class="p-4">
+        <div id="artifacts-loading" class="text-center py-8 text-base-content/50">
+            <p>Loading artifacts...</p>
+        </div>
+        <div id="artifacts-empty" class="hidden text-center py-8 text-base-content/50">
+            <p>No artifacts</p>
+        </div>
+        <div id="artifacts-list" class="hidden overflow-x-auto">
+            <table class="table table-sm w-full">
+                <thead>
+                    <tr class="border-b border-gray-700/50">
+                        <th class="bg-transparent">Original Name</th>
+                        <th class="bg-transparent">Size</th>
+                        <th class="bg-transparent">Created</th>
+                        <th class="bg-transparent text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="artifacts-table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -225,6 +257,102 @@
         const text = document.getElementById('stderr-log')?.innerText || '';
         downloadText(`execution-${execId}-stderr.log`, text);
         window.showToast?.('Download started', 'info');
+    });
+    
+    // Artifacts management
+    async function loadArtifacts() {
+        try {
+            const response = await fetch(`/api/executions/${execId}/artifacts`);
+            const data = await response.json();
+            
+            const loading = document.getElementById('artifacts-loading');
+            const empty = document.getElementById('artifacts-empty');
+            const list = document.getElementById('artifacts-list');
+            const countBadge = document.getElementById('artifacts-count-badge');
+            const tableBody = document.getElementById('artifacts-table-body');
+            
+            loading.classList.add('hidden');
+            
+            if (data.items && data.items.length > 0) {
+                empty.classList.add('hidden');
+                list.classList.remove('hidden');
+                countBadge.textContent = data.items.length;
+                
+                tableBody.innerHTML = data.items.map(artifact => {
+                    const size = formatFileSize(artifact.size_bytes);
+                    const date = new Date(artifact.created_at).toLocaleString();
+                    
+                    return `
+                        <tr class="border-b border-gray-700/30 hover:bg-white/5">
+                            <td>${escapeHtml(artifact.original_filename)}</td>
+                            <td class="text-sm">${size}</td>
+                            <td class="text-sm">${date}</td>
+                            <td class="text-right">
+                                <div class="flex gap-2 justify-end">
+                                    <a href="/api/executions/${execId}/artifacts/${artifact.id}" 
+                                       class="btn btn-ghost btn-xs" 
+                                       download="${escapeHtml(artifact.original_filename)}">
+                                        Download
+                                    </a>
+                                    <button onclick="deleteArtifact(${artifact.id}, '${escapeHtml(artifact.original_filename)}')" 
+                                            class="btn btn-ghost btn-xs text-error">
+                                        Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } else {
+                empty.classList.remove('hidden');
+                list.classList.add('hidden');
+                countBadge.textContent = '0';
+            }
+        } catch (err) {
+            console.error('Failed to load artifacts:', err);
+            document.getElementById('artifacts-loading').innerHTML = 
+                '<p class="text-error">Failed to load artifacts</p>';
+        }
+    }
+    
+    async function deleteArtifact(artifactId, filename) {
+        if (!confirm(`Delete artifact "${filename}"?`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/executions/${execId}/artifacts/${artifactId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                window.showToast?.(`Deleted ${filename}`, 'success');
+                await loadArtifacts();
+            } else {
+                window.showToast?.('Failed to delete artifact', 'error');
+            }
+        } catch (err) {
+            window.showToast?.(err.message || 'Failed to delete artifact', 'error');
+        }
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Load artifacts on page load
+    window.addEventListener('DOMContentLoaded', () => {
+        loadArtifacts();
     });
 </script>
 {% endblock %}

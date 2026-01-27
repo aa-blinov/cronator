@@ -2,20 +2,27 @@
 
 import asyncio
 import json
+import os
+import shutil
 from datetime import UTC
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.config import get_settings
 from app.database import get_db
+from app.models.artifact import Artifact
 from app.models.execution import Execution, ExecutionStatus
+from app.schemas.artifact import ArtifactList, ArtifactRead
 from app.schemas.execution import ExecutionList, ExecutionRead, ExecutionStats
 from app.services.executor import executor_service
 
 router = APIRouter()
+settings = get_settings()
 
 
 @router.get("", response_model=ExecutionList)
@@ -293,8 +300,19 @@ async def delete_execution(
     if execution.status == ExecutionStatus.RUNNING.value:
         raise HTTPException(status_code=400, detail="Cannot delete running execution")
 
+    # Delete from database (artifacts will cascade delete)
     await db.delete(execution)
     await db.commit()
+
+    # Delete artifacts directory from filesystem
+    artifacts_dir = settings.artifacts_dir / str(execution_id)
+    if artifacts_dir.exists():
+        try:
+            shutil.rmtree(artifacts_dir)
+        except Exception as e:
+            # Log but don't fail if cleanup fails
+            import logging
+            logging.warning(f"Failed to delete artifacts directory {artifacts_dir}: {e}")
 
     return {"message": "Execution deleted"}
 
@@ -330,9 +348,150 @@ async def clear_old_executions(
     executions = result.scalars().all()
 
     count = len(executions)
+    execution_ids = [exc.id for exc in executions]
+    
     for exc in executions:
         await db.delete(exc)
 
     await db.commit()
 
-    return {"deleted": count, "message": f"Deleted {count} executions older than {days} days"}
+    # Delete artifacts directories from filesystem
+    deleted_artifacts = 0
+    for exec_id in execution_ids:
+        artifacts_dir = settings.artifacts_dir / str(exec_id)
+        if artifacts_dir.exists():
+            try:
+                shutil.rmtree(artifacts_dir)
+                deleted_artifacts += 1
+            except Exception as e:
+                import logging
+                logging.warning(f"Failed to delete artifacts directory {artifacts_dir}: {e}")
+
+    return {
+        "deleted": count,
+        "deleted_artifacts": deleted_artifacts,
+        "message": f"Deleted {count} executions older than {days} days"
+    }
+
+
+# ============================================================================
+# Artifacts Endpoints
+# ============================================================================
+
+
+@router.get("/{execution_id}/artifacts", response_model=ArtifactList)
+async def list_artifacts(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all artifacts for an execution."""
+    # Verify execution exists
+    result = await db.execute(select(Execution).where(Execution.id == execution_id))
+    execution = result.scalar_one_or_none()
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    # Get artifacts
+    result = await db.execute(
+        select(Artifact)
+        .where(Artifact.execution_id == execution_id)
+        .order_by(Artifact.created_at.desc())
+    )
+    artifacts = result.scalars().all()
+
+    items = [ArtifactRead.model_validate(artifact) for artifact in artifacts]
+
+    return ArtifactList(
+        items=items,
+        total=len(items),
+    )
+
+
+@router.get("/{execution_id}/artifacts/{artifact_id}")
+async def download_artifact(
+    execution_id: int,
+    artifact_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Download a specific artifact file."""
+    # Get artifact from database
+    result = await db.execute(
+        select(Artifact).where(
+            Artifact.id == artifact_id,
+            Artifact.execution_id == execution_id,
+        )
+    )
+    artifact = result.scalar_one_or_none()
+
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+
+    # Construct safe file path
+    artifacts_dir = settings.artifacts_dir / str(execution_id)
+    
+    # Security: only use basename to prevent path traversal
+    safe_filename = os.path.basename(artifact.filename)
+    file_path = artifacts_dir / safe_filename
+
+    # Verify file exists and is within artifacts directory
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Artifact file not found on disk")
+
+    if not file_path.is_relative_to(artifacts_dir):
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    # Return file with original filename for download
+    return FileResponse(
+        path=file_path,
+        filename=artifact.original_filename,
+        media_type="application/octet-stream",
+    )
+
+
+@router.delete("/{execution_id}/artifacts/{artifact_id}")
+async def delete_artifact(
+    execution_id: int,
+    artifact_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a specific artifact."""
+    # Get artifact
+    result = await db.execute(
+        select(Artifact).where(
+            Artifact.id == artifact_id,
+            Artifact.execution_id == execution_id,
+        )
+    )
+    artifact = result.scalar_one_or_none()
+
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+
+    # Delete file from filesystem
+    artifacts_dir = settings.artifacts_dir / str(execution_id)
+    safe_filename = os.path.basename(artifact.filename)
+    file_path = artifacts_dir / safe_filename
+
+    if file_path.exists() and file_path.is_relative_to(artifacts_dir):
+        try:
+            file_path.unlink()
+        except Exception as e:
+            import logging
+            logging.warning(f"Failed to delete artifact file {file_path}: {e}")
+
+    # Delete from database
+    size_bytes = artifact.size_bytes
+    await db.delete(artifact)
+
+    # Update execution counters
+    result = await db.execute(select(Execution).where(Execution.id == execution_id))
+    execution = result.scalar_one_or_none()
+    
+    if execution:
+        execution.artifacts_count = max(0, execution.artifacts_count - 1)
+        execution.artifacts_size_bytes = max(0, execution.artifacts_size_bytes - size_bytes)
+
+    await db.commit()
+
+    return {"message": "Artifact deleted"}
