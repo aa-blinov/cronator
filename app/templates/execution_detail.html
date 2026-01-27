@@ -199,6 +199,78 @@
         URL.revokeObjectURL(url);
     }
 
+    // Convert JSON logs to formatted HTML
+    function formatJsonLogs(text) {
+        const levelColors = {
+            'DEBUG': '#6b7280',
+            'INFO': '#10b981',
+            'WARNING': '#f59e0b',
+            'ERROR': '#ef4444',
+            'CRITICAL': '#dc2626'
+        };
+        
+        const lines = text.split('\n');
+        const formatted = [];
+        
+        for (const line of lines) {
+            if (!line.trim()) {
+                formatted.push('');
+                continue;
+            }
+            
+            try {
+                const log = JSON.parse(line);
+                const timestamp = new Date(log.timestamp).toLocaleString('ru-RU', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                const level = log.level || 'INFO';
+                const color = levelColors[level] || '#6b7280';
+                const message = (log.message || '').replace(/&/g, '&amp;')
+                                                   .replace(/</g, '&lt;')
+                                                   .replace(/>/g, '&gt;');
+                
+                formatted.push(
+                    `<span style="color: #9ca3af">[${timestamp}]</span> ` +
+                    `<span style="color: ${color}; font-weight: bold">${level}</span> ` +
+                    message
+                );
+                
+                if (log.exception) {
+                    formatted.push(`<span style="color: #ef4444">${log.exception}</span>`);
+                }
+            } catch (e) {
+                // Not JSON, display as-is (escaped)
+                const escaped = line.replace(/&/g, '&amp;')
+                                   .replace(/</g, '&lt;')
+                                   .replace(/>/g, '&gt;');
+                formatted.push(escaped);
+            }
+        }
+        
+        return formatted.join('<br>');
+    }
+
+    // Apply formatting to logs on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        const stdoutLog = document.getElementById('stdout-log');
+        const stderrLog = document.getElementById('stderr-log');
+        
+        if (stdoutLog && stdoutLog.textContent) {
+            stdoutLog.innerHTML = formatJsonLogs(stdoutLog.textContent);
+            stdoutLog.style.lineHeight = '1.2';
+        }
+        
+        if (stderrLog && stderrLog.textContent) {
+            stderrLog.innerHTML = formatJsonLogs(stderrLog.textContent);
+            stderrLog.style.lineHeight = '1.2';
+        }
+    });
+
     async function copyText(text) {
         await navigator.clipboard.writeText(text);
     }
