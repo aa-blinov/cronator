@@ -21,7 +21,7 @@ from app.services.scheduler import scheduler_service
 settings = get_settings()
 
 # Configure logging
-log_dir = settings.data_dir / "logs"
+log_dir = settings.logs_dir
 log_dir.mkdir(parents=True, exist_ok=True)
 log_file = log_dir / "cronator.log"
 

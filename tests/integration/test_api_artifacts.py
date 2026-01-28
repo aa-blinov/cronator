@@ -230,8 +230,8 @@ async def test_clear_all_artifacts_api(test_client: AsyncClient, tmp_artifacts_d
                 # Script still marked as running, wait and retry
                 await asyncio.sleep(0.5)
             else:
-                pytest.fail(f"Failed to start script run {i+1} after retries")
-            
+                pytest.fail(f"Failed to start script run {i + 1} after retries")
+
             await wait_for_execution_finish(test_client, execution_id)
 
         # Confirm we have multiple directories in artifacts_dir

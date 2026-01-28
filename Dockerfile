@@ -92,11 +92,14 @@ USER cronator
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH="/app" \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PORT=8080
 
 # Expose port
 EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8080/health')" || exit 1
+    CMD sh -c "python -c \"import os,httpx; httpx.get('http://localhost:' + os.getenv('PORT','8080') + '/health')\"" || exit 1
+
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}

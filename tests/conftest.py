@@ -2,6 +2,8 @@
 
 import asyncio
 import os
+
+os.environ.setdefault("SUPPRESS_CONFIG_WARNINGS", "1")
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -14,9 +16,6 @@ from app.database import Base
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
 
-# Test database URL
-# Default to file-based SQLite for local development
-# Use TEST_DATABASE_URL environment variable if provided (e.g., for containerized tests)
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite+aiosqlite:///./test_app.db")
 
 

@@ -3,7 +3,7 @@ name = "cronator"
 version = "0.1.0"
 description = "Python Script Scheduler with Web UI"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = "==3.12.*"
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",

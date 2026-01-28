@@ -1,5 +1,6 @@
 """Application configuration using pydantic-settings."""
 
+import os
 from pathlib import Path
 
 from pydantic import model_validator
@@ -53,23 +54,29 @@ class Settings(BaseSettings):
         if not self.artifacts_dir.is_absolute():
             self.artifacts_dir = self.base_dir / self.artifacts_dir
 
-        # Validate production secrets ONLY in non-debug mode
-        # In development (DEBUG=True), default values are acceptable
-        if not self.debug:
-            if self.secret_key == "change-me-in-production-please":
-                import warnings
+        import warnings
 
+        suppress_config_warnings = bool(os.getenv("SUPPRESS_CONFIG_WARNINGS"))
+
+        if not suppress_config_warnings:
+            if not self.database_url or str(self.database_url).startswith("sqlite"):
                 warnings.warn(
-                    "SECRET_KEY is using default value in production! "
-                    "Set a secure random value in environment or .env file.",
+                    (
+                        "DATABASE_URL is not set or points to SQLite; "
+                        "use a production database in non-test environments."
+                    ),
                     stacklevel=2,
                 )
-            if self.admin_password == "admin":
-                import warnings
 
+            if self.secret_key == "change-me-in-production-please" or len(self.secret_key) < 32:
                 warnings.warn(
-                    "ADMIN_PASSWORD is using default value in production! "
-                    "Set a secure password in environment or .env file.",
+                    "SECRET_KEY is default or too short; set a strong random value (32+ chars).",
+                    stacklevel=2,
+                )
+
+            if self.admin_password == "admin" or len(self.admin_password) < 8:
+                warnings.warn(
+                    "ADMIN_PASSWORD is default or weak; set a strong admin password.",
                     stacklevel=2,
                 )
 

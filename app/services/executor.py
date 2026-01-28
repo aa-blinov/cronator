@@ -466,23 +466,8 @@ class ExecutorService:
             script = result.scalar_one_or_none()
 
             if script and script.alert_on_success:
-                # Throttling for success alerts too (optional, consistency)
-                now = datetime.now(UTC)
-                if script.last_alert_at:
-                    # Ensure last_alert_at is timezone-aware
-                    last_alert = script.last_alert_at
-                    if last_alert.tzinfo is None:
-                        last_alert = last_alert.replace(tzinfo=UTC)
-
-                    if (now - last_alert).total_seconds() < 3600:
-                        logger.info(
-                            f"Throttling alert for {script.name} "
-                            f"(last alert at {script.last_alert_at})"
-                        )
-                        return
-
                 await alerting_service.send_success_alert(script, execution)
-                script.last_alert_at = now
+                script.last_alert_at = datetime.now(UTC)
                 await db.commit()
 
     async def cancel_execution(self, execution_id: int) -> bool:
