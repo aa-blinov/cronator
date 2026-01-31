@@ -64,7 +64,3 @@ Dockerfile
 # OS
 .DS_Store
 Thumbs.db
-
-# Security check scripts
-check_db_security.py
-verify_security.py
