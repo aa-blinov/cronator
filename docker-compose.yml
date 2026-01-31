@@ -1,3 +1,5 @@
+version: '3.3'
+
 services:
   db:
     image: postgres:16-alpine
@@ -26,7 +28,7 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://cronator:${POSTGRES_PASSWORD}@db:5432/cronator
     ports:
-      - "${PORT:-8080}:${PORT:-8080}"
+      - "${PORT}:8080"
     volumes:
       # Scripts directory - add your scripts here
       - ./scripts:/app/scripts
@@ -37,14 +39,12 @@ services:
       # Logs
       - ./logs:/app/logs
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     healthcheck:
       test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
     networks:
       - cronator-network
 
@@ -59,7 +59,7 @@ services:
       - PGPASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=cronator
       - PGHOST=db
-      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-7}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS}
     volumes:
       - ./backups:/backups
     entrypoint: ["/bin/sh", "-c"]
@@ -84,8 +84,7 @@ services:
           fi
         done
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     networks:
       - cronator-network
 

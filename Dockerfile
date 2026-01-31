@@ -58,10 +58,13 @@ RUN --mount=type=cache,target=/root/.npm \
 # Runtime stage
 FROM python:3.12-slim
 
-# Install uv for script environments, git for git sync, and gosu for user switching
+# Install uv for script environments, git for git sync, gosu for user switching, and nodejs for CSS building
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     gosu \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -79,8 +82,12 @@ COPY --from=builder /app/pyproject.toml /app/
 COPY --from=builder /app/alembic /app/alembic
 COPY --from=builder /app/alembic.ini /app/
 
-# Copy built CSS from css-builder
+# Copy built CSS from css-builder (fallback if build fails at runtime)
 COPY --from=css-builder /app/app/static/output.css /app/app/static/output.css
+
+# Copy package files for CSS building at runtime
+COPY package.json tailwind.config.js ./
+COPY app/static/input.css ./app/static/
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/

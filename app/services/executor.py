@@ -308,9 +308,13 @@ class ExecutorService:
                         if len(stderr_text) > settings.max_log_size:
                             stderr_text = stderr_text[: settings.max_log_size] + "\n... (truncated)"
 
-                        status = (
-                            ExecutionStatus.SUCCESS if exit_code == 0 else ExecutionStatus.FAILED
-                        )
+                        await db.refresh(execution)
+                        if execution.status == ExecutionStatus.CANCELLED.value:
+                            status = ExecutionStatus.CANCELLED
+                        elif exit_code == 0:
+                            status = ExecutionStatus.SUCCESS
+                        else:
+                            status = ExecutionStatus.FAILED
 
                         await self._finish_execution(
                             db,
@@ -409,6 +413,27 @@ class ExecutorService:
         artifacts_metadata: list[dict] | None = None,
     ) -> None:
         """Update execution with final status."""
+        # Refresh execution to get latest status (might have been cancelled)
+        await db.refresh(execution)
+        
+        # Don't overwrite CANCELLED status - it was set by user action
+        if execution.status == ExecutionStatus.CANCELLED.value:
+            logger.info(
+                f"Execution {execution.id} was cancelled by user, "
+                f"not updating status to {status.value}"
+            )
+            # Still update exit_code, stdout, stderr if not already set
+            if execution.exit_code is None and exit_code is not None:
+                execution.exit_code = exit_code
+            if not execution.stdout and stdout:
+                execution.stdout = stdout
+            if not execution.stderr and stderr:
+                execution.stderr = stderr
+            if not execution.finished_at:
+                execution.finished_at = datetime.now(UTC)
+            await db.commit()
+            return
+        
         end_time = datetime.now(UTC)
 
         execution.status = status.value
@@ -520,19 +545,82 @@ class ExecutorService:
     async def cancel_execution(self, execution_id: int) -> bool:
         """Cancel a running execution."""
         process = self.running_processes.get(execution_id)
+        
+        # Check execution status first
+        async with async_session_maker() as db:
+            result = await db.execute(select(Execution).where(Execution.id == execution_id))
+            execution = result.scalar_one_or_none()
+            
+            if not execution:
+                # Execution doesn't exist
+                # Cleanup anyway in case of stale reference
+                self.running_processes.pop(execution_id, None)
+                return False
+            
+            # If execution already finished, just cleanup
+            if execution.status != ExecutionStatus.RUNNING.value:
+                logger.info(
+                    f"Execution {execution_id} is not running (status: {execution.status}), "
+                    "cleaning up stale process reference"
+                )
+                # Cleanup stale references
+                self.running_processes.pop(execution_id, None)
+                if execution.script_id:
+                    self._running_scripts.discard(execution.script_id)
+                return False
+        
+        # Execution is running, proceed with cancellation
         if process:
-            process.kill()
+            try:
+                process.kill()
+                logger.info(f"Killed process for execution {execution_id}")
+            except ProcessLookupError:
+                # Process already terminated
+                logger.warning(f"Process for execution {execution_id} already terminated")
+            except Exception as e:
+                logger.error(f"Error killing process for execution {execution_id}: {e}")
 
+            script_id = None
             async with async_session_maker() as db:
                 result = await db.execute(select(Execution).where(Execution.id == execution_id))
                 execution = result.scalar_one_or_none()
                 if execution:
-                    execution.status = ExecutionStatus.CANCELLED.value
-                    execution.finished_at = datetime.now(UTC)
-                    execution.error_message = "Cancelled by user"
-                    await db.commit()
+                    script_id = execution.script_id
+                    # Only update if still running (avoid race condition)
+                    if execution.status == ExecutionStatus.RUNNING.value:
+                        execution.status = ExecutionStatus.CANCELLED.value
+                        execution.finished_at = datetime.now(UTC)
+                        execution.error_message = "Cancelled by user"
+                        await db.commit()
+                    else:
+                        logger.info(
+                            f"Execution {execution_id} status changed to {execution.status} "
+                            "before cancellation could be applied"
+                        )
+
+            # Signal end of stream if queue exists (for SSE)
+            if execution_id in self.output_queues:
+                try:
+                    await asyncio.sleep(0.1)  # Small delay to ensure DB commit is visible
+                    await self.output_queues[execution_id].put(("done", None))
+                except Exception:
+                    pass
+
+            # Cleanup
+            self.running_processes.pop(execution_id, None)
+            if script_id:
+                self._running_scripts.discard(script_id)
 
             return True
+        
+        # Process not found in running_processes but execution exists
+        # This can happen if process already finished but wasn't cleaned up
+        logger.warning(
+            f"Process for execution {execution_id} not found in running_processes, "
+            "but execution exists. Cleaning up."
+        )
+        if execution and execution.script_id:
+            self._running_scripts.discard(execution.script_id)
         return False
 
     async def cleanup_stale_executions(self) -> None:

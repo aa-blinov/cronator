@@ -28,5 +28,18 @@ for dir in $DIRS; do
     chmod 2775 "$dir" 2>/dev/null || chmod 755 "$dir" 2>/dev/null || true
 done
 
+# Always rebuild CSS from input.css on container startup
+# This ensures CSS is always up-to-date with any changes
+if [ -f /app/app/static/input.css ]; then
+    echo "Building CSS from input.css..."
+    # Install npm dependencies if node_modules doesn't exist
+    if [ ! -d /app/node_modules ]; then
+        npm install --silent 2>/dev/null || true
+    fi
+    # Build CSS
+    npm run build:css 2>/dev/null || true
+    echo "CSS build completed (or skipped if npm not available)"
+fi
+
 # Switch to cronator user and execute the main command
 exec gosu cronator "$@"

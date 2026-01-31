@@ -163,11 +163,22 @@ async def cancel_execution(
         raise HTTPException(status_code=404, detail="Execution not found")
 
     if execution.status != ExecutionStatus.RUNNING.value:
-        raise HTTPException(status_code=400, detail="Execution is not running")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Execution is not running (current status: {execution.status})",
+        )
 
     success = await executor_service.cancel_execution(execution_id)
 
     if not success:
+        # Re-check status - might have changed during cancellation
+        result = await db.execute(select(Execution).where(Execution.id == execution_id))
+        updated_execution = result.scalar_one_or_none()
+        if updated_execution and updated_execution.status != ExecutionStatus.RUNNING.value:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Execution already finished (status: {updated_execution.status})",
+            )
         raise HTTPException(status_code=500, detail="Failed to cancel execution")
 
     return {"message": "Execution cancelled"}

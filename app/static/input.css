@@ -33,6 +33,7 @@ body {
 .status-badge.failed, .status-badge.timeout { background: oklch(82.418% 0.099 33.756 / 0.2); color: oklch(82.418% 0.099 33.756); }
 .status-badge.running { background: oklch(86.078% 0.142 206.182 / 0.2); color: oklch(86.078% 0.142 206.182); }
 .status-badge.pending { background: oklch(86.163% 0.142 94.818 / 0.2); color: oklch(86.163% 0.142 94.818); }
+.status-badge.cancelled { background: oklch(82.901% 0.142 94.818 / 0.2); color: oklch(82.901% 0.142 94.818); }
 
 .pulse-dot {
     width: 8px;
