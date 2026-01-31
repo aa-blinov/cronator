@@ -30,7 +30,6 @@ class SettingsResponse(BaseModel):
     smtp_port: int
     smtp_user: str
     smtp_from: str
-    smtp_use_tls: bool
     alert_email: str
 
     default_timeout: int
@@ -53,7 +52,6 @@ async def get_settings_info() -> SettingsResponse:
     smtp_port = await settings_service.get("smtp_port", settings.smtp_port)
     smtp_user = await settings_service.get("smtp_user", settings.smtp_user)
     smtp_from = await settings_service.get("smtp_from", settings.smtp_from)
-    smtp_use_tls = await settings_service.get("smtp_use_tls", settings.smtp_use_tls)
     alert_email = await settings_service.get("alert_email", settings.alert_email)
     default_timeout = await settings_service.get("default_timeout", settings.default_timeout)
 
@@ -66,7 +64,6 @@ async def get_settings_info() -> SettingsResponse:
         smtp_port=smtp_port,
         smtp_user=smtp_user,
         smtp_from=smtp_from,
-        smtp_use_tls=smtp_use_tls,
         alert_email=alert_email,
         default_timeout=default_timeout,
     )
@@ -98,7 +95,11 @@ async def test_email():
         body_text="Test Email\n\nIf you received this, email alerts are working!",
     )
 
-    return {"success": sent, "message": "Test email sent" if sent else "Failed to send test email"}
+    if not sent:
+        # Get the last error from logs or return generic message
+        return {"success": False, "message": "SMTP authentication failed. Check your credentials."}
+
+    return {"success": True, "message": "Test email sent successfully"}
 
 
 @router.post("/reload-scheduler")
@@ -140,7 +141,6 @@ class UpdateSettingsRequest(BaseModel):
     smtp_user: str | None = None
     smtp_password: str | None = None
     smtp_from: str | None = None
-    smtp_use_tls: bool | None = None
     alert_email: str | None = None
 
     default_timeout: int | None = None
@@ -164,8 +164,6 @@ async def update_settings(request: UpdateSettingsRequest):
         updates["smtp_password"] = request.smtp_password
     if request.smtp_from is not None:
         updates["smtp_from"] = request.smtp_from
-    if request.smtp_use_tls is not None:
-        updates["smtp_use_tls"] = request.smtp_use_tls
     if request.alert_email is not None:
         updates["alert_email"] = request.alert_email
     if request.default_timeout is not None:

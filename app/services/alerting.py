@@ -26,7 +26,6 @@ class AlertingService:
         self.password = settings.smtp_password
         self.from_addr = settings.smtp_from or settings.smtp_user
         self.to_addr = settings.alert_email
-        self.use_tls = settings.smtp_use_tls
 
     async def _get_settings(self) -> dict:
         """Get current settings from DB, fallback to env."""
@@ -43,7 +42,6 @@ class AlertingService:
             "password": await settings_service.get("smtp_password", self.password),
             "from_addr": smtp_from or smtp_user,
             "to_addr": await settings_service.get("alert_email", self.to_addr),
-            "use_tls": await settings_service.get("smtp_use_tls", self.use_tls),
         }
 
     async def send_email(
@@ -74,14 +72,27 @@ class AlertingService:
                 msg.attach(MIMEText(body_text, "plain"))
             msg.attach(MIMEText(body_html, "html"))
 
-            await aiosmtplib.send(
-                msg,
-                hostname=cfg["host"],
-                port=cfg["port"],
-                username=cfg["user"],
-                password=cfg["password"],
-                use_tls=cfg["use_tls"],
-            )
+            # Detect SSL/TLS method based on port
+            # Port 465 = Direct SSL (use_tls)
+            # Port 587 = STARTTLS (start_tls)
+            if cfg["port"] == 465:
+                await aiosmtplib.send(
+                    msg,
+                    hostname=cfg["host"],
+                    port=cfg["port"],
+                    username=cfg["user"],
+                    password=cfg["password"],
+                    use_tls=True,
+                )
+            else:
+                await aiosmtplib.send(
+                    msg,
+                    hostname=cfg["host"],
+                    port=cfg["port"],
+                    username=cfg["user"],
+                    password=cfg["password"],
+                    start_tls=True,
+                )
 
             logger.info(f"Alert email sent to {self.to_addr}: {subject}")
             return True
@@ -233,13 +244,24 @@ Stderr:
             return False, "SMTP is disabled"
 
         try:
-            async with aiosmtplib.SMTP(
-                hostname=cfg["host"],
-                port=cfg["port"],
-                start_tls=cfg["use_tls"],
-            ) as smtp:
-                await smtp.login(cfg["user"], cfg["password"])
-                return True, "Connection successful"
+            # Port 465 = Direct SSL (use_tls)
+            # Port 587 = STARTTLS (start_tls)
+            if cfg["port"] == 465:
+                async with aiosmtplib.SMTP(
+                    hostname=cfg["host"],
+                    port=cfg["port"],
+                    use_tls=True,
+                ) as smtp:
+                    await smtp.login(cfg["user"], cfg["password"])
+                    return True, "Connection successful"
+            else:
+                async with aiosmtplib.SMTP(
+                    hostname=cfg["host"],
+                    port=cfg["port"],
+                    start_tls=True,
+                ) as smtp:
+                    await smtp.login(cfg["user"], cfg["password"])
+                    return True, "Connection successful"
         except Exception as e:
             return False, str(e)
 

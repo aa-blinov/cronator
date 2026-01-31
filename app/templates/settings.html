@@ -159,10 +159,6 @@
                         <input type="email" name="smtp_from" value="{{ settings.smtp_from }}" class="input input-bordered input-sm">
                     </label>
                     <label class="form-control">
-                        <span class="label-text">Use TLS</span>
-                        <input type="checkbox" name="smtp_use_tls" class="toggle toggle-primary" {% if settings.smtp_use_tls %}checked{% endif %}>
-                    </label>
-                    <label class="form-control">
                         <span class="label-text">Alert Email</span>
                         <input type="email" name="alert_email" value="{{ settings.alert_email }}" class="input input-bordered input-sm">
                     </label>
@@ -252,7 +248,6 @@
         
         // Checkboxes
         data.smtp_enabled = formData.get('smtp_enabled') === 'on';
-        data.smtp_use_tls = formData.get('smtp_use_tls') === 'on';
         
         // Text fields
         if (formData.get('smtp_host')) data.smtp_host = formData.get('smtp_host');

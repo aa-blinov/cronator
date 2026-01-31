@@ -226,7 +226,6 @@ class SettingsService:
             "smtp_user": env_settings.smtp_user,
             "smtp_password": env_settings.smtp_password,
             "smtp_from": env_settings.smtp_from,
-            "smtp_use_tls": env_settings.smtp_use_tls,
             "alert_email": env_settings.alert_email,
             "default_timeout": env_settings.default_timeout,
         }

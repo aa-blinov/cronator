@@ -94,7 +94,6 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
-    smtp_use_tls: bool = True
     alert_email: str = ""
 
     # Execution
