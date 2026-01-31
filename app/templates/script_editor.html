@@ -428,7 +428,7 @@
 <script>
     // Script ID for API calls (read from form data attribute)
     const scriptForm = document.getElementById('script-form');
-    const scriptId = scriptForm ? (scriptForm.dataset.scriptId || null) : null;
+    let scriptId = scriptForm ? (scriptForm.dataset.scriptId || null) : null;
     
     // Initialize CodeMirror
     const textarea = document.getElementById('code-editor');
@@ -443,6 +443,86 @@
         matchBrackets: true,
         autoCloseBrackets: true,
     });
+    
+    // Store original script data for change detection
+    let originalScriptData = null;
+    
+    // Function to collect form data into an object
+    function collectFormData() {
+        const form = document.getElementById('script-form');
+        const formData = new FormData(form);
+        return {
+            name: formData.get('name') || '',
+            description: formData.get('description') || '',
+            content: formData.get('content') || '',
+            cron_expression: formData.get('cron_expression') || '',
+            python_version: formData.get('python_version') || '',
+            timeout: parseInt(formData.get('timeout')) || 3600,
+            misfire_grace_time: parseInt(formData.get('misfire_grace_time')) || 60,
+            enabled: formData.get('enabled') === 'true',
+            dependencies: formData.get('dependencies') || '',
+            alert_on_failure: formData.get('alert_on_failure') === 'true',
+            alert_on_success: formData.get('alert_on_success') === 'true',
+            environment_vars: formData.get('environment_vars') || '',
+        };
+    }
+    
+    // Initialize original script data if script exists
+    if (scriptId) {
+        // Wait for editor to be ready, then save original data
+        setTimeout(() => {
+            editor.save(); // Ensure textarea is synced
+            originalScriptData = collectFormData();
+        }, 100);
+    }
+    
+    // Function to check if script data has changed
+    function hasScriptChanged(currentData, originalData) {
+        if (!originalData) {
+            // No original data means it's a new script, so it's always "changed"
+            return true;
+        }
+        
+        // Compare all fields
+        const fieldsToCompare = [
+            'name',
+            'description',
+            'content',
+            'cron_expression',
+            'python_version',
+            'timeout',
+            'misfire_grace_time',
+            'enabled',
+            'dependencies',
+            'alert_on_failure',
+            'alert_on_success',
+            'environment_vars'
+        ];
+        
+        for (const field of fieldsToCompare) {
+            const currentValue = String(currentData[field] || '').trim();
+            const originalValue = String(originalData[field] || '').trim();
+            
+            // Special handling for numeric fields
+            if (field === 'timeout' || field === 'misfire_grace_time') {
+                if (parseInt(currentValue) !== parseInt(originalValue)) {
+                    return true;
+                }
+            }
+            // Special handling for boolean fields
+            else if (field === 'enabled' || field === 'alert_on_failure' || field === 'alert_on_success') {
+                if (currentData[field] !== originalData[field]) {
+                    return true;
+                }
+            }
+            // String comparison for other fields
+            else if (currentValue !== originalValue) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
     
     // === INLINE DIFF LOGIC ===
     let originalDeps = {{ (script.dependencies if script else "") | tojson }};
@@ -1268,21 +1348,10 @@ ${separator}
         
         // Collect form data
         const form = document.getElementById('script-form');
-        const formData = new FormData(form);
-        const data = {
-            name: formData.get('name'),
-            description: formData.get('description'),
-            content: formData.get('content'),
-            cron_expression: formData.get('cron_expression'),
-            python_version: formData.get('python_version'),
-            timeout: parseInt(formData.get('timeout')),
-            misfire_grace_time: parseInt(formData.get('misfire_grace_time')),
-            enabled: formData.get('enabled') === 'true',
-            dependencies: formData.get('dependencies'),
-            alert_on_failure: formData.get('alert_on_failure') === 'true',
-            alert_on_success: formData.get('alert_on_success') === 'true',
-            environment_vars: formData.get('environment_vars'),
-        };
+        const data = collectFormData();
+        
+        // Update scriptId from form (in case it was updated elsewhere)
+        scriptId = form ? (form.dataset.scriptId || null) : null;
         
         // For new scripts, require a name
         let currentScriptId = scriptId;
@@ -1326,6 +1395,9 @@ ${separator}
                 const createResult = await createResponse.json();
                 currentScriptId = createResult.id;
                 
+                // Update global scriptId so subsequent test runs know the script exists
+                scriptId = currentScriptId;
+                
                 // Update the form's data-script-id and action for future saves
                 form.dataset.scriptId = currentScriptId;
                 form.action = `/api/scripts/${currentScriptId}`;
@@ -1333,20 +1405,39 @@ ${separator}
                 // Update URL without reload
                 window.history.replaceState({}, '', `/scripts/${currentScriptId}/edit`);
                 
+                // Save current data as original after creation
+                originalScriptData = collectFormData();
+                
                 appendBlockToConsole('Auto-save', `Script created with ID: ${currentScriptId}`, 'success');
+                
+                // Small delay to ensure file is synced to disk before test execution
+                await new Promise(resolve => setTimeout(resolve, 100));
             } else {
-                // Existing script - save changes
-                setConsoleStatus('Saving...', 'badge-info');
+                // Existing script - check if there are changes
+                const hasChanges = hasScriptChanged(data, originalScriptData);
                 
-                const saveResponse = await fetch(`/api/scripts/${currentScriptId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data),
-                });
-                
-                if (!saveResponse.ok) {
-                    const error = await saveResponse.json();
-                    throw new Error(error.detail || 'Failed to save script');
+                if (hasChanges) {
+                    // Save changes only if script has changed
+                    setConsoleStatus('Saving...', 'badge-info');
+                    appendBlockToConsole('Auto-save', 'Saving changes before test run...', 'info');
+                    
+                    const saveResponse = await fetch(`/api/scripts/${currentScriptId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data),
+                    });
+                    
+                    if (!saveResponse.ok) {
+                        const error = await saveResponse.json();
+                        throw new Error(error.detail || 'Failed to save script');
+                    }
+                    
+                    // Update original data after successful save
+                    originalScriptData = collectFormData();
+                    appendBlockToConsole('Auto-save', 'Changes saved', 'success');
+                } else {
+                    // No changes - skip saving
+                    appendBlockToConsole('Auto-save', 'No changes detected, skipping save', 'info');
                 }
             }
             

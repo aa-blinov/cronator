@@ -111,6 +111,11 @@ class ExecutorService:
                     logger.error(f"Script or execution not found: {script_id}, {execution_id}")
                     return
 
+                # Create output queue early so SSE stream can receive 'done' message
+                # even if execution fails
+                output_queue = asyncio.Queue()
+                self.output_queues[execution_id] = output_queue
+
                 # Determine script path
                 script_path = self._get_script_path(script)
                 if not script_path.exists():
@@ -120,6 +125,9 @@ class ExecutorService:
                         status=ExecutionStatus.FAILED,
                         error_message=f"Script file not found: {script_path}",
                     )
+                    # Signal end of stream
+                    await asyncio.sleep(0.1)  # Small delay to ensure DB commit is visible
+                    await output_queue.put(("done", None))
                     return
 
                 # Ensure environment exists
@@ -137,6 +145,9 @@ class ExecutorService:
                             status=ExecutionStatus.FAILED,
                             error_message=f"Failed to setup environment: {msg}",
                         )
+                        # Signal end of stream
+                        await asyncio.sleep(0.1)  # Small delay to ensure DB commit is visible
+                        await output_queue.put(("done", None))
                         return
 
                 # Get Python path
@@ -148,6 +159,9 @@ class ExecutorService:
                         status=ExecutionStatus.FAILED,
                         error_message=f"Python not found at {python_path}",
                     )
+                    # Signal end of stream
+                    await asyncio.sleep(0.1)  # Small delay to ensure DB commit is visible
+                    await output_queue.put(("done", None))
                     return
 
                 # Prepare environment variables
@@ -178,8 +192,18 @@ class ExecutorService:
 
                 # Create artifacts directory for this execution
                 execution_artifacts_dir = settings.artifacts_dir / str(execution_id)
-                execution_artifacts_dir.mkdir(parents=True, exist_ok=True)
-                env["CRONATOR_ARTIFACTS_DIR"] = str(execution_artifacts_dir)
+                try:
+                    execution_artifacts_dir.mkdir(parents=True, exist_ok=True)
+                except (PermissionError, OSError) as e:
+                    logger.warning(
+                        f"Could not create artifacts directory {execution_artifacts_dir}: {e}. "
+                        "Artifacts will not be saved for this execution."
+                    )
+                    # Set to a temp directory as fallback, or None if we can't create anything
+                    execution_artifacts_dir = None
+                env["CRONATOR_ARTIFACTS_DIR"] = (
+                    str(execution_artifacts_dir) if execution_artifacts_dir else ""
+                )
 
                 # Determine working directory
                 if script.working_directory:
@@ -208,9 +232,7 @@ class ExecutorService:
 
                     self.running_processes[execution_id] = process
 
-                    # Create output queue for streaming
-                    output_queue = asyncio.Queue()
-                    self.output_queues[execution_id] = output_queue
+                    # Output queue already created above
 
                     # Collect output and stream to queue
                     stdout_lines = []
@@ -328,12 +350,37 @@ class ExecutorService:
 
             except Exception as e:
                 logger.exception(f"Error executing script {script_id}")
-                await self._finish_execution(
-                    db,
-                    execution,
-                    status=ExecutionStatus.FAILED,
-                    error_message=str(e),
-                )
+                # Create queue if it doesn't exist (for early errors)
+                if execution_id not in self.output_queues:
+                    output_queue = asyncio.Queue()
+                    self.output_queues[execution_id] = output_queue
+                else:
+                    output_queue = self.output_queues[execution_id]
+
+                # Try to get execution if not already available
+                if "execution" not in locals():
+                    result = await db.execute(select(Execution).where(Execution.id == execution_id))
+                    execution = result.scalar_one_or_none()
+
+                if execution:
+                    await self._finish_execution(
+                        db,
+                        execution,
+                        status=ExecutionStatus.FAILED,
+                        error_message=str(e),
+                    )
+                    # Signal end of stream
+                    try:
+                        await asyncio.sleep(0.1)  # Small delay to ensure DB commit is visible
+                        await output_queue.put(("done", None))
+                    except Exception:
+                        pass
+                else:
+                    # If we can't get execution, just signal done
+                    try:
+                        await output_queue.put(("done", None))
+                    except Exception:
+                        pass
             finally:
                 # Always remove script from running set
                 self._running_scripts.discard(script_id)

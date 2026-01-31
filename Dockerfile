@@ -58,9 +58,10 @@ RUN --mount=type=cache,target=/root/.npm \
 # Runtime stage
 FROM python:3.12-slim
 
-# Install uv for script environments and git for git sync
+# Install uv for script environments, git for git sync, and gosu for user switching
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -81,12 +82,18 @@ COPY --from=builder /app/alembic.ini /app/
 # Copy built CSS from css-builder
 COPY --from=css-builder /app/app/static/output.css /app/app/static/output.css
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Create directories
-RUN mkdir -p /app/scripts /app/envs /app/logs /app/data \
+RUN mkdir -p /app/scripts /app/envs /app/logs /app/data /app/data/artifacts \
     && chown -R cronator:cronator /app
 
-# Switch to non-root user
-USER cronator
+# Set entrypoint (runs as root to fix permissions, then switches to cronator user)
+# Note: We don't set USER cronator here because entrypoint needs to run as root
+# The entrypoint script will switch to cronator user before executing the command
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Environment variables
 ENV PATH="/app/.venv/bin:$PATH" \

@@ -110,6 +110,11 @@ class Settings(BaseSettings):
 
     def ensure_directories(self) -> None:
         """Create required directories if they don't exist."""
+        import logging
+        import sys
+
+        logger = logging.getLogger(__name__)
+
         for dir_path in [
             self.scripts_dir,
             self.envs_dir,
@@ -117,7 +122,24 @@ class Settings(BaseSettings):
             self.data_dir,
             self.artifacts_dir,
         ]:
-            dir_path.mkdir(parents=True, exist_ok=True)
+            try:
+                dir_path.mkdir(parents=True, exist_ok=True)
+            except (PermissionError, OSError) as e:
+                # Log warning but don't fail - directories might be created externally
+                # or have permission issues that don't prevent the app from running
+                logger.warning(
+                    f"Could not create directory {dir_path}: {e}. "
+                    "The directory may already exist or have permission issues."
+                )
+                # Check if directory exists despite the error
+                if not dir_path.exists():
+                    # If it doesn't exist and we can't create it, this might be a problem
+                    # but we'll continue anyway to allow the app to start
+                    print(
+                        f"Warning: Directory {dir_path} does not exist "
+                        f"and could not be created: {e}",
+                        file=sys.stderr,
+                    )
 
 
 _settings_cache: Settings | None = None

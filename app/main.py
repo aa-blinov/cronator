@@ -22,20 +22,34 @@ settings = get_settings()
 
 # Configure logging
 log_dir = settings.logs_dir
-log_dir.mkdir(parents=True, exist_ok=True)
 log_file = log_dir / "cronator.log"
+
+# Create handlers list - always include StreamHandler
+handlers = [logging.StreamHandler()]
+
+# Try to add file handler, but handle permission errors gracefully
+try:
+    # Ensure directory exists
+    log_dir.mkdir(parents=True, exist_ok=True)
+    # Try to create file handler
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file,
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5,
+    )
+    handlers.append(file_handler)
+except (PermissionError, OSError) as e:
+    # If we can't write to the log file, just use StreamHandler
+    # This allows the app to start even if log directory has permission issues
+    import sys
+
+    print(f"Warning: Could not create log file at {log_file}: {e}", file=sys.stderr)
+    print("Warning: Logging to file disabled. Using console logging only.", file=sys.stderr)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.handlers.RotatingFileHandler(
-            log_file,
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5,
-        ),
-    ],
+    handlers=handlers,
 )
 logger = logging.getLogger(__name__)
 

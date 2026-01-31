@@ -155,7 +155,14 @@ async def create_script(
     else:
         # Create script in scripts directory
         script_dir = settings.scripts_dir / data.name
-        script_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            script_dir.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError) as e:
+            logger.error(f"Could not create script directory {script_dir}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Could not create script directory: {e}",
+            )
         script_file = script_dir / "script.py"
 
         # Save relative path (without scripts_dir prefix)
@@ -163,7 +170,17 @@ async def create_script(
 
         # Write script content
         async with aiofiles.open(script_file, "w") as f:
-            await f.write(data.content or "# New script\nprint('Hello from Cronator!')\n")
+            content = data.content or "# New script\nprint('Hello from Cronator!')\n"
+            await f.write(content)
+            # Ensure file is flushed to disk before proceeding
+            await f.flush()
+
+        # Verify file exists and is readable (ensures filesystem sync)
+        if not script_file.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Script file was not created: {script_file}",
+            )
 
     script = Script(
         name=data.name,
@@ -271,7 +288,14 @@ async def update_script(
     # Update script file if content changed
     if data.content is not None:
         script_path = settings.scripts_dir / script.name / "script.py"
-        script_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError) as e:
+            logger.error(f"Could not create script directory {script_path.parent}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Could not create script directory: {e}",
+            )
         async with aiofiles.open(script_path, "w") as f:
             await f.write(data.content)
         # Save relative path (without scripts_dir prefix)
@@ -847,7 +871,14 @@ async def revert_to_version(
 
     # Update script file
     script_path = settings.scripts_dir / script.name / "script.py"
-    script_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        script_path.parent.mkdir(parents=True, exist_ok=True)
+    except (PermissionError, OSError) as e:
+        logger.error(f"Could not create script directory {script_path.parent}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not create script directory: {e}",
+        )
     async with aiofiles.open(script_path, "w") as f:
         await f.write(version.content)
 

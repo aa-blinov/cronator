@@ -138,7 +138,11 @@ class EnvironmentService:
                         logger.error(f"Error removing environment for {script_name}: {e}")
                         return False, f"Failed to remove existing environment: {str(e)}"
 
-                env_path.mkdir(parents=True, exist_ok=True)
+                try:
+                    env_path.mkdir(parents=True, exist_ok=True)
+                except (PermissionError, OSError) as e:
+                    logger.error(f"Could not create environment directory {env_path}: {e}")
+                    return False, f"Could not create environment directory: {e}"
 
                 # Create venv using uv
                 # Use --python to specify the version. uv will download it if missing
@@ -640,7 +644,11 @@ class EnvironmentService:
             try:
                 if env_path.exists():
                     shutil.rmtree(env_path)
-                env_path.mkdir(parents=True, exist_ok=True)
+                try:
+                    env_path.mkdir(parents=True, exist_ok=True)
+                except (PermissionError, OSError) as e:
+                    logger.error(f"Could not create environment directory {env_path}: {e}")
+                    raise
 
                 cmd = [
                     self.uv_path,
