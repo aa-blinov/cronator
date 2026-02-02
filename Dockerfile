@@ -66,6 +66,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     unzip \
     libnsl2 \
+    libaio1 \
     gcc \
     g++ \
     make \
