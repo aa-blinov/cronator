@@ -58,14 +58,38 @@ RUN --mount=type=cache,target=/root/.npm \
 # Runtime stage
 FROM python:3.12-slim
 
-# Install uv for script environments, git for git sync, gosu for user switching, and nodejs for CSS building
+# Install dependencies for Oracle client, uv, git, gosu, and nodejs
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     gosu \
     curl \
+    wget \
+    unzip \
+    libnsl2 \
+    gcc \
+    g++ \
+    make \
+    libssl-dev \
+    python3-dev \
+    build-essential \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Oracle Instant Client Basic Lite
+RUN mkdir -p /usr/lib/instantclient && \
+    cd /tmp && \
+    curl -o instantclient-basiclite.zip https://download.oracle.com/otn_software/linux/instantclient/instantclient-basiclite-linuxx64.zip -SL && \
+    unzip instantclient-basiclite.zip && \
+    mv instantclient*/* /usr/lib/instantclient/ && \
+    rm -rf /tmp/* && \
+    ln -s /usr/lib/instantclient/libclntsh.so.19.1 /usr/lib/libclntsh.so || true && \
+    ln -s /usr/lib/instantclient/libocci.so.19.1 /usr/lib/libocci.so || true && \
+    ln -s /usr/lib/instantclient/libociicus.so /usr/lib/libociicus.so || true && \
+    ln -s /usr/lib/instantclient/libnnz19.so /usr/lib/libnnz19.so || true && \
+    ln -s /lib/x86_64-linux-gnu/libnsl.so.2 /usr/lib/libnsl.so.1 || true && \
+    ln -s /lib/x86_64-linux-gnu/libc.so.6 /usr/lib/libresolv.so.2 || true && \
+    ln -s /lib64/ld-linux-x86-64.so.2 /usr/lib/ld-linux-x86-64.so.2 || true
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -107,7 +131,11 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH="/app" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8080
+    PORT=8080 \
+    ORACLE_BASE=/usr/lib/instantclient \
+    LD_LIBRARY_PATH=/usr/lib/instantclient \
+    TNS_ADMIN=/usr/lib/instantclient \
+    ORACLE_HOME=/usr/lib/instantclient
 
 # Expose port
 EXPOSE 8080
