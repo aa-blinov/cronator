@@ -93,7 +93,8 @@ RUN mkdir -p /usr/lib/instantclient/lib && \
     ln -s /usr/lib/instantclient/lib/libnnz19.so /usr/lib/libnnz19.so || true && \
     ln -s /lib/x86_64-linux-gnu/libnsl.so.2 /usr/lib/libnsl.so.1 || true && \
     ln -s /lib/x86_64-linux-gnu/libc.so.6 /usr/lib/libresolv.so.2 || true && \
-    ln -s /lib64/ld-linux-x86-64.so.2 /usr/lib/ld-linux-x86-64.so.2 || true
+    ln -s /lib64/ld-linux-x86-64.so.2 /usr/lib/ld-linux-x86-64.so.2 || true && \
+    ln -s /lib/x86_64-linux-gnu/libaio.so.1t64 /lib/x86_64-linux-gnu/libaio.so.1 || true
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
