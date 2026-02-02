@@ -118,9 +118,10 @@ COPY --from=css-builder /app/app/static/output.css /app/app/static/output.css
 COPY package.json tailwind.config.js ./
 COPY app/static/input.css ./app/static/
 
-# Copy entrypoint script
+# Copy entrypoint script and fix Windows line endings
 COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Create directories
 RUN mkdir -p /app/scripts /app/envs /app/logs /app/data /app/data/artifacts \

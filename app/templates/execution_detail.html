@@ -118,13 +118,7 @@
             </div>
         </div>
         <div class="p-4">
-            {% if execution.stdout %}
-            <pre id="stdout-log" class="log-output">{{ execution.stdout }}</pre>
-            {% else %}
-            <div class="text-center py-8 text-base-content/50">
-                <p>No output</p>
-            </div>
-            {% endif %}
+            <pre id="stdout-log" class="log-output">{% if execution.stdout %}{{ execution.stdout }}{% elif execution.status == 'running' %}Waiting for output...{% else %}No output{% endif %}</pre>
         </div>
     </div>
     
@@ -141,13 +135,7 @@
             </div>
         </div>
         <div class="p-4">
-            {% if execution.stderr %}
-            <pre id="stderr-log" class="log-output text-error">{{ execution.stderr }}</pre>
-            {% else %}
-            <div class="text-center py-8 text-base-content/50">
-                <p>No errors</p>
-            </div>
-            {% endif %}
+            <pre id="stderr-log" class="log-output text-error">{% if execution.stderr %}{{ execution.stderr }}{% elif execution.status == 'running' %}Waiting for output...{% else %}No errors{% endif %}</pre>
         </div>
     </div>
 </div>
@@ -448,9 +436,75 @@
         return div.innerHTML;
     }
     
+    // ==================== SSE Streaming for Running Executions ====================
+    
+    const isRunning = '{{ execution.status }}' === 'running';
+    let eventSource = null;
+    
+    function appendToLog(elementId, html) {
+        const logEl = document.getElementById(elementId);
+        if (!logEl) return;
+        
+        // Clear placeholder text on first real output
+        if (logEl.textContent === 'Waiting for output...' || logEl.textContent === 'No output' || logEl.textContent === 'No errors') {
+            logEl.innerHTML = '';
+        }
+        
+        logEl.insertAdjacentHTML('beforeend', html);
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+    
+    function startStreaming() {
+        if (!isRunning) return;
+        
+        const stdoutLog = document.getElementById('stdout-log');
+        const stderrLog = document.getElementById('stderr-log');
+        
+        // Clear placeholder
+        if (stdoutLog) stdoutLog.textContent = '';
+        if (stderrLog) stderrLog.textContent = '';
+        
+        eventSource = new EventSource(`/api/executions/${execId}/stream`);
+        
+        eventSource.onmessage = (event) => {
+            // Default messages go to stdout
+            const formatted = formatJsonLogs(event.data);
+            appendToLog('stdout-log', formatted + '<br>');
+        };
+        
+        eventSource.addEventListener('done', (event) => {
+            eventSource.close();
+            eventSource = null;
+            
+            const data = JSON.parse(event.data);
+            window.showToast?.(`Execution finished: ${data.status}`, data.status === 'success' ? 'success' : 'error');
+            
+            // Reload page to show final status
+            setTimeout(() => location.reload(), 1500);
+        });
+        
+        eventSource.onerror = (error) => {
+            console.error('SSE Error:', error);
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            // Try to reload to check if execution finished
+            setTimeout(() => location.reload(), 3000);
+        };
+    }
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (eventSource) {
+            eventSource.close();
+        }
+    });
+    
     // Load artifacts on page load
     window.addEventListener('DOMContentLoaded', () => {
         loadArtifacts();
+        startStreaming();
     });
 </script>
 {% endblock %}
