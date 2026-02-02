@@ -405,8 +405,18 @@ class ExecutorService:
                     except Exception:
                         pass
             finally:
-                # Always remove script from running set
+                # Cleanup resources
                 self._running_scripts.discard(script_id)
+                if execution_id in self.running_processes:
+                    del self.running_processes[execution_id]
+                
+                # Cleanup output queue
+                # We do this here so it persists as long as the execution runs,
+                # even if clients disconnect
+                if execution_id in self.output_queues:
+                    # Verify it's the same queue (just in case of race condition/restart)
+                    if self.output_queues[execution_id] is output_queue:
+                        del self.output_queues[execution_id]
 
     def _get_script_path(self, script: Script) -> Path:
         """Get the path to the script file."""

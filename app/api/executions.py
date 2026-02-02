@@ -280,9 +280,9 @@ async def stream_execution_output(
                     continue
 
         finally:
-            # Cleanup queue
-            if execution_id in executor_service.output_queues:
-                del executor_service.output_queues[execution_id]
+            # Cleanup is now handled by ExecutorService when execution finishes
+            # preventing premature deletion on client disconnect
+            pass
 
     return StreamingResponse(
         event_generator(),
