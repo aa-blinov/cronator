@@ -169,15 +169,21 @@ class ExecutorService:
                 
                 # Ensure Oracle Client environment variables are set
                 # These are critical for cx_Oracle to find the Oracle Instant Client libraries
-                oracle_lib_path = "/usr/lib/instantclient"
-                if "LD_LIBRARY_PATH" not in env:
-                    env["LD_LIBRARY_PATH"] = oracle_lib_path
-                elif oracle_lib_path not in env["LD_LIBRARY_PATH"]:
-                    env["LD_LIBRARY_PATH"] = f"{oracle_lib_path}:{env['LD_LIBRARY_PATH']}"
+                oracle_root = "/usr/lib/instantclient"
+                oracle_lib = "/usr/lib/instantclient/lib"
                 
-                env.setdefault("ORACLE_HOME", oracle_lib_path)
-                env.setdefault("ORACLE_BASE", oracle_lib_path)
-                env.setdefault("TNS_ADMIN", oracle_lib_path)
+                # We add both root and lib to LD_LIBRARY_PATH for maximum compatibility
+                paths_to_add = [oracle_lib, oracle_root]
+                current_ld_path = env.get("LD_LIBRARY_PATH", "")
+                
+                for path in paths_to_add:
+                    if path not in current_ld_path:
+                        current_ld_path = f"{path}:{current_ld_path}" if current_ld_path else path
+                
+                env["LD_LIBRARY_PATH"] = current_ld_path
+                env.setdefault("ORACLE_HOME", oracle_root)
+                env.setdefault("ORACLE_BASE", oracle_root)
+                env.setdefault("TNS_ADMIN", oracle_root)
                 
                 if script.environment_vars:
                     try:

@@ -24,9 +24,9 @@ ARG INSTALL_DEV=false
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     if [ "$INSTALL_DEV" = "true" ]; then \
-        uv sync --frozen --all-extras --no-install-project; \
+    uv sync --frozen --all-extras --no-install-project; \
     else \
-        uv sync --frozen --no-dev --no-install-project; \
+    uv sync --frozen --no-dev --no-install-project; \
     fi
 
 # Copy application code
@@ -34,9 +34,9 @@ COPY . .
 
 # Install the project
 RUN if [ "$INSTALL_DEV" = "true" ]; then \
-        uv sync --frozen --all-extras; \
+    uv sync --frozen --all-extras; \
     else \
-        uv sync --frozen --no-dev; \
+    uv sync --frozen --no-dev; \
     fi
 
 # Build CSS stage
@@ -77,16 +77,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Oracle Instant Client Basic Lite
-RUN mkdir -p /usr/lib/instantclient && \
+RUN mkdir -p /usr/lib/instantclient/lib && \
     cd /tmp && \
     curl -o instantclient-basiclite.zip https://download.oracle.com/otn_software/linux/instantclient/instantclient-basiclite-linuxx64.zip -SL && \
     unzip instantclient-basiclite.zip && \
-    mv instantclient*/* /usr/lib/instantclient/ && \
+    mv instantclient*/* /usr/lib/instantclient/lib/ && \
     rm -rf /tmp/* && \
-    ln -s /usr/lib/instantclient/libclntsh.so.19.1 /usr/lib/libclntsh.so || true && \
-    ln -s /usr/lib/instantclient/libocci.so.19.1 /usr/lib/libocci.so || true && \
-    ln -s /usr/lib/instantclient/libociicus.so /usr/lib/libociicus.so || true && \
-    ln -s /usr/lib/instantclient/libnnz19.so /usr/lib/libnnz19.so || true && \
+    # Create symlinks in the lib directory itself
+    ln -s /usr/lib/instantclient/lib/libclntsh.so.19.1 /usr/lib/instantclient/lib/libclntsh.so || true && \
+    # Create symlinks in /usr/lib for system-wide access
+    ln -s /usr/lib/instantclient/lib/libclntsh.so.19.1 /usr/lib/libclntsh.so || true && \
+    ln -s /usr/lib/instantclient/lib/libocci.so.19.1 /usr/lib/libocci.so || true && \
+    ln -s /usr/lib/instantclient/lib/libociicus.so /usr/lib/libociicus.so || true && \
+    ln -s /usr/lib/instantclient/lib/libnnz19.so /usr/lib/libnnz19.so || true && \
     ln -s /lib/x86_64-linux-gnu/libnsl.so.2 /usr/lib/libnsl.so.1 || true && \
     ln -s /lib/x86_64-linux-gnu/libc.so.6 /usr/lib/libresolv.so.2 || true && \
     ln -s /lib64/ld-linux-x86-64.so.2 /usr/lib/ld-linux-x86-64.so.2 || true
