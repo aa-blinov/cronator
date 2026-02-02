@@ -54,8 +54,20 @@ class TestExecutorService:
     async def test_cancel_execution_not_running(self):
         """Test canceling execution that's not running."""
         service = ExecutorService()
-        result = await service.cancel_execution(999)
-        assert result is False
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=None)
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_ctx = AsyncMock()
+        mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_session_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("app.services.executor.async_session_maker", return_value=mock_session_ctx):
+            result = await service.cancel_execution(999)
+            assert result is False
 
     @pytest.mark.asyncio
     async def test_cancel_execution_running(self):
