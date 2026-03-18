@@ -71,6 +71,7 @@ class ExecutorService:
             script = result.scalar_one_or_none()
 
             if not script:
+                self._running_scripts.discard(script_id)
                 raise ValueError(f"Script with ID {script_id} not found")
 
             # Create execution record
