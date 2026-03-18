@@ -4,6 +4,8 @@ import asyncio
 import os
 
 os.environ.setdefault("SUPPRESS_CONFIG_WARNINGS", "1")
+os.environ.setdefault("ADMIN_PASSWORD", "test-admin-password-ok")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-at-least-32-chars-long-x")
 from collections.abc import AsyncGenerator
 from typing import Any
 

@@ -68,15 +68,15 @@ class Settings(BaseSettings):
                     stacklevel=2,
                 )
 
-            if self.secret_key == "change-me-in-production-please" or len(self.secret_key) < 32:
+            if len(self.secret_key) < 32:
                 warnings.warn(
-                    "SECRET_KEY is default or too short; set a strong random value (32+ chars).",
+                    "SECRET_KEY is too short; set a strong random value (32+ chars).",
                     stacklevel=2,
                 )
 
-            if self.admin_password == "admin" or len(self.admin_password) < 8:
+            if len(self.admin_password) < 8:
                 warnings.warn(
-                    "ADMIN_PASSWORD is default or weak; set a strong admin password.",
+                    "ADMIN_PASSWORD is too short; set a strong admin password (8+ chars).",
                     stacklevel=2,
                 )
 
@@ -84,8 +84,8 @@ class Settings(BaseSettings):
 
     # Authentication
     admin_username: str = "admin"
-    admin_password: str = "admin"
-    secret_key: str = "change-me-in-production-please"
+    admin_password: str  # required — no default, must be set via env var
+    secret_key: str      # required — no default, must be set via env var
 
     # SMTP for alerts
     smtp_enabled: bool = False

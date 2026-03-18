@@ -165,26 +165,30 @@ class ExecutorService:
                     return
 
                 # Prepare environment variables
-                env = os.environ.copy()
-                
-                # Ensure Oracle Client environment variables are set
-                # These are critical for cx_Oracle to find the Oracle Instant Client libraries
+                # Only pass what the script explicitly needs — never inherit Cronator's own env
                 oracle_root = "/usr/lib/instantclient"
                 oracle_lib = "/usr/lib/instantclient/lib"
-                
-                # We add both root and lib to LD_LIBRARY_PATH for maximum compatibility
-                paths_to_add = [oracle_lib, oracle_root]
-                current_ld_path = env.get("LD_LIBRARY_PATH", "")
-                
-                for path in paths_to_add:
-                    if path not in current_ld_path:
-                        current_ld_path = f"{path}:{current_ld_path}" if current_ld_path else path
-                
-                env["LD_LIBRARY_PATH"] = current_ld_path
-                env.setdefault("ORACLE_HOME", oracle_root)
-                env.setdefault("ORACLE_BASE", oracle_root)
-                env.setdefault("TNS_ADMIN", oracle_root)
-                
+
+                env = {
+                    # Minimal system vars required for subprocess to function
+                    "PATH": "/usr/local/bin:/usr/bin:/bin",
+                    "HOME": "/home/cronator",
+                    "LANG": "en_US.UTF-8",
+                    "TZ": "UTC",
+                    # Oracle client — required for cx_Oracle
+                    "LD_LIBRARY_PATH": f"{oracle_lib}:{oracle_root}",
+                    "ORACLE_HOME": oracle_root,
+                    "ORACLE_BASE": oracle_root,
+                    "TNS_ADMIN": oracle_root,
+                    # Cronator execution context
+                    "CRONATOR_SCRIPT_ID": str(script_id),
+                    "CRONATOR_EXECUTION_ID": str(execution_id),
+                    "CRONATOR_SCRIPT_NAME": script.name,
+                    # Allow scripts to import cronator_lib
+                    "PYTHONPATH": str(settings.base_dir),
+                }
+
+                # Add only user-defined script variables
                 if script.environment_vars:
                     try:
                         extra_env = json.loads(script.environment_vars)
@@ -195,19 +199,6 @@ class ExecutorService:
                             if "=" in line:
                                 key, value = line.split("=", 1)
                                 env[key.strip()] = value.strip()
-
-                # Add cronator-specific env vars
-                env["CRONATOR_SCRIPT_ID"] = str(script_id)
-                env["CRONATOR_EXECUTION_ID"] = str(execution_id)
-                env["CRONATOR_SCRIPT_NAME"] = script.name
-
-                # Add cronator_lib to PYTHONPATH so scripts can import it
-                # even if not installed in venv
-                cronator_lib_parent = str(settings.base_dir)
-                if "PYTHONPATH" in env:
-                    env["PYTHONPATH"] = f"{cronator_lib_parent}{os.pathsep}{env['PYTHONPATH']}"
-                else:
-                    env["PYTHONPATH"] = cronator_lib_parent
 
                 # Create artifacts directory for this execution
                 execution_artifacts_dir = settings.artifacts_dir / str(execution_id)
