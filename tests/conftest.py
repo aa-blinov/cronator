@@ -150,6 +150,46 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
     fastapi_app.dependency_overrides.clear()
 
 
+# --- ExecutorService fixture (shared with integration + pg tests) ---
+
+
+@pytest_asyncio.fixture
+async def exec_service(test_engine, monkeypatch) -> "ExecutorService":
+    """ExecutorService подключённый к тестовой БД (SQLite или PostgreSQL)."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    import app.services.executor as executor_module
+    from app.services.executor import ExecutorService
+
+    test_session = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(executor_module, "async_session_maker", test_session)
+    return ExecutorService()
+
+
+@pytest_asyncio.fixture
+async def db_script(db_session: AsyncSession) -> "Script":
+    """Реальный Script в тестовой БД для тестов concurrency."""
+    from app.models.script import Script
+
+    script = Script(
+        name="concurrency_integration_script",
+        content="print('hello')",
+        cron_expression="0 * * * *",
+        enabled=True,
+        python_version="3.12",
+        timeout=3600,
+        path="/scripts/concurrency_integration_script/main.py",
+    )
+    db_session.add(script)
+    await db_session.commit()
+    await db_session.refresh(script)
+    return script
+
+
 # --- Factory fixtures ---
 
 

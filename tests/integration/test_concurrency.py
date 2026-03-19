@@ -13,51 +13,12 @@ import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
-import pytest_asyncio
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
 from app.services.executor import ExecutorService
-
-
-# ─────────────────────────── fixtures ────────────────────────────────────────
-
-
-@pytest_asyncio.fixture
-async def exec_service(test_engine, monkeypatch) -> ExecutorService:
-    """
-    ExecutorService с тестовой БД.
-    async_session_maker в app.services.executor патчится на test_engine.
-    """
-    test_session = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-    import app.services.executor as executor_module
-
-    monkeypatch.setattr(executor_module, "async_session_maker", test_session)
-    return ExecutorService()
-
-
-@pytest_asyncio.fixture
-async def db_script(db_session: AsyncSession) -> Script:
-    """Реальный Script в тестовой БД."""
-    script = Script(
-        name="concurrency_integration_script",
-        content="print('hello')",
-        cron_expression="0 * * * *",
-        enabled=True,
-        python_version="3.12",
-        timeout=3600,
-        path="/scripts/concurrency_integration_script/main.py",
-    )
-    db_session.add(script)
-    await db_session.commit()
-    await db_session.refresh(script)
-    return script
 
 
 # ─────────────────────────── tests ───────────────────────────────────────────
