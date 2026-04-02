@@ -295,6 +295,34 @@ class ExecutorService:
                                             )
                                     except Exception as e:
                                         logger.warning(f"Failed to parse artifact metadata: {e}")
+
+                                # Parse for notify markers
+                                if "CRONATOR_NOTIFY:" in decoded:
+                                    try:
+                                        message = decoded.strip()
+                                        if message.startswith("{"):
+                                            try:
+                                                log_entry = json.loads(message)
+                                                message = log_entry.get("message", message)
+                                            except json.JSONDecodeError:
+                                                pass
+                                        marker_idx = message.find("CRONATOR_NOTIFY:")
+                                        if marker_idx != -1:
+                                            payload = message[marker_idx + len("CRONATOR_NOTIFY:"):].strip()
+                                            if "|" in payload:
+                                                notify_title, notify_body = payload.split("|", 1)
+                                            else:
+                                                notify_title, notify_body = script.name, payload
+                                            asyncio.create_task(
+                                                self._send_manual_alert(
+                                                    execution_id,
+                                                    notify_title.strip(),
+                                                    notify_body.strip(),
+                                                )
+                                            )
+                                    except Exception as e:
+                                        logger.warning(f"Failed to parse notify marker: {e}")
+
                             # Add to queue for streaming
                             await output_queue.put(("stderr" if is_stderr else "stdout", decoded))
 
@@ -562,6 +590,29 @@ class ExecutorService:
                 await alerting_service.send_success_alert(script, execution)
                 script.last_alert_at = datetime.now(UTC)
                 await db.commit()
+
+    async def _send_manual_alert(
+        self, execution_id: int, title: str, message: str
+    ) -> None:
+        """Send a manual alert triggered by notify() in a script."""
+        from app.services.alerting import alerting_service
+
+        subject = f"[Cronator] {title}"
+        body_html = f"""
+        <html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>{title}</h2>
+            <p>{message}</p>
+            <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">
+                Sent by Cronator script (execution #{execution_id})
+            </p>
+        </body></html>
+        """
+        body_text = f"{title}\n\n{message}\n\nExecution #{execution_id}"
+        try:
+            await alerting_service.send_email(subject, body_html, body_text)
+            logger.info(f"Manual alert sent for execution {execution_id}: {title}")
+        except Exception as e:
+            logger.warning(f"Failed to send manual alert: {e}")
 
     async def cancel_execution(self, execution_id: int) -> bool:
         """Cancel a running execution."""

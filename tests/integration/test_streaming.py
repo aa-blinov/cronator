@@ -8,7 +8,6 @@ from httpx import AsyncClient
 
 from app.models.execution import ExecutionStatus
 
-
 # ─────────────────────────── SSE helpers ─────────────────────────────────────
 
 
@@ -28,8 +27,8 @@ def parse_sse(raw: bytes | str) -> list[dict]:
         for line in block.split("\n"):
             if line.startswith("event: "):
                 event["event"] = line[7:]
-            elif line.startswith("data: "):
-                event["data"] = line[6:]
+            elif line.startswith("data:"):
+                event["data"] = line[5:].lstrip(" ")
             elif line.startswith(":"):
                 event["comment"] = line[1:].strip()
         if event:
@@ -46,9 +45,7 @@ class TestStreamingSSE:
     # ── 404 / базовые ────────────────────────────────────────────────────────
 
     @pytest.mark.asyncio
-    async def test_stream_returns_404_for_unknown_execution(
-        self, test_client: AsyncClient
-    ):
+    async def test_stream_returns_404_for_unknown_execution(self, test_client: AsyncClient):
         """Стриминг несуществующего execution → 404."""
         response = await test_client.get("/api/executions/99999/stream")
         assert response.status_code == 404
@@ -65,9 +62,7 @@ class TestStreamingSSE:
             status=ExecutionStatus.SUCCESS.value,
             stdout="ok\n",
         )
-        async with test_client.stream(
-            "GET", f"/api/executions/{execution.id}/stream"
-        ) as response:
+        async with test_client.stream("GET", f"/api/executions/{execution.id}/stream") as response:
             assert response.status_code == 200
             assert "text/event-stream" in response.headers["content-type"]
             await response.aread()
@@ -82,9 +77,7 @@ class TestStreamingSSE:
             status=ExecutionStatus.SUCCESS.value,
             stdout="ok\n",
         )
-        async with test_client.stream(
-            "GET", f"/api/executions/{execution.id}/stream"
-        ) as response:
+        async with test_client.stream("GET", f"/api/executions/{execution.id}/stream") as response:
             assert response.headers.get("cache-control") == "no-cache"
             await response.aread()
 
@@ -99,13 +92,11 @@ class TestStreamingSSE:
             stdout="alpha\nbeta\ngamma\n",
             stderr="",
         )
-        async with test_client.stream(
-            "GET", f"/api/executions/{execution.id}/stream"
-        ) as response:
+        async with test_client.stream("GET", f"/api/executions/{execution.id}/stream") as response:
             raw = await response.aread()
 
         events = parse_sse(raw)
-        data_lines = [e["data"] for e in events if "data" in e and "event" not in e]
+        data_lines = [e["data"] for e in events if e.get("event") == "stdout"]
 
         assert "alpha" in data_lines
         assert "beta" in data_lines
@@ -123,13 +114,11 @@ class TestStreamingSSE:
             stderr="Traceback:\n  ...\nRuntimeError: boom\n",
             exit_code=1,
         )
-        async with test_client.stream(
-            "GET", f"/api/executions/{execution.id}/stream"
-        ) as response:
+        async with test_client.stream("GET", f"/api/executions/{execution.id}/stream") as response:
             raw = await response.aread()
 
         events = parse_sse(raw)
-        data_lines = [e["data"] for e in events if "data" in e and "event" not in e]
+        data_lines = [e["data"] for e in events if e.get("event") == "stderr"]
         assert any("RuntimeError: boom" in line for line in data_lines)
 
     @pytest.mark.asyncio
@@ -159,9 +148,7 @@ class TestStreamingSSE:
             stderr=stderr,
             exit_code=exit_code,
         )
-        async with test_client.stream(
-            "GET", f"/api/executions/{execution.id}/stream"
-        ) as response:
+        async with test_client.stream("GET", f"/api/executions/{execution.id}/stream") as response:
             raw = await response.aread()
 
         events = parse_sse(raw)
@@ -183,9 +170,7 @@ class TestStreamingSSE:
             stdout="",
             stderr="",
         )
-        async with test_client.stream(
-            "GET", f"/api/executions/{execution.id}/stream"
-        ) as response:
+        async with test_client.stream("GET", f"/api/executions/{execution.id}/stream") as response:
             raw = await response.aread()
 
         events = parse_sse(raw)
@@ -208,9 +193,7 @@ class TestStreamingSSE:
             status=ExecutionStatus.SUCCESS.value,
             stdout="line_one\nline_two\nline_three\n",
         )
-        async with test_client.stream(
-            "GET", f"/api/executions/{execution.id}/stream"
-        ) as response:
+        async with test_client.stream("GET", f"/api/executions/{execution.id}/stream") as response:
             raw = await response.aread()
 
         text = raw.decode()
@@ -257,7 +240,7 @@ class TestStreamingSSE:
             executions_module.executor_service.output_queues.pop(execution.id, None)
 
         events = parse_sse(raw)
-        data_lines = [e["data"] for e in events if "data" in e and "event" not in e]
+        data_lines = [e["data"] for e in events if e.get("event") == "stdout"]
         assert "live_alpha" in data_lines
         assert "live_beta" in data_lines
 
