@@ -257,10 +257,13 @@ class ExecutorService:
                             if not line:
                                 break
                             decoded = line.decode("utf-8", errors="replace")
+                            is_internal_marker = (
+                                "CRONATOR_NOTIFY:" in decoded
+                                or "ARTIFACT_SAVED:" in decoded
+                            )
                             if is_stderr:
                                 stderr_lines.append(decoded)
                             else:
-                                stdout_lines.append(decoded)
                                 # Parse for artifact markers
                                 if "ARTIFACT_SAVED:" in decoded:
                                     try:
@@ -297,7 +300,7 @@ class ExecutorService:
                                         logger.warning(f"Failed to parse artifact metadata: {e}")
 
                                 # Parse for notify markers
-                                if "CRONATOR_NOTIFY:" in decoded:
+                                elif "CRONATOR_NOTIFY:" in decoded:
                                     try:
                                         message = decoded.strip()
                                         if message.startswith("{"):
@@ -323,8 +326,13 @@ class ExecutorService:
                                     except Exception as e:
                                         logger.warning(f"Failed to parse notify marker: {e}")
 
-                            # Add to queue for streaming
-                            await output_queue.put(("stderr" if is_stderr else "stdout", decoded))
+                                else:
+                                    # Regular stdout line — store and stream
+                                    stdout_lines.append(decoded)
+
+                            # Stream to UI — skip internal markers
+                            if not is_internal_marker:
+                                await output_queue.put(("stderr" if is_stderr else "stdout", decoded))
 
                     # Read both streams concurrently
                     await asyncio.gather(
