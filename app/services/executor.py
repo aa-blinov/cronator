@@ -316,13 +316,19 @@ class ExecutorService:
                                                 notify_title, notify_body = payload.split("|", 1)
                                             else:
                                                 notify_title, notify_body = script.name, payload
+                                            notify_title = notify_title.strip()
+                                            notify_body = notify_body.strip()
                                             asyncio.create_task(
                                                 self._send_manual_alert(
                                                     execution_id,
-                                                    notify_title.strip(),
-                                                    notify_body.strip(),
+                                                    notify_title,
+                                                    notify_body,
                                                 )
                                             )
+                                            # Replace raw marker with a clean log line
+                                            pretty = f"[notify → {notify_title}] {notify_body}\n"
+                                            stdout_lines.append(pretty)
+                                            await output_queue.put(("stdout", pretty))
                                     except Exception as e:
                                         logger.warning(f"Failed to parse notify marker: {e}")
 
