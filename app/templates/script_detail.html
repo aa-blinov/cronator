@@ -156,6 +156,7 @@ function deleteScript(scriptId) {
         </div>
     </div>
     
+    <div id="execution-history-content">
     {% if executions %}
     <div class="overflow-x-auto">
         <table class="table w-full">
@@ -254,16 +255,116 @@ function deleteScript(scriptId) {
         </button>
     </div>
     {% endif %}
+    </div>
 </div>
 
 <script>
 const scriptId = {{ script.id }};
 const playIcon = `{{ icons.play("w-4 h-4") }}`.trim();
-const pauseIcon = `{{ icons.pause("w-4 h-4") }}`.trim();
+const justStartedExecutionKey = `script:${scriptId}:just-started-execution`;
 
-// Run Now button handler
-document.getElementById('run-now-btn')?.addEventListener('click', async () => {
-    const btn = document.getElementById('run-now-btn');
+function getShowTestsPreference() {
+    return localStorage.getItem('showTestRuns') === 'true';
+}
+
+function applyTestRunFilter() {
+    const showTests = getShowTestsPreference();
+    if (showTestRunsCheckbox) {
+        showTestRunsCheckbox.checked = showTests;
+    }
+    document.querySelectorAll('.test-run').forEach(row => {
+        row.style.display = showTests ? '' : 'none';
+    });
+}
+
+async function handleCancelExecution(executionId, buttonEl) {
+    if (!confirm('Are you sure you want to cancel this execution?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/executions/${executionId}/cancel`, {
+            method: 'POST',
+        });
+
+        if (response.ok) {
+            const row = buttonEl?.closest('tr');
+            const statusBadge = document.getElementById(`status-${executionId}`);
+
+            if (statusBadge) {
+                statusBadge.className = 'status-badge cancelled';
+                statusBadge.innerHTML = 'cancelled';
+            }
+
+            row?.removeAttribute('data-status');
+            buttonEl?.remove();
+            window.showToast?.('Execution cancelled', 'success');
+            syncRunNowButtonState();
+            restartFastExecutionHistoryRefresh();
+        } else {
+            const error = await response.json();
+            window.showToast?.(error.detail || 'Failed to cancel execution', 'error');
+        }
+    } catch (err) {
+        window.showToast?.(err.message || 'Failed to cancel execution', 'error');
+    }
+}
+
+function bindExecutionHistoryInteractions() {
+    document.querySelectorAll('.cancel-execution-btn').forEach(btn => {
+        btn.onclick = async (e) => {
+            const button = e.currentTarget;
+            const executionId = button.dataset.executionId;
+            await handleCancelExecution(executionId, button);
+        };
+    });
+
+    const emptyRunBtn = document.getElementById('run-now-empty-btn');
+    if (emptyRunBtn) {
+        emptyRunBtn.onclick = async () => {
+            await handleRunNow('run-now-empty-btn');
+        };
+    }
+
+    applyTestRunFilter();
+}
+
+function hasRunningExecutionRows() {
+    return document.querySelector('tr[data-status="running"]') !== null;
+}
+
+function syncRunNowButtonState() {
+    const runNowBtn = document.getElementById('run-now-btn');
+    if (!runNowBtn) return;
+
+    if (hasRunningExecutionRows()) {
+        runNowBtn.disabled = true;
+        runNowBtn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Running...';
+        return;
+    }
+
+    runNowBtn.disabled = false;
+    runNowBtn.innerHTML = `${playIcon} Run Now`;
+}
+
+// Auto-refresh execution history
+let autoRefreshInterval = null;
+
+function restartFastExecutionHistoryRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+
+    if (hasRunningExecutionRows()) {
+        autoRefreshInterval = setInterval(refreshExecutionHistory, 3000);
+    }
+}
+
+async function handleRunNow(buttonId) {
+    const btn = document.getElementById(buttonId);
+    if (!btn) return;
+
     const originalHTML = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Running...';
@@ -273,9 +374,11 @@ document.getElementById('run-now-btn')?.addEventListener('click', async () => {
         
         if (response.ok) {
             const result = await response.json();
-            // Reload page to show new execution
-            window.showToast?.('Script started', 'success');
-            setTimeout(() => window.location.reload(), 2800);
+            if (!result.execution_id) {
+                throw new Error('Execution started but no execution ID was returned');
+            }
+            sessionStorage.setItem(justStartedExecutionKey, String(result.execution_id));
+            window.location.assign(`/executions/${result.execution_id}`);
         } else if (response.status === 409) {
             const error = await response.json();
             window.showToast?.(error.detail || 'Script is already running', 'warning');
@@ -292,32 +395,11 @@ document.getElementById('run-now-btn')?.addEventListener('click', async () => {
         btn.disabled = false;
         btn.innerHTML = originalHTML;
     }
-});
+}
 
-// Empty state Run Now button
-document.getElementById('run-now-empty-btn')?.addEventListener('click', async () => {
-    const btn = document.getElementById('run-now-empty-btn');
-    const originalHTML = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Running...';
-    
-    try {
-        const response = await fetch(`/api/scripts/${scriptId}/run`, { method: 'POST' });
-        
-        if (response.ok) {
-            window.showToast?.('Script started', 'success');
-            setTimeout(() => window.location.reload(), 2800);
-        } else {
-            const error = await response.json();
-            window.showToast?.(error.detail || 'Failed to run script', 'error');
-            btn.disabled = false;
-            btn.innerHTML = originalHTML;
-        }
-    } catch (err) {
-        window.showToast?.(err.message || 'Failed to run script', 'error');
-        btn.disabled = false;
-        btn.innerHTML = originalHTML;
-    }
+// Run Now button handler
+document.getElementById('run-now-btn')?.addEventListener('click', async () => {
+    await handleRunNow('run-now-btn');
 });
 
 // Toggle enabled/disabled button
@@ -344,66 +426,13 @@ document.getElementById('toggle-btn')?.addEventListener('click', async () => {
 
 // Test runs filter with localStorage
 const showTestRunsCheckbox = document.getElementById('show-test-runs');
-const testRuns = document.querySelectorAll('.test-run');
-
-// Load saved preference
-const showTests = localStorage.getItem('showTestRuns') === 'true';
-showTestRunsCheckbox.checked = showTests;
-testRuns.forEach(row => {
-    row.style.display = showTests ? '' : 'none';
-});
+applyTestRunFilter();
 
 showTestRunsCheckbox.addEventListener('change', (e) => {
     const show = e.target.checked;
     localStorage.setItem('showTestRuns', show);
-    testRuns.forEach(row => {
-        row.style.display = show ? '' : 'none';
-    });
+    applyTestRunFilter();
 });
-
-// Cancel execution buttons
-document.querySelectorAll('.cancel-execution-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-        const executionId = e.target.dataset.executionId;
-        
-        if (!confirm('Are you sure you want to cancel this execution?')) {
-            return;
-        }
-        
-        try {
-            const response = await fetch(`/api/executions/${executionId}/cancel`, {
-                method: 'POST',
-            });
-            
-            if (response.ok) {
-                // Update UI
-                const row = document.querySelector(`tr[data-execution-id="${executionId}"]`);
-                const statusBadge = document.getElementById(`status-${executionId}`);
-                
-                if (statusBadge) {
-                    statusBadge.className = 'status-badge cancelled';
-                    statusBadge.innerHTML = 'cancelled';
-                }
-                
-                // Remove cancel button
-                e.target.remove();
-
-                window.showToast?.('Execution cancelled', 'success');
-                
-                // Show success message (optional)
-                // alert('Execution cancelled');
-            } else {
-                const error = await response.json();
-                window.showToast?.(error.detail || 'Failed to cancel execution', 'error');
-            }
-        } catch (err) {
-            window.showToast?.(err.message || 'Failed to cancel execution', 'error');
-        }
-    });
-});
-
-// Auto-refresh execution history
-let autoRefreshInterval = null;
 
 async function refreshExecutionHistory() {
     try {
@@ -417,63 +446,39 @@ async function refreshExecutionHistory() {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         
-        // Find the execution table in the response
-        const newTable = doc.querySelector('.overflow-x-auto');
-        const currentTable = document.querySelector('.overflow-x-auto');
+        const newHistoryContent = doc.getElementById('execution-history-content');
+        const currentHistoryContent = document.getElementById('execution-history-content');
         
-        if (newTable && currentTable) {
-            // Check if content changed before updating
-            if (currentTable.innerHTML !== newTable.innerHTML) {
-                currentTable.innerHTML = newTable.innerHTML;
-                
-                // Re-apply test runs filter
-                const showTests = localStorage.getItem('showTestRuns') === 'true';
-                document.querySelectorAll('.test-run').forEach(row => {
-                    row.style.display = showTests ? '' : 'none';
-                });
-                
-                // Re-attach cancel button listeners
-                document.querySelectorAll('.cancel-execution-btn').forEach(btn => {
-                    btn.addEventListener('click', async (e) => {
-                        const executionId = e.target.dataset.executionId;
-                        if (!confirm('Are you sure you want to cancel this execution?')) return;
-                        
-                        try {
-                            const resp = await fetch(`/api/executions/${executionId}/cancel`, { method: 'POST' });
-                            if (resp.ok) {
-                                const statusBadge = document.getElementById(`status-${executionId}`);
-                                if (statusBadge) {
-                                    statusBadge.className = 'status-badge cancelled';
-                                    statusBadge.innerHTML = 'cancelled';
-                                }
-                                e.target.remove();
-                                window.showToast?.('Execution cancelled', 'success');
-                            } else {
-                                const error = await resp.json();
-                                window.showToast?.(error.detail || 'Failed to cancel execution', 'error');
-                            }
-                        } catch (err) {
-                            window.showToast?.(err.message || 'Failed to cancel execution', 'error');
-                        }
-                    });
-                });
+        if (newHistoryContent && currentHistoryContent) {
+            if (currentHistoryContent.innerHTML !== newHistoryContent.innerHTML) {
+                currentHistoryContent.innerHTML = newHistoryContent.innerHTML;
             }
+
+            bindExecutionHistoryInteractions();
+            syncRunNowButtonState();
+            restartFastExecutionHistoryRefresh();
         }
     } catch (err) {
         console.error('Failed to refresh execution history:', err);
     }
 }
 
-// Check if there are running executions
-const hasRunningExecutions = document.querySelector('tr[data-status="running"]') !== null;
-
-// Start auto-refresh if there are running executions
-if (hasRunningExecutions) {
-    autoRefreshInterval = setInterval(refreshExecutionHistory, 3000); // Every 3 seconds
-}
+bindExecutionHistoryInteractions();
+syncRunNowButtonState();
+restartFastExecutionHistoryRefresh();
 
 // Also refresh periodically to catch new scheduled executions
 const slowRefreshInterval = setInterval(refreshExecutionHistory, 30000); // Every 30 seconds
+
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted || sessionStorage.getItem(justStartedExecutionKey)) {
+        sessionStorage.removeItem(justStartedExecutionKey);
+        void refreshExecutionHistory();
+        return;
+    }
+
+    syncRunNowButtonState();
+});
 
 // Stop refresh on page unload
 window.addEventListener('beforeunload', () => {
