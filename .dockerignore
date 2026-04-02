@@ -1,6 +1,5 @@
 # Node modules
 node_modules/
-package-lock.json
 
 # Build artifacts (but keep input.css for Docker build)
 # app/static/input.css is needed for CSS building

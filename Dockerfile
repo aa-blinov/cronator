@@ -45,13 +45,13 @@ FROM node:20-slim AS css-builder
 WORKDIR /app
 
 # Copy package files and templates for content scanning
-COPY package.json tailwind.config.js ./
+COPY package.json package-lock.json tailwind.config.js ./
 COPY app/static/input.css ./app/static/
 COPY app/templates ./app/templates
 
 # Install dependencies and build CSS with caching
 RUN --mount=type=cache,target=/root/.npm \
-    npm install && \
+    npm ci && \
     npx tailwindcss -i ./app/static/input.css -o ./app/static/output.css --minify
 
 
@@ -113,9 +113,10 @@ COPY --from=builder /app/alembic.ini /app/
 
 # Copy built CSS from css-builder (fallback if build fails at runtime)
 COPY --from=css-builder /app/app/static/output.css /app/app/static/output.css
+COPY --from=css-builder /app/node_modules /app/node_modules
 
 # Copy package files for CSS building at runtime
-COPY package.json tailwind.config.js ./
+COPY package.json package-lock.json tailwind.config.js ./
 COPY app/static/input.css ./app/static/
 
 # Copy entrypoint script and fix Windows line endings
@@ -147,7 +148,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD sh -c "python -c \"import os,httpx; httpx.get('http://localhost:' + os.getenv('PORT','8080') + '/health')\"" || exit 1
 
 CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}

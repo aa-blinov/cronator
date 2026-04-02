@@ -24,6 +24,30 @@ router = APIRouter()
 settings = get_settings()
 
 
+def _build_done_payload(execution: Execution | None) -> str:
+    """Serialize final execution state for SSE `done` events."""
+    finished_at = execution.finished_at if execution else None
+    if finished_at:
+        finished_at = (
+            finished_at.replace(tzinfo=UTC)
+            if finished_at.tzinfo is None
+            else finished_at.astimezone(UTC)
+        )
+
+    return json.dumps(
+        {
+            "status": execution.status if execution else "unknown",
+            "exit_code": execution.exit_code if execution else None,
+            "finished_at": finished_at.isoformat() if finished_at else None,
+            "finished_at_display": (
+                finished_at.strftime("%Y-%m-%d %H:%M:%S UTC") if finished_at else None
+            ),
+            "duration_ms": execution.duration_ms if execution else None,
+            "duration_formatted": execution.duration_formatted if execution else "-",
+        }
+    )
+
+
 @router.get("", response_model=ExecutionList)
 async def list_executions(
     page: int = 1,
@@ -215,12 +239,7 @@ async def stream_execution_output(
             for line in iter_lines(execution.stderr or ""):
                 yield f"event: stderr\ndata: {line}\n\n"
 
-            done_payload = json.dumps(
-                {
-                    "status": execution.status,
-                    "exit_code": execution.exit_code,
-                }
-            )
+            done_payload = _build_done_payload(execution)
             yield f"event: done\ndata: {done_payload}\n\n"
 
         return StreamingResponse(
@@ -253,16 +272,7 @@ async def stream_execution_output(
                             select(Execution).where(Execution.id == execution_id)
                         )
                         updated_execution = result.scalar_one_or_none()
-                        done_payload = json.dumps(
-                            {
-                                "status": updated_execution.status
-                                if updated_execution
-                                else "unknown",
-                                "exit_code": updated_execution.exit_code
-                                if updated_execution
-                                else None,
-                            }
-                        )
+                        done_payload = _build_done_payload(updated_execution)
                         yield f"event: done\ndata: {done_payload}\n\n"
                         break
 
