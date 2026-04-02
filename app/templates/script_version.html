@@ -123,6 +123,7 @@
 <script>
 const scriptId = {{ script.id }};
 const versionNumber = {{ version.version_number }};
+const restoredVersionToastKey = `script:${scriptId}:restored-version`;
 
 // Initialize CodeMirror (read-only)
 const editor = CodeMirror.fromTextArea(document.getElementById('code-viewer'), {
@@ -155,12 +156,11 @@ document.getElementById('restore-btn').addEventListener('click', async () => {
         }
         
         const result = await response.json();
-        window.showToast?.(result.message, 'success');
-        
-        // Redirect to editor
-        setTimeout(() => {
-            window.location.href = `/scripts/${scriptId}/edit`;
-        }, 1500);
+        sessionStorage.setItem(restoredVersionToastKey, JSON.stringify({
+            version_number: versionNumber,
+            needs_install: Boolean(result.needs_install),
+        }));
+        window.location.assign(`/scripts/${scriptId}/edit`);
         
     } catch (err) {
         window.showToast?.('Failed to restore: ' + err.message, 'error');
