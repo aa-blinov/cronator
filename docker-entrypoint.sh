@@ -31,14 +31,22 @@ done
 # Always rebuild CSS from input.css on container startup
 # This ensures CSS is always up-to-date with any changes
 if [ -f /app/app/static/input.css ]; then
-    echo "Building CSS from input.css..."
-    # Install npm dependencies if node_modules doesn't exist
-    if [ ! -d /app/node_modules ]; then
-        npm install --silent 2>/dev/null || true
-    fi
-    # Build CSS
-    npm run build:css 2>/dev/null || true
-    echo "CSS build completed (or skipped if npm not available)"
+    echo "Scheduling CSS rebuild from input.css in background..."
+    (
+        echo "Building CSS from input.css..."
+
+        # Fallback only if node_modules was not copied into the runtime image
+        if [ ! -d /app/node_modules ]; then
+            echo "node_modules not found, installing CSS dependencies..."
+            gosu cronator npm ci --silent 2>/dev/null || gosu cronator npm install --silent 2>/dev/null || true
+        fi
+
+        if gosu cronator npm run build:css 2>/dev/null; then
+            echo "CSS build completed"
+        else
+            echo "CSS build failed, continuing with bundled output.css"
+        fi
+    ) &
 fi
 
 # Switch to cronator user and execute the main command

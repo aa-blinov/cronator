@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
@@ -181,6 +182,33 @@ class TestStreamingSSE:
         assert len(done_events) == 1
 
     @pytest.mark.asyncio
+    async def test_stream_done_event_includes_completion_metadata(
+        self, test_client: AsyncClient, execution_factory, sample_script
+    ):
+        """event: done включает finished_at и duration для завершённого execution."""
+        finished_at = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
+        execution = await execution_factory(
+            script_id=sample_script.id,
+            status=ExecutionStatus.SUCCESS.value,
+            exit_code=0,
+            finished_at=finished_at,
+            duration_ms=5500,
+        )
+
+        async with test_client.stream("GET", f"/api/executions/{execution.id}/stream") as response:
+            raw = await response.aread()
+
+        events = parse_sse(raw)
+        done_events = [e for e in events if e.get("event") == "done"]
+
+        assert len(done_events) == 1
+        payload = json.loads(done_events[0]["data"])
+        assert payload["finished_at"] == finished_at.isoformat()
+        assert payload["finished_at_display"] == "2026-01-02 03:04:05 UTC"
+        assert payload["duration_ms"] == 5500
+        assert payload["duration_formatted"] == "5.5s"
+
+    @pytest.mark.asyncio
     async def test_stream_multiline_stdout_no_embedded_newlines_in_sse(
         self, test_client: AsyncClient, execution_factory, sample_script
     ):
@@ -269,3 +297,49 @@ class TestStreamingSSE:
                 await response.aread()
         finally:
             executions_module.executor_service.output_queues.pop(execution.id, None)
+
+    @pytest.mark.asyncio
+    async def test_stream_live_done_event_includes_completion_metadata(
+        self, test_client: AsyncClient, execution_factory, sample_script, db_session
+    ):
+        """Live queue path: done payload подтягивает финальные поля из БД."""
+        import app.api.executions as executions_module
+
+        finished_at = datetime(2026, 2, 3, 4, 5, 6, tzinfo=UTC)
+        execution = await execution_factory(
+            script_id=sample_script.id,
+            status=ExecutionStatus.RUNNING.value,
+            exit_code=None,
+            stdout="",
+            stderr="",
+        )
+
+        execution.status = ExecutionStatus.CANCELLED.value
+        execution.exit_code = 130
+        execution.finished_at = finished_at
+        execution.duration_ms = 2500
+        await db_session.commit()
+
+        queue: asyncio.Queue = asyncio.Queue()
+        await queue.put(("done", None))
+        executions_module.executor_service.output_queues[execution.id] = queue
+
+        try:
+            async with test_client.stream(
+                "GET", f"/api/executions/{execution.id}/stream"
+            ) as response:
+                raw = await response.aread()
+        finally:
+            executions_module.executor_service.output_queues.pop(execution.id, None)
+
+        events = parse_sse(raw)
+        done_events = [e for e in events if e.get("event") == "done"]
+
+        assert len(done_events) == 1
+        payload = json.loads(done_events[0]["data"])
+        assert payload["status"] == ExecutionStatus.CANCELLED.value
+        assert payload["exit_code"] == 130
+        assert payload["finished_at"] == finished_at.isoformat()
+        assert payload["finished_at_display"] == "2026-02-03 04:05:06 UTC"
+        assert payload["duration_ms"] == 2500
+        assert payload["duration_formatted"] == "2.5s"
