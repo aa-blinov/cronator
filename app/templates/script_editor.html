@@ -429,6 +429,7 @@
     // Script ID for API calls (read from form data attribute)
     const scriptForm = document.getElementById('script-form');
     let scriptId = scriptForm ? (scriptForm.dataset.scriptId || null) : null;
+    const restoredVersionToastKey = scriptId ? `script:${scriptId}:restored-version` : null;
     
     // Initialize CodeMirror
     const textarea = document.getElementById('code-editor');
@@ -522,6 +523,25 @@
         }
         
         return false;
+    }
+
+    function consumeRestoredVersionToast() {
+        if (!restoredVersionToastKey) return;
+
+        const raw = sessionStorage.getItem(restoredVersionToastKey);
+        if (!raw) return;
+
+        sessionStorage.removeItem(restoredVersionToastKey);
+
+        try {
+            const payload = JSON.parse(raw);
+            const message = payload?.needs_install
+                ? `Version ${payload.version_number} restored. Reinstall dependencies if needed.`
+                : `Version ${payload.version_number} restored.`;
+            window.showToast?.(message, payload?.needs_install ? 'warning' : 'success');
+        } catch {
+            window.showToast?.('Version restored.', 'success');
+        }
     }
     
     // === INLINE DIFF LOGIC ===
@@ -1622,7 +1642,7 @@ ${separator}
                     e.preventDefault();
                     e.stopPropagation();
                     const version = parseInt(btn.dataset.version);
-                    revertToVersion(version);
+                    revertToVersion(version, btn);
                 });
             });
             
@@ -1632,27 +1652,94 @@ ${separator}
         }
     }
     
-    async function revertToVersion(versionNumber) {
+    async function fetchVersionDetails(versionNumber) {
+        const response = await fetch(`/api/scripts/${scriptId}/versions/${versionNumber}`);
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || 'Failed to load version details');
+        }
+
+        return response.json();
+    }
+
+    function applyRestoredVersion(version) {
+        if (!version) return;
+
+        const form = document.getElementById('script-form');
+        if (!form) return;
+
+        editor.setValue(version.content || '');
+        editor.save();
+
+        form.elements.cron_expression.value = version.cron_expression || '0 * * * *';
+        form.elements.python_version.value = version.python_version || '3.12';
+        form.elements.timeout.value = version.timeout ?? 3600;
+        form.elements.dependencies.value = version.dependencies || '';
+        form.elements.environment_vars.value = version.environment_vars || '';
+
+        const changeSummary = document.getElementById('change-summary');
+        if (changeSummary) {
+            changeSummary.value = '';
+        }
+
+        originalDeps = version.dependencies || '';
+        lastInstallFailed = false;
+        retryBtn.style.display = 'none';
+        renderDiff({ added: [], removed: [], modified: [] });
+        updateDependencyButtonsState();
+        updateCronDescription(form.elements.cron_expression.value);
+
+        originalScriptData = collectFormData();
+    }
+
+    async function revertToVersion(versionNumber, triggerButton = null) {
         if (!confirm(`Restore script to version ${versionNumber}?\n\nThis will:\n- Replace current content with version ${versionNumber}\n- Create a new version with current state\n- Trigger dependency reinstall if needed`)) {
             return;
         }
-        
+
+        const originalButtonHtml = triggerButton?.innerHTML;
+        if (triggerButton) {
+            triggerButton.disabled = true;
+            triggerButton.innerHTML = '<span class="loading loading-spinner loading-xs"></span><span class="hidden sm:inline">Restoring</span>';
+        }
+
         try {
+            const version = await fetchVersionDetails(versionNumber);
             const response = await fetch(`/api/scripts/${scriptId}/revert/${versionNumber}`, {
                 method: 'POST'
             });
-            
-            if (!response.ok) throw new Error('Failed to revert');
-            
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.detail || 'Failed to revert');
+            }
+
             const result = await response.json();
-            window.showToast?.(result.message, 'success');
-            
-            // Reload page to show reverted content
-            setTimeout(() => window.location.reload(), 1000);
-            
+            applyRestoredVersion(version);
+            await loadVersionHistory();
+
+            appendBlockToConsole(
+                'Version Restore',
+                result.needs_install
+                    ? `${result.message}\nDependencies or Python version changed. Reinstall environment if needed.`
+                    : result.message,
+                result.needs_install ? 'info' : 'success'
+            );
+
+            window.showToast?.(
+                result.needs_install
+                    ? `${result.message}. Reinstall dependencies if needed.`
+                    : result.message,
+                result.needs_install ? 'warning' : 'success'
+            );
         } catch (err) {
             console.error('Failed to revert:', err);
-            window.showToast?.('Failed to revert to version', 'error');
+            window.showToast?.('Failed to revert to version: ' + err.message, 'error');
+        } finally {
+            if (triggerButton?.isConnected) {
+                triggerButton.disabled = false;
+                triggerButton.innerHTML = originalButtonHtml;
+            }
         }
     }
     
@@ -1817,6 +1904,8 @@ ${separator}
                 updateCronDescription(e.target.value);
             });
         }
+
+        consumeRestoredVersionToast();
     });
     
     // Load versions on page load for editing
