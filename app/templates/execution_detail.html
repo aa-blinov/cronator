@@ -190,20 +190,21 @@
     // Convert JSON logs to formatted HTML
     function formatJsonLogs(text) {
         const levelColors = {
-            'DEBUG': '#6b7280',
-            'INFO': '#10b981',
-            'WARNING': '#f59e0b',
-            'ERROR': '#ef4444',
-            'CRITICAL': '#dc2626'
+            'DEBUG':    '#6b7280',
+            'INFO':     '#10b981',
+            'WARNING':  '#f59e0b',
+            'ERROR':    '#ef4444',
+            'CRITICAL': '#dc2626',
+            'TIMER':    '#60a5fa',
+            'NOTIFY':   '#a78bfa',
         };
-        
+
         const lines = text.split('\n');
         const formatted = [];
-        
+
         for (const line of lines) {
             if (!line.trim()) {
-                formatted.push('');
-                continue;
+                continue;  // пропускаем пустые строки — не добавляем лишние <br>
             }
             
             try {
@@ -465,12 +466,16 @@
         if (stderrLog) stderrLog.textContent = '';
         
         eventSource = new EventSource(`/api/executions/${execId}/stream`);
-        
-        eventSource.onmessage = (event) => {
-            // Default messages go to stdout
+
+        eventSource.addEventListener('stdout', (event) => {
             const formatted = formatJsonLogs(event.data);
-            appendToLog('stdout-log', formatted + '<br>');
-        };
+            if (formatted) appendToLog('stdout-log', formatted + '<br>');
+        });
+
+        eventSource.addEventListener('stderr', (event) => {
+            const formatted = formatJsonLogs(event.data);
+            if (formatted) appendToLog('stderr-log', formatted + '<br>');
+        });
         
         eventSource.addEventListener('done', (event) => {
             eventSource.close();
