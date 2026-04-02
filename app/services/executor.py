@@ -314,10 +314,15 @@ class ExecutorService:
                                             payload = message[marker_idx + len("CRONATOR_NOTIFY:"):].strip()
                                             if "|" in payload:
                                                 notify_title, notify_body = payload.split("|", 1)
+                                                notify_title = notify_title.strip()
+                                                notify_body = notify_body.strip()
+                                                # Custom title — show it explicitly
+                                                display_msg = f"[notify] {notify_title}: {notify_body}"
                                             else:
-                                                notify_title, notify_body = script.name, payload
-                                            notify_title = notify_title.strip()
-                                            notify_body = notify_body.strip()
+                                                notify_title = script.name
+                                                notify_body = payload.strip()
+                                                # No custom title — just the message
+                                                display_msg = f"[notify] {notify_body}"
                                             asyncio.create_task(
                                                 self._send_manual_alert(
                                                     execution_id,
@@ -325,14 +330,11 @@ class ExecutorService:
                                                     notify_body,
                                                 )
                                             )
-                                            # Replace raw marker with a JSON log entry
-                                            # matching CronatorFormatter so UI renders
-                                            # it with timestamp and level like other logs
                                             from datetime import UTC, datetime
                                             log_line = json.dumps({
                                                 "timestamp": datetime.now(UTC).isoformat(),
                                                 "level": "NOTIFY",
-                                                "message": f"[notify → {notify_title}] {notify_body}",
+                                                "message": display_msg,
                                                 "logger": "cronator.notify",
                                             }) + "\n"
                                             stdout_lines.append(log_line)
