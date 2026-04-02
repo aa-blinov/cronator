@@ -325,10 +325,18 @@ class ExecutorService:
                                                     notify_body,
                                                 )
                                             )
-                                            # Replace raw marker with a clean log line
-                                            pretty = f"[notify → {notify_title}] {notify_body}\n"
-                                            stdout_lines.append(pretty)
-                                            await output_queue.put(("stdout", pretty))
+                                            # Replace raw marker with a JSON log entry
+                                            # matching CronatorFormatter so UI renders
+                                            # it with timestamp and level like other logs
+                                            from datetime import UTC, datetime
+                                            log_line = json.dumps({
+                                                "timestamp": datetime.now(UTC).isoformat(),
+                                                "level": "NOTIFY",
+                                                "message": f"[notify → {notify_title}] {notify_body}",
+                                                "logger": "cronator.notify",
+                                            }) + "\n"
+                                            stdout_lines.append(log_line)
+                                            await output_queue.put(("stdout", log_line))
                                     except Exception as e:
                                         logger.warning(f"Failed to parse notify marker: {e}")
 
