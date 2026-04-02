@@ -2,6 +2,7 @@
 {% import "icons.html" as icons %}
 
 {% block content %}
+<div id="dashboard-refresh-root">
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
     <div class="stat-card glass-card rounded-xl p-6">
@@ -173,33 +174,106 @@
     </div>
     {% endif %}
 </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
 (() => {
-    const input = document.getElementById('script-filter');
-    if (!input) return;
-
     const storageKey = 'dashboardScriptFilter';
-    input.value = localStorage.getItem(storageKey) || '';
+    let dashboardRefreshInterval = null;
 
-    const rows = Array.from(document.querySelectorAll('tbody tr[data-search]'));
+    function getFilterInput() {
+        return document.getElementById('script-filter');
+    }
+
+    function getFilterRows() {
+        return Array.from(document.querySelectorAll('#dashboard-refresh-root tbody tr[data-search]'));
+    }
 
     function applyFilter() {
+        const input = getFilterInput();
+        if (!input) return;
+
         const q = (input.value || '').trim().toLowerCase();
-        for (const row of rows) {
+        for (const row of getFilterRows()) {
             const haystack = row.dataset.search || '';
             row.style.display = !q || haystack.includes(q) ? '' : 'none';
         }
     }
 
-    input.addEventListener('input', () => {
-        localStorage.setItem(storageKey, input.value);
+    function bindFilter() {
+        const input = getFilterInput();
+        if (!input) return;
+
+        input.value = localStorage.getItem(storageKey) || '';
+        input.oninput = () => {
+            localStorage.setItem(storageKey, input.value);
+            applyFilter();
+        };
+
         applyFilter();
+    }
+
+    function hasRunningRows() {
+        return document.querySelector('#dashboard-refresh-root .status-badge.running') !== null;
+    }
+
+    function restartDashboardRefresh() {
+        if (dashboardRefreshInterval) {
+            clearInterval(dashboardRefreshInterval);
+            dashboardRefreshInterval = null;
+        }
+
+        if (hasRunningRows()) {
+            dashboardRefreshInterval = setInterval(refreshDashboardContent, 5000);
+        }
+    }
+
+    async function refreshDashboardContent() {
+        try {
+            const response = await fetch(window.location.pathname, {
+                headers: { 'X-Refresh-Only': 'true' }
+            });
+            if (!response.ok) return;
+
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newRoot = doc.getElementById('dashboard-refresh-root');
+            const currentRoot = document.getElementById('dashboard-refresh-root');
+
+            if (!newRoot || !currentRoot) return;
+
+            if (currentRoot.innerHTML !== newRoot.innerHTML) {
+                currentRoot.innerHTML = newRoot.innerHTML;
+            }
+
+            bindFilter();
+            restartDashboardRefresh();
+        } catch (err) {
+            console.error('Failed to refresh dashboard:', err);
+        }
+    }
+
+    bindFilter();
+    restartDashboardRefresh();
+
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            void refreshDashboardContent();
+            return;
+        }
+
+        bindFilter();
+        restartDashboardRefresh();
     });
 
-    applyFilter();
+    window.addEventListener('beforeunload', () => {
+        if (dashboardRefreshInterval) {
+            clearInterval(dashboardRefreshInterval);
+        }
+    });
 })();
 </script>
 {% endblock %}

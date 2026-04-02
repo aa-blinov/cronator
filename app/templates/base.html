@@ -150,16 +150,6 @@
             setTimeout(remove, timeoutMs);
         }
 
-        // Auto-refresh for running executions
-        function checkForUpdates() {
-            const runningElements = document.querySelectorAll('.status-running, [data-status="running"]');
-            if (runningElements.length > 0) {
-                setTimeout(() => location.reload(), 5000);
-            }
-        }
-        
-        document.addEventListener('DOMContentLoaded', checkForUpdates);
-        
         // Confirm dangerous actions
         document.querySelectorAll('[data-confirm]').forEach(el => {
             el.addEventListener('click', (e) => {

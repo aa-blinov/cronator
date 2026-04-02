@@ -45,107 +45,174 @@ function removeEmptyParams(event) {
 </script>
 
 <!-- Executions Table -->
-<div class="glass-card rounded-xl overflow-hidden">
-    {% if executions %}
-    <div class="overflow-x-auto">
-        <table class="table w-full">
-            <thead>
-                <tr class="border-b border-gray-700/50">
-                    <th class="bg-transparent">ID</th>
-                    <th class="bg-transparent">Script</th>
-                    <th class="bg-transparent">Status</th>
-                    <th class="bg-transparent">Started</th>
-                    <th class="bg-transparent">Duration</th>
-                    <th class="bg-transparent">Exit Code</th>
-                    <th class="bg-transparent">Triggered By</th>
-                    <th class="bg-transparent">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for exec in executions %}
-                <tr class="border-b border-gray-700/30 hover:bg-white/5" {% if exec.status == 'running' %}data-status="running"{% endif %}>
-                    <td>
-                        <a href="/executions/{{ exec.id }}" class="text-indigo-400 hover:underline">#{{ exec.id }}</a>
-                    </td>
-                    <td>
-                        <a href="/scripts/{{ exec.script_id }}" class="hover:text-indigo-400">
-                            {{ exec.script.name if exec.script else 'Unknown' }}
-                        </a>
-                    </td>
-                    <td>
-                        <span class="status-badge {{ exec.status }}">
-                            {% if exec.status == 'running' %}
-                                <span class="pulse-dot"></span>
-                            {% endif %}
-                            {{ exec.status }}
-                        </span>
-                    </td>
-                    <td>{{ exec.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                    <td>{{ exec.duration_formatted }}</td>
-                    <td>
-                        {% if exec.exit_code is not none %}
-                            <code class="{% if exec.exit_code == 0 %}text-green-400{% else %}text-red-400{% endif %}">{{ exec.exit_code }}</code>
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span class="badge badge-ghost badge-sm">{{ exec.triggered_by }}</span>
-                    </td>
-                    <td>
-                        <div class="flex items-center gap-2">
-                            <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">View Logs</a>
-                            {% if exec.artifacts_count > 0 %}
-                            <span class="badge badge-sm gap-1 flex items-center" title="{{ exec.artifacts_count }} artifact(s)">
-                                {{ icons.archive_box("w-3 h-3") }} {{ exec.artifacts_count }}
+<div id="executions-refresh-root">
+    <div class="glass-card rounded-xl overflow-hidden">
+        {% if executions %}
+        <div class="overflow-x-auto">
+            <table class="table w-full">
+                <thead>
+                    <tr class="border-b border-gray-700/50">
+                        <th class="bg-transparent">ID</th>
+                        <th class="bg-transparent">Script</th>
+                        <th class="bg-transparent">Status</th>
+                        <th class="bg-transparent">Started</th>
+                        <th class="bg-transparent">Duration</th>
+                        <th class="bg-transparent">Exit Code</th>
+                        <th class="bg-transparent">Triggered By</th>
+                        <th class="bg-transparent">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exec in executions %}
+                    <tr class="border-b border-gray-700/30 hover:bg-white/5" {% if exec.status == 'running' %}data-status="running"{% endif %}>
+                        <td>
+                            <a href="/executions/{{ exec.id }}" class="text-indigo-400 hover:underline">#{{ exec.id }}</a>
+                        </td>
+                        <td>
+                            <a href="/scripts/{{ exec.script_id }}" class="hover:text-indigo-400">
+                                {{ exec.script.name if exec.script else 'Unknown' }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="status-badge {{ exec.status }}">
+                                {% if exec.status == 'running' %}
+                                    <span class="pulse-dot"></span>
+                                {% endif %}
+                                {{ exec.status }}
                             </span>
+                        </td>
+                        <td>{{ exec.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>{{ exec.duration_formatted }}</td>
+                        <td>
+                            {% if exec.exit_code is not none %}
+                                <code class="{% if exec.exit_code == 0 %}text-green-400{% else %}text-red-400{% endif %}">{{ exec.exit_code }}</code>
+                            {% else %}
+                                -
                             {% endif %}
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    
-    <!-- Pagination -->
-    {% if pagination.pages > 1 %}
-    <div class="px-6 py-4 border-t border-gray-700/50 flex items-center justify-between">
-        <p class="text-sm text-gray-400">
-            Showing {{ (pagination.page - 1) * pagination.per_page + 1 }} - {{ [pagination.page * pagination.per_page, pagination.total] | min }} of {{ pagination.total }}
-        </p>
-        <div class="join">
-            {% set filter_params = [] %}
-            {% if filters.script_id %}{% set _ = filter_params.append('script_id=' ~ filters.script_id) %}{% endif %}
-            {% if filters.status %}{% set _ = filter_params.append('status=' ~ filters.status) %}{% endif %}
-            {% set filter_query = '&' ~ filter_params|join('&') if filter_params else '' %}
-            
-            {% if pagination.page > 1 %}
-            <a href="?page={{ pagination.page - 1 }}{{ filter_query }}" class="join-item btn btn-sm">«</a>
-            {% endif %}
-            
-            {% for p in range(1, pagination.pages + 1) %}
-                {% if p == pagination.page %}
-                    <button class="join-item btn btn-sm btn-active">{{ p }}</button>
-                {% elif p <= 3 or p > pagination.pages - 2 or (p >= pagination.page - 1 and p <= pagination.page + 1) %}
-                    <a href="?page={{ p }}{{ filter_query }}" class="join-item btn btn-sm">{{ p }}</a>
-                {% elif p == 4 or p == pagination.pages - 2 %}
-                    <button class="join-item btn btn-sm btn-disabled">...</button>
-                {% endif %}
-            {% endfor %}
-            
-            {% if pagination.page < pagination.pages %}
-            <a href="?page={{ pagination.page + 1 }}{{ filter_query }}" class="join-item btn btn-sm">»</a>
-            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge badge-ghost badge-sm">{{ exec.triggered_by }}</span>
+                        </td>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">View Logs</a>
+                                {% if exec.artifacts_count > 0 %}
+                                <span class="badge badge-sm gap-1 flex items-center" title="{{ exec.artifacts_count }} artifact(s)">
+                                    {{ icons.archive_box("w-3 h-3") }} {{ exec.artifacts_count }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
+        
+        <!-- Pagination -->
+        {% if pagination.pages > 1 %}
+        <div class="px-6 py-4 border-t border-gray-700/50 flex items-center justify-between">
+            <p class="text-sm text-gray-400">
+                Showing {{ (pagination.page - 1) * pagination.per_page + 1 }} - {{ [pagination.page * pagination.per_page, pagination.total] | min }} of {{ pagination.total }}
+            </p>
+            <div class="join">
+                {% set filter_params = [] %}
+                {% if filters.script_id %}{% set _ = filter_params.append('script_id=' ~ filters.script_id) %}{% endif %}
+                {% if filters.status %}{% set _ = filter_params.append('status=' ~ filters.status) %}{% endif %}
+                {% set filter_query = '&' ~ filter_params|join('&') if filter_params else '' %}
+                
+                {% if pagination.page > 1 %}
+                <a href="?page={{ pagination.page - 1 }}{{ filter_query }}" class="join-item btn btn-sm">«</a>
+                {% endif %}
+                
+                {% for p in range(1, pagination.pages + 1) %}
+                    {% if p == pagination.page %}
+                        <button class="join-item btn btn-sm btn-active">{{ p }}</button>
+                    {% elif p <= 3 or p > pagination.pages - 2 or (p >= pagination.page - 1 and p <= pagination.page + 1) %}
+                        <a href="?page={{ p }}{{ filter_query }}" class="join-item btn btn-sm">{{ p }}</a>
+                    {% elif p == 4 or p == pagination.pages - 2 %}
+                        <button class="join-item btn btn-sm btn-disabled">...</button>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if pagination.page < pagination.pages %}
+                <a href="?page={{ pagination.page + 1 }}{{ filter_query }}" class="join-item btn btn-sm">»</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="p-12 text-center">
+            {{ icons.inbox("w-20 h-20 mb-4 opacity-50 mx-auto") }}
+            <h3 class="text-xl font-medium text-gray-400 mb-2">No executions found</h3>
+            <p class="text-gray-500">{% if filters.script_id or filters.status %}Try adjusting your filters{% else %}Run a script to see execution history{% endif %}</p>
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
-    {% else %}
-    <div class="p-12 text-center">
-        {{ icons.inbox("w-20 h-20 mb-4 opacity-50 mx-auto") }}
-        <h3 class="text-xl font-medium text-gray-400 mb-2">No executions found</h3>
-        <p class="text-gray-500">{% if filters.script_id or filters.status %}Try adjusting your filters{% else %}Run a script to see execution history{% endif %}</p>
-    </div>
-    {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(() => {
+    let executionsRefreshInterval = null;
+
+    function hasRunningRows() {
+        return document.querySelector('#executions-refresh-root [data-status="running"]') !== null;
+    }
+
+    function restartExecutionsRefresh() {
+        if (executionsRefreshInterval) {
+            clearInterval(executionsRefreshInterval);
+            executionsRefreshInterval = null;
+        }
+
+        if (hasRunningRows()) {
+            executionsRefreshInterval = setInterval(refreshExecutionsContent, 5000);
+        }
+    }
+
+    async function refreshExecutionsContent() {
+        try {
+            const response = await fetch(`${window.location.pathname}${window.location.search}`, {
+                headers: { 'X-Refresh-Only': 'true' }
+            });
+            if (!response.ok) return;
+
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newRoot = doc.getElementById('executions-refresh-root');
+            const currentRoot = document.getElementById('executions-refresh-root');
+
+            if (!newRoot || !currentRoot) return;
+
+            if (currentRoot.innerHTML !== newRoot.innerHTML) {
+                currentRoot.innerHTML = newRoot.innerHTML;
+            }
+
+            restartExecutionsRefresh();
+        } catch (err) {
+            console.error('Failed to refresh executions list:', err);
+        }
+    }
+
+    restartExecutionsRefresh();
+
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            void refreshExecutionsContent();
+            return;
+        }
+
+        restartExecutionsRefresh();
+    });
+
+    window.addEventListener('beforeunload', () => {
+        if (executionsRefreshInterval) {
+            clearInterval(executionsRefreshInterval);
+        }
+    });
+})();
+</script>
 {% endblock %}
