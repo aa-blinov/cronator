@@ -222,12 +222,14 @@ class TestNotify:
         out = capsys.readouterr().out
         assert "export done: 500 rows" in out
 
-    def test_default_title_is_script_name(self, capsys):
-        """По умолчанию заголовок = CRONATOR_SCRIPT_NAME."""
-        with patch.dict(os.environ, {"CRONATOR_SCRIPT_NAME": "my_script"}):
-            notify("hello")
+    def test_without_explicit_title_no_pipe_in_payload(self, capsys):
+        """Без явного title — payload не содержит | (только сообщение)."""
+        notify("hello")
         out = capsys.readouterr().out
-        assert "my_script" in out
+        marker_idx = out.find("CRONATOR_NOTIFY:")
+        payload = out[marker_idx + len("CRONATOR_NOTIFY:"):].strip()
+        assert "|" not in payload
+        assert payload == "hello"
 
     def test_custom_title_used_when_provided(self, capsys):
         """Кастомный title включается в вывод."""
@@ -263,10 +265,10 @@ class TestNotify:
             _, kwargs = mock_print.call_args
             assert kwargs.get("flush") is True
 
-    def test_without_script_name_env(self, capsys):
-        """Без CRONATOR_SCRIPT_NAME — fallback на 'cronator_script'."""
+    def test_without_script_name_env_message_still_sent(self, capsys):
+        """Без CRONATOR_SCRIPT_NAME — сообщение всё равно отправляется."""
         env = {k: v for k, v in os.environ.items() if k != "CRONATOR_SCRIPT_NAME"}
         with patch.dict(os.environ, env, clear=True):
             notify("msg")
         out = capsys.readouterr().out
-        assert "cronator_script" in out
+        assert "CRONATOR_NOTIFY:msg" in out
