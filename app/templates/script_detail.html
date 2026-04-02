@@ -64,9 +64,9 @@ function deleteScript(scriptId) {
                 <p class="text-gray-400 text-sm">Status</p>
                 <p>
                     {% if script.enabled %}
-                        <span class="badge badge-success">Enabled</span>
+                        <span id="script-enabled-badge" class="badge badge-success">Enabled</span>
                     {% else %}
-                        <span class="badge badge-ghost">Disabled</span>
+                        <span id="script-enabled-badge" class="badge badge-ghost">Disabled</span>
                     {% endif %}
                 </p>
             </div>
@@ -84,7 +84,7 @@ function deleteScript(scriptId) {
             </div>
             <div>
                 <p class="text-gray-400 text-sm">Next Run</p>
-                <p>{% if next_run %}{{ next_run.strftime('%Y-%m-%d %H:%M:%S UTC') }}{% else %}-{% endif %}</p>
+                <p id="script-next-run">{% if next_run %}{{ next_run.strftime('%Y-%m-%d %H:%M:%S UTC') }}{% else %}-{% endif %}</p>
             </div>
             <div class="col-span-2">
                 <p class="text-gray-400 text-sm">Path</p>
@@ -261,7 +261,53 @@ function deleteScript(scriptId) {
 <script>
 const scriptId = {{ script.id }};
 const playIcon = `{{ icons.play("w-4 h-4") }}`.trim();
+const pauseIcon = `{{ icons.pause("w-4 h-4") }}`.trim();
 const justStartedExecutionKey = `script:${scriptId}:just-started-execution`;
+
+function formatUtcDateTime(value) {
+    if (!value) return '-';
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    const pad = (part) => String(part).padStart(2, '0');
+    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())} UTC`;
+}
+
+function applyScriptState(script) {
+    if (!script) return;
+
+    const statusBadge = document.getElementById('script-enabled-badge');
+    if (statusBadge) {
+        statusBadge.className = script.enabled ? 'badge badge-success' : 'badge badge-ghost';
+        statusBadge.textContent = script.enabled ? 'Enabled' : 'Disabled';
+    }
+
+    const nextRunEl = document.getElementById('script-next-run');
+    if (nextRunEl) {
+        nextRunEl.textContent = script.enabled ? formatUtcDateTime(script.next_run_at) : '-';
+    }
+
+    const toggleBtn = document.getElementById('toggle-btn');
+    if (toggleBtn) {
+        toggleBtn.innerHTML = script.enabled
+            ? `${pauseIcon} Disable`
+            : `${playIcon} Enable`;
+    }
+}
+
+async function refreshScriptState() {
+    const response = await fetch(`/api/scripts/${scriptId}`);
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+    }
+
+    const script = await response.json();
+    applyScriptState(script);
+    return script;
+}
 
 function getShowTestsPreference() {
     return localStorage.getItem('showTestRuns') === 'true';
@@ -411,8 +457,10 @@ document.getElementById('toggle-btn')?.addEventListener('click', async () => {
         const response = await fetch(`/api/scripts/${scriptId}/toggle`, { method: 'POST' });
         
         if (response.ok) {
-            window.showToast?.('Script toggled', 'success');
-            setTimeout(() => window.location.reload(), 2800);
+            const result = await response.json();
+            await refreshScriptState();
+            window.showToast?.(result.enabled ? 'Script enabled' : 'Script disabled', 'success');
+            btn.disabled = false;
         } else {
             const error = await response.json();
             window.showToast?.(error.detail || 'Failed to toggle script', 'error');

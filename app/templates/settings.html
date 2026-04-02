@@ -20,19 +20,19 @@
         <div class="space-y-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
                 <span class="text-base-content/60">App Name</span>
-                <span>{{ settings.app_name }}</span>
+                <span id="settings-app-name">{{ settings.app_name }}</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
                 <span class="text-base-content/60">Scripts Directory</span>
-                <code class="text-xs">{{ settings.scripts_dir }}</code>
+                <code id="settings-scripts-dir" class="text-xs">{{ settings.scripts_dir }}</code>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
                 <span class="text-base-content/60">Environments Directory</span>
-                <code class="text-xs">{{ settings.envs_dir }}</code>
+                <code id="settings-envs-dir" class="text-xs">{{ settings.envs_dir }}</code>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
                 <span class="text-base-content/60">Default Timeout</span>
-                <span>{{ settings.default_timeout }}s</span>
+                <span id="settings-default-timeout">{{ settings.default_timeout }}s</span>
             </div>
         </div>
     </div>
@@ -41,7 +41,7 @@
     <div class="glass-card rounded-xl p-6">
         <h3 class="text-lg font-semibold mb-4">Email Alerts</h3>
         
-        <div class="space-y-4">
+        <div id="settings-email-summary" class="space-y-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
                 <span class="text-base-content/60">SMTP Enabled</span>
                 {% if settings.smtp_enabled %}
@@ -191,10 +191,88 @@
 
 {% block extra_scripts %}
 <script>
+    const mailIcon = `{{ icons.envelope("w-4 h-4") }}`.trim();
+
     // Load artifacts stats on page load
     window.addEventListener('DOMContentLoaded', async () => {
         await loadArtifactsStats();
     });
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text ?? '';
+        return div.innerHTML;
+    }
+
+    function applySettingsSummary(settings) {
+        if (!settings) return;
+
+        document.getElementById('settings-app-name').textContent = settings.app_name || '-';
+        document.getElementById('settings-scripts-dir').textContent = settings.scripts_dir || '-';
+        document.getElementById('settings-envs-dir').textContent = settings.envs_dir || '-';
+        document.getElementById('settings-default-timeout').textContent = `${settings.default_timeout}s`;
+
+        const emailSummary = document.getElementById('settings-email-summary');
+        if (!emailSummary) return;
+
+        const smtpEnabledBadge = settings.smtp_enabled
+            ? '<span class="badge badge-success">Enabled</span>'
+            : '<span class="badge badge-ghost">Disabled</span>';
+
+        const smtpDetails = settings.smtp_enabled
+            ? `
+                <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                    <span class="text-base-content/60">SMTP Host</span>
+                    <code class="text-xs">${escapeHtml(settings.smtp_host)}:${escapeHtml(String(settings.smtp_port))}</code>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                    <span class="text-base-content/60">Alert Email</span>
+                    <span>${escapeHtml(settings.alert_email || 'Not configured')}</span>
+                </div>
+                <div class="mt-4">
+                    <button onclick="testEmail()" class="btn btn-sm btn-outline gap-2">
+                        ${mailIcon} Send Test Email
+                    </button>
+                </div>
+            `
+            : '';
+
+        emailSummary.innerHTML = `
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">SMTP Enabled</span>
+                ${smtpEnabledBadge}
+            </div>
+            ${smtpDetails}
+        `;
+    }
+
+    function syncSettingsForm(settings) {
+        if (!settings) return;
+
+        const form = document.getElementById('settings-form');
+        if (!form) return;
+
+        form.elements.smtp_enabled.checked = Boolean(settings.smtp_enabled);
+        form.elements.smtp_host.value = settings.smtp_host || '';
+        form.elements.smtp_port.value = settings.smtp_port ?? '';
+        form.elements.smtp_user.value = settings.smtp_user || '';
+        form.elements.smtp_password.value = '';
+        form.elements.smtp_from.value = settings.smtp_from || '';
+        form.elements.alert_email.value = settings.alert_email || '';
+        form.elements.default_timeout.value = settings.default_timeout ?? '';
+    }
+
+    async function refreshSettingsSummary() {
+        const response = await fetch('/api/settings');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const settings = await response.json();
+        applySettingsSummary(settings);
+        syncSettingsForm(settings);
+        return settings;
+    }
     
     async function loadArtifactsStats() {
         try {
@@ -270,8 +348,8 @@
             
             if (result.success) {
                 closeEditModal();
+                await refreshSettingsSummary();
                 window.showToast?.('Settings saved', 'success');
-                setTimeout(() => location.reload(), 2800);
             } else {
                 window.showToast?.(result.message || 'Failed to save settings', 'error');
             }
@@ -295,8 +373,7 @@
             const response = await fetch('/api/settings/reload-scheduler', { method: 'POST' });
             const data = await response.json();
             const msg = (data.message || 'Scheduler reloaded') + (typeof data.job_count === 'number' ? ` (${data.job_count} jobs)` : '');
-            window.showToast?.(msg, data.success ? 'success' : 'warning');
-            if (data.success) setTimeout(() => location.reload(), 2800);
+            window.showToast?.(msg, response.ok ? 'success' : 'warning');
         } catch (err) {
             window.showToast?.(err.message || 'Failed to reload scheduler', 'error');
         }
