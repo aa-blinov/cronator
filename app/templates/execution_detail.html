@@ -70,14 +70,12 @@
             </div>
         </div>
         
-        {% if execution.error_message %}
-        <div class="mt-6">
+        <div id="execution-error-message-section" class="mt-6{% if not execution.error_message %} hidden{% endif %}">
             <p class="text-base-content/60 text-sm mb-2">Error Message</p>
             <div class="bg-red-900/30 border border-red-500/30 rounded-lg p-4">
-                <pre class="text-red-300 text-sm whitespace-pre-wrap">{{ execution.error_message }}</pre>
+                <pre id="execution-error-message-text" class="text-red-300 text-sm whitespace-pre-wrap">{{ execution.error_message or '' }}</pre>
             </div>
         </div>
-        {% endif %}
     </div>
     
     <!-- Quick Stats -->
@@ -391,6 +389,21 @@
         durationMsRow.classList.remove('hidden');
     }
 
+    function updateExecutionErrorMessage(errorMessage) {
+        const errorSection = document.getElementById('execution-error-message-section');
+        const errorTextEl = document.getElementById('execution-error-message-text');
+        if (!errorSection || !errorTextEl) return;
+
+        if (!errorMessage) {
+            errorTextEl.textContent = '';
+            errorSection.classList.add('hidden');
+            return;
+        }
+
+        errorTextEl.textContent = errorMessage;
+        errorSection.classList.remove('hidden');
+    }
+
     function applyExecutionCompletion(data) {
         if (!data) return;
 
@@ -398,7 +411,44 @@
         updateExecutionExitCode(data.exit_code);
         updateExecutionFinishedAt(data.finished_at, data.finished_at_display);
         updateExecutionDuration(data.duration_formatted, data.duration_ms);
-        document.getElementById('cancel-exec-btn')?.remove();
+        if (data.status && data.status !== 'running') {
+            document.getElementById('cancel-exec-btn')?.remove();
+        }
+    }
+
+    function applyExecutionDetails(data) {
+        if (!data) return;
+
+        applyExecutionCompletion({
+            status: data.status,
+            exit_code: data.exit_code,
+            finished_at: data.finished_at,
+            finished_at_display: formatUtcTimestamp(data.finished_at),
+            duration_ms: data.duration_ms,
+            duration_formatted: data.duration_formatted,
+        });
+        updateExecutionErrorMessage(data.error_message);
+    }
+
+    async function refreshExecutionDetails(options = {}) {
+        const { showErrorToast = false } = options;
+
+        try {
+            const response = await fetch(`/api/executions/${execId}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const execution = await response.json();
+            applyExecutionDetails(execution);
+            return execution;
+        } catch (err) {
+            console.error('Failed to refresh execution details:', err);
+            if (showErrorToast) {
+                window.showToast?.('Failed to refresh execution details', 'error');
+            }
+            return null;
+        }
     }
 
     // Cancel (AJAX, stay on page)
@@ -591,7 +641,7 @@
     function startStreaming() {
         if (!isRunning) return;
 
-        // Track whether 'done' was received so onerror doesn't trigger a second reload
+        // Track whether 'done' was received so onerror doesn't trigger duplicate recovery.
         let doneReceived = false;
 
         const liveBadge = document.getElementById('sse-live-badge');
@@ -622,6 +672,7 @@
             finalizeLogPlaceholder('stdout-log', 'stdout-char-count', 'No output');
             finalizeLogPlaceholder('stderr-log', 'stderr-char-count', 'No errors');
             applyExecutionCompletion(data);
+            void refreshExecutionDetails();
             loadArtifacts();
 
             const toastType = data.status === 'success'
@@ -633,7 +684,7 @@
         });
 
         eventSource.onerror = (error) => {
-            // EventSource fires onerror on normal close (after done) — ignore that case
+            // EventSource fires onerror on normal close (after done) — ignore that case.
             if (doneReceived) return;
 
             console.error('SSE Error:', error);
@@ -643,8 +694,19 @@
             }
             if (liveBadge) liveBadge.classList.add('hidden');
 
-            // Reload to check if execution finished while we were disconnected
-            setTimeout(() => location.reload(), 3000);
+            setTimeout(async () => {
+                const execution = await refreshExecutionDetails({ showErrorToast: true });
+                if (!execution) return;
+
+                if (execution.status !== 'running') {
+                    finalizeLogPlaceholder('stdout-log', 'stdout-char-count', 'No output');
+                    finalizeLogPlaceholder('stderr-log', 'stderr-char-count', 'No errors');
+                    loadArtifacts();
+                    return;
+                }
+
+                startStreaming();
+            }, 3000);
         };
 
         // Show live indicator once connection is open
