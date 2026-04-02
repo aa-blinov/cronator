@@ -29,7 +29,7 @@
             </div>
             <div>
                 <p class="text-base-content/60 text-sm">Status</p>
-                <span class="status-badge {{ execution.status }}">
+                <span id="execution-status-badge" class="status-badge {{ execution.status }}">
                     {% if execution.status == 'running' %}
                         <span class="pulse-dot"></span>
                     {% endif %}
@@ -38,7 +38,7 @@
             </div>
             <div>
                 <p class="text-base-content/60 text-sm">Exit Code</p>
-                <p>
+                <p id="execution-exit-code">
                     {% if execution.exit_code is not none %}
                         <code class="{% if execution.exit_code == 0 %}text-success{% else %}text-error{% endif %} text-lg">{{ execution.exit_code }}</code>
                     {% else %}
@@ -52,7 +52,7 @@
             </div>
             <div>
                 <p class="text-base-content/60 text-sm">Finished At</p>
-                <p>
+                <p id="execution-finished-at">
                     {% if execution.finished_at %}
                         {{ execution.finished_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}
                     {% else %}
@@ -62,7 +62,7 @@
             </div>
             <div>
                 <p class="text-base-content/60 text-sm">Duration</p>
-                <p class="text-lg font-medium">{{ execution.duration_formatted }}</p>
+                <p id="execution-duration" class="text-lg font-medium">{{ execution.duration_formatted }}</p>
             </div>
             <div>
                 <p class="text-base-content/60 text-sm">Triggered By</p>
@@ -93,12 +93,10 @@
                 <span class="text-base-content/60">Script ID</span>
                 <code>{{ execution.script_id }}</code>
             </div>
-            {% if execution.duration_ms %}
-            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+            <div id="execution-duration-ms-row" class="flex items-center justify-between p-3 bg-base-200 rounded-lg{% if execution.duration_ms is none %} hidden{% endif %}">
                 <span class="text-base-content/60">Duration (ms)</span>
-                <code>{{ execution.duration_ms }}</code>
+                <code id="execution-duration-ms">{% if execution.duration_ms is not none %}{{ execution.duration_ms }}{% endif %}</code>
             </div>
-            {% endif %}
         </div>
     </div>
 </div>
@@ -297,6 +295,99 @@
 
     const execId = {{ execution.id }};
 
+    function formatUtcTimestamp(value) {
+        if (!value) return null;
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+
+        const pad = (part) => String(part).padStart(2, '0');
+        return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())} UTC`;
+    }
+
+    function formatDuration(durationMs) {
+        if (durationMs === null || durationMs === undefined) {
+            return '-';
+        }
+
+        const seconds = durationMs / 1000;
+        if (seconds < 60) {
+            return `${seconds.toFixed(1)}s`;
+        }
+        if (seconds < 3600) {
+            return `${(seconds / 60).toFixed(1)}m`;
+        }
+        return `${(seconds / 3600).toFixed(1)}h`;
+    }
+
+    function updateExecutionStatus(status) {
+        const statusBadge = document.getElementById('execution-status-badge');
+        if (!statusBadge || !status) return;
+
+        statusBadge.className = `status-badge ${status}`;
+        statusBadge.innerHTML = status === 'running'
+            ? `<span class="pulse-dot"></span><span>${escapeHtml(status)}</span>`
+            : `<span>${escapeHtml(status)}</span>`;
+    }
+
+    function updateExecutionExitCode(exitCode) {
+        const exitCodeEl = document.getElementById('execution-exit-code');
+        if (!exitCodeEl) return;
+
+        if (exitCode === null || exitCode === undefined) {
+            exitCodeEl.innerHTML = '<span class="text-base-content/50">-</span>';
+            return;
+        }
+
+        const codeClass = exitCode === 0 ? 'text-success' : 'text-error';
+        exitCodeEl.innerHTML = `<code class="${codeClass} text-lg">${escapeHtml(String(exitCode))}</code>`;
+    }
+
+    function updateExecutionFinishedAt(finishedAt, displayValue) {
+        const finishedAtEl = document.getElementById('execution-finished-at');
+        if (!finishedAtEl) return;
+
+        const formattedValue = displayValue || formatUtcTimestamp(finishedAt);
+        if (formattedValue) {
+            finishedAtEl.textContent = formattedValue;
+            return;
+        }
+
+        finishedAtEl.innerHTML = '<span class="text-base-content/50">Running...</span>';
+    }
+
+    function updateExecutionDuration(durationFormatted, durationMs) {
+        const durationEl = document.getElementById('execution-duration');
+        if (durationEl) {
+            durationEl.textContent = durationFormatted || formatDuration(durationMs);
+        }
+
+        const durationMsRow = document.getElementById('execution-duration-ms-row');
+        const durationMsEl = document.getElementById('execution-duration-ms');
+        if (!durationMsRow || !durationMsEl) return;
+
+        if (durationMs === null || durationMs === undefined) {
+            durationMsRow.classList.add('hidden');
+            durationMsEl.textContent = '';
+            return;
+        }
+
+        durationMsEl.textContent = String(durationMs);
+        durationMsRow.classList.remove('hidden');
+    }
+
+    function applyExecutionCompletion(data) {
+        if (!data) return;
+
+        updateExecutionStatus(data.status);
+        updateExecutionExitCode(data.exit_code);
+        updateExecutionFinishedAt(data.finished_at, data.finished_at_display);
+        updateExecutionDuration(data.duration_formatted, data.duration_ms);
+        document.getElementById('cancel-exec-btn')?.remove();
+    }
+
     // Cancel (AJAX, stay on page)
     document.getElementById('cancel-exec-btn')?.addEventListener('click', async (e) => {
         const btn = e.currentTarget;
@@ -311,8 +402,7 @@
                 btn.disabled = false;
                 return;
             }
-            window.showToast?.('Execution cancelled', 'success');
-            setTimeout(() => location.reload(), 2800);
+            window.showToast?.('Cancellation requested', 'info');
         } catch (err) {
             window.showToast?.(err.message || 'Failed to cancel execution', 'error');
             btn.disabled = false;
@@ -487,10 +577,15 @@
             if (liveBadge) liveBadge.classList.add('hidden');
 
             const data = JSON.parse(event.data);
-            window.showToast?.(`Execution finished: ${data.status}`, data.status === 'success' ? 'success' : 'error');
+            applyExecutionCompletion(data);
+            loadArtifacts();
 
-            // Give user 3s to read the last lines before reloading to final status
-            setTimeout(() => location.reload(), 3000);
+            const toastType = data.status === 'success'
+                ? 'success'
+                : data.status === 'cancelled'
+                    ? 'warning'
+                    : 'error';
+            window.showToast?.(`Execution finished: ${data.status}`, toastType);
         });
 
         eventSource.onerror = (error) => {
