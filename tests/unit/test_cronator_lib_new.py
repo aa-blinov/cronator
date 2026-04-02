@@ -1,5 +1,6 @@
 """Unit tests for cronator_lib: CronatorContext, timer(), notify()."""
 
+import json
 import os
 import time
 from io import StringIO
@@ -181,13 +182,25 @@ class TestTimer:
             pass
         mock_logger.info.assert_called_once()
 
-    def test_uses_get_logger_when_no_logger_given(self):
-        """Без явного logger берёт get_logger()."""
+    def test_uses_get_logger_in_local_mode(self):
+        """Без CRONATOR_EXECUTION_ID — использует get_logger()."""
         mock_logger = MagicMock()
-        with patch("cronator_lib.timer.get_logger", return_value=mock_logger):
-            with timer("auto"):
-                pass
+        env = {k: v for k, v in os.environ.items() if k != "CRONATOR_EXECUTION_ID"}
+        with patch.dict(os.environ, env, clear=True):
+            with patch("cronator_lib.timer.get_logger", return_value=mock_logger):
+                with timer("auto"):
+                    pass
         mock_logger.info.assert_called_once()
+
+    def test_emits_json_with_timer_level_in_cronator_context(self, capsys):
+        """В Cronator-контексте — печатает JSON с level=TIMER в stdout."""
+        with patch.dict(os.environ, {"CRONATOR_EXECUTION_ID": "1"}):
+            with timer("db query"):
+                pass
+        out = capsys.readouterr().out
+        parsed = json.loads(out.strip())
+        assert parsed["level"] == "TIMER"
+        assert "db query" in parsed["message"]
 
     def test_logs_even_on_exception(self):
         """Время логируется даже если блок завершился исключением."""

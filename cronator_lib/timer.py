@@ -1,7 +1,10 @@
 """Timer context manager for measuring and logging code block duration."""
 
+import json
+import os
 import time
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from typing import Generator
 
 from cronator_lib.logging import get_logger
@@ -53,4 +56,18 @@ def timer(label: str = "", logger=None) -> Generator[dict, None, None]:
             formatted = f"{minutes}m {seconds:.0f}s"
 
         msg = f"[{label}] completed in {formatted}" if label else f"Completed in {formatted}"
-        logger.info(msg)
+
+        if os.environ.get("CRONATOR_EXECUTION_ID"):
+            # In Cronator context — emit JSON with TIMER level so UI renders it distinctly
+            print(
+                json.dumps({
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "level": "TIMER",
+                    "message": msg,
+                    "logger": "cronator.timer",
+                }),
+                flush=True,
+            )
+        else:
+            # Local dev — use regular logger
+            logger.info(msg)
