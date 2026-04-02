@@ -9,8 +9,12 @@
 <!-- CodeMirror -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-ocean.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
 <style>
     .CodeMirror {
         height: 500px;
@@ -90,6 +94,43 @@
     #deps-diff-container input[type="checkbox"] {
         display: none;
     }
+
+    .CodeMirror-hints {
+        z-index: 1200;
+        padding: 0.35rem;
+        border: 1px solid oklch(var(--b3) / 1);
+        border-radius: 0.75rem;
+        background: oklch(var(--b1) / 0.98);
+        color: oklch(var(--bc) / 1);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+    }
+
+    .CodeMirror-hint {
+        border-radius: 0.5rem;
+        color: oklch(var(--bc) / 0.92);
+        padding: 0.35rem 0.6rem;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    li.CodeMirror-hint-active {
+        background: oklch(var(--in) / 0.18);
+        color: oklch(var(--bc) / 1);
+    }
+
+    .CodeMirror-hints::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .CodeMirror-hints::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .CodeMirror-hints::-webkit-scrollbar-thumb {
+        background: oklch(var(--b3) / 1);
+        border-radius: 9999px;
+    }
 </style>
 {% endblock %}
 
@@ -101,7 +142,10 @@
         <div class="lg:col-span-2 space-y-6">
             <div class="glass-card rounded-xl p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold">Script Code</h3>
+                    <div>
+                        <h3 class="text-lg font-semibold">Script Code</h3>
+                        <p class="text-xs text-base-content/50 mt-1">Autocomplete: `Ctrl+Space` or just keep typing</p>
+                    </div>
                     <div class="flex gap-2">
                         <button type="button" id="validate-btn" class="btn btn-outline btn-info btn-sm gap-2">
                             {{ icons.check_circle("w-4 h-4") }}
@@ -430,7 +474,25 @@
     const scriptForm = document.getElementById('script-form');
     let scriptId = scriptForm ? (scriptForm.dataset.scriptId || null) : null;
     const restoredVersionToastKey = scriptId ? `script:${scriptId}:restored-version` : null;
-    
+    const pythonAutocompleteWords = [
+        'and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue',
+        'def', 'del', 'elif', 'else', 'except', 'False', 'finally', 'for',
+        'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'None',
+        'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'True', 'try',
+        'while', 'with', 'yield',
+        'abs', 'all', 'any', 'bool', 'breakpoint', 'bytearray', 'bytes', 'callable',
+        'chr', 'classmethod', 'dict', 'dir', 'enumerate', 'filter', 'float',
+        'format', 'frozenset', 'getattr', 'hasattr', 'hash', 'help', 'hex',
+        'id', 'input', 'int', 'isinstance', 'issubclass', 'iter', 'len',
+        'list', 'locals', 'map', 'max', 'min', 'next', 'object', 'oct', 'open',
+        'ord', 'pow', 'print', 'property', 'range', 'repr', 'reversed', 'round',
+        'set', 'setattr', 'slice', 'sorted', 'staticmethod', 'str', 'sum',
+        'super', 'tuple', 'type', 'vars', 'zip',
+        'datetime', 'json', 'logging', 'os', 'pathlib', 're', 'sys', 'time',
+        'logger', 'get_logger', 'notify', 'save_artifact', 'success', 'task_start',
+        'task_end', 'timer', 'with_data'
+    ];
+
     // Initialize CodeMirror
     const textarea = document.getElementById('code-editor');
     const editor = CodeMirror.fromTextArea(textarea, {
@@ -443,6 +505,67 @@
         lineWrapping: true,
         matchBrackets: true,
         autoCloseBrackets: true,
+        extraKeys: {
+            'Ctrl-Space': 'autocomplete',
+        },
+    });
+
+    function collectPythonAutocompleteWords(cm) {
+        const words = new Set(pythonAutocompleteWords);
+        const identifiers = cm.getValue().match(/\b[A-Za-z_][A-Za-z0-9_]*\b/g) || [];
+        identifiers.forEach(word => words.add(word));
+        return Array.from(words).sort((a, b) => a.localeCompare(b));
+    }
+
+    CodeMirror.registerHelper('hint', 'python', function(cm) {
+        const cursor = cm.getCursor();
+        const token = cm.getTokenAt(cursor);
+        const tokenPrefix = token.string.slice(0, Math.max(cursor.ch - token.start, 0));
+
+        if (token.type && /comment|string/.test(token.type)) {
+            return null;
+        }
+
+        const currentWord = /^[A-Za-z_][A-Za-z0-9_]*$/.test(tokenPrefix) ? tokenPrefix : '';
+        const start = currentWord ? cursor.ch - currentWord.length : cursor.ch;
+        const suggestions = collectPythonAutocompleteWords(cm).filter(word => (
+            currentWord
+                ? word.toLowerCase().startsWith(currentWord.toLowerCase()) && word !== currentWord
+                : true
+        ));
+
+        if (!suggestions.length) {
+            return null;
+        }
+
+        return {
+            list: suggestions.slice(0, 80),
+            from: CodeMirror.Pos(cursor.line, start),
+            to: CodeMirror.Pos(cursor.line, cursor.ch),
+        };
+    });
+
+    editor.on('inputRead', (cm, change) => {
+        if (cm.state.completionActive || change.origin !== '+input') {
+            return;
+        }
+
+        const typedText = change.text.join('');
+        if (!/^[A-Za-z_]$/.test(typedText)) {
+            return;
+        }
+
+        const cursor = cm.getCursor();
+        const token = cm.getTokenAt(cursor);
+        const tokenPrefix = token.string.slice(0, Math.max(cursor.ch - token.start, 0));
+        if (tokenPrefix.length < 2) {
+            return;
+        }
+
+        cm.showHint({
+            completeSingle: false,
+            alignWithWord: true,
+        });
     });
     
     // Store original script data for change detection
