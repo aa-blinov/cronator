@@ -1,6 +1,7 @@
 """Unit tests for Executor service."""
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -102,6 +103,91 @@ class TestExecutorService:
             result = await service.cancel_execution(execution_id)
             assert result is True
             mock_process.kill.assert_called_once()
+            assert mock_execution.status == ExecutionStatus.CANCELLED.value
+            assert mock_execution.error_message == "Cancelled by user"
+
+    @pytest.mark.asyncio
+    async def test_cancel_execution_commits_cancelled_status_before_kill(self):
+        """Cancellation persists `cancelled` before the process exits."""
+        service = ExecutorService()
+
+        execution_id = 1
+        call_order: list[tuple[str, str]] = []
+
+        mock_process = MagicMock()
+        mock_execution = MagicMock()
+        mock_execution.id = execution_id
+        mock_execution.script_id = 7
+        mock_execution.status = ExecutionStatus.RUNNING.value
+        mock_execution.finished_at = None
+        mock_execution.error_message = None
+
+        def kill_side_effect():
+            call_order.append(("kill", mock_execution.status))
+
+        mock_process.kill.side_effect = kill_side_effect
+        service.running_processes[execution_id] = mock_process
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=mock_execution)
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=mock_result)
+
+        async def commit_side_effect():
+            call_order.append(("commit", mock_execution.status))
+
+        mock_db.commit.side_effect = commit_side_effect
+
+        mock_session_ctx = AsyncMock()
+        mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_session_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("app.services.executor.async_session_maker", return_value=mock_session_ctx):
+            result = await service.cancel_execution(execution_id)
+
+        assert result is True
+        assert call_order == [
+            ("commit", ExecutionStatus.CANCELLED.value),
+            ("kill", ExecutionStatus.CANCELLED.value),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_finish_execution_keeps_cancelled_status_and_sets_duration(self):
+        """Cancelled executions keep their status while still capturing final metadata."""
+        service = ExecutorService()
+
+        execution = MagicMock()
+        execution.id = 42
+        execution.status = ExecutionStatus.CANCELLED.value
+        execution.exit_code = None
+        execution.stdout = ""
+        execution.stderr = ""
+        execution.finished_at = datetime.now(UTC)
+        execution.duration_ms = None
+        execution.error_message = "Cancelled by user"
+
+        mock_db = AsyncMock()
+        mock_db.refresh = AsyncMock()
+        mock_db.commit = AsyncMock()
+
+        start_time = execution.finished_at - timedelta(seconds=4)
+
+        await service._finish_execution(
+            mock_db,
+            execution,
+            status=ExecutionStatus.FAILED,
+            exit_code=-9,
+            stdout="partial output\n",
+            stderr="",
+            start_time=start_time,
+        )
+
+        assert execution.status == ExecutionStatus.CANCELLED.value
+        assert execution.exit_code == -9
+        assert execution.stdout == "partial output\n"
+        assert execution.duration_ms == 4000
+        assert execution.error_message == "Cancelled by user"
 
     @pytest.mark.asyncio
     async def test_cleanup_stale_executions(self):

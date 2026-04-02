@@ -294,6 +294,19 @@
     }
 
     const execId = {{ execution.id }};
+    const rawLogs = {
+        stdout: {{ execution.stdout | tojson }},
+        stderr: {{ execution.stderr | tojson }},
+    };
+
+    function getRawLog(streamType) {
+        return rawLogs[streamType] || '';
+    }
+
+    function appendRawLog(streamType, chunk) {
+        if (!(streamType in rawLogs) || chunk === null || chunk === undefined) return;
+        rawLogs[streamType] += `${chunk}\n`;
+    }
 
     function formatUtcTimestamp(value) {
         if (!value) return null;
@@ -402,6 +415,7 @@
                 btn.disabled = false;
                 return;
             }
+            btn.remove();
             window.showToast?.('Cancellation requested', 'info');
         } catch (err) {
             window.showToast?.(err.message || 'Failed to cancel execution', 'error');
@@ -411,7 +425,7 @@
 
     // Stdout helpers
     document.getElementById('copy-stdout-btn')?.addEventListener('click', async () => {
-        const text = document.getElementById('stdout-log')?.innerText || '';
+        const text = getRawLog('stdout');
         try {
             await copyText(text);
             window.showToast?.('Stdout copied', 'success');
@@ -420,14 +434,14 @@
         }
     });
     document.getElementById('download-stdout-btn')?.addEventListener('click', () => {
-        const text = document.getElementById('stdout-log')?.innerText || '';
+        const text = getRawLog('stdout');
         downloadText(`execution-${execId}-stdout.log`, text);
         window.showToast?.('Download started', 'info');
     });
 
     // Stderr helpers
     document.getElementById('copy-stderr-btn')?.addEventListener('click', async () => {
-        const text = document.getElementById('stderr-log')?.innerText || '';
+        const text = getRawLog('stderr');
         try {
             await copyText(text);
             window.showToast?.('Stderr copied', 'success');
@@ -436,7 +450,7 @@
         }
     });
     document.getElementById('download-stderr-btn')?.addEventListener('click', () => {
-        const text = document.getElementById('stderr-log')?.innerText || '';
+        const text = getRawLog('stderr');
         downloadText(`execution-${execId}-stderr.log`, text);
         window.showToast?.('Download started', 'info');
     });
@@ -585,12 +599,14 @@
         eventSource = new EventSource(`/api/executions/${execId}/stream`);
 
         eventSource.addEventListener('stdout', (event) => {
+            appendRawLog('stdout', event.data);
             incrementLogCharCount('stdout-char-count', event.data);
             const formatted = formatJsonLogs(event.data);
             if (formatted) appendToLog('stdout-log', formatted + '<br>');
         });
 
         eventSource.addEventListener('stderr', (event) => {
+            appendRawLog('stderr', event.data);
             incrementLogCharCount('stderr-char-count', event.data);
             const formatted = formatJsonLogs(event.data);
             if (formatted) appendToLog('stderr-log', formatted + '<br>');
