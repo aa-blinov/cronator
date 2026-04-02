@@ -211,9 +211,9 @@ async def stream_execution_output(
                     yield ""
 
             for line in iter_lines(execution.stdout or ""):
-                yield f"data: {line}\n\n"
+                yield f"event: stdout\ndata: {line}\n\n"
             for line in iter_lines(execution.stderr or ""):
-                yield f"data: {line}\n\n"
+                yield f"event: stderr\ndata: {line}\n\n"
 
             done_payload = json.dumps(
                 {
@@ -269,7 +269,7 @@ async def stream_execution_output(
                     # IMPORTANT: do not embed newlines inside an SSE `data:` line.
                     # Send one log line per SSE message.
                     payload = (line or "").rstrip("\r\n")
-                    yield f"data: {payload}\n\n"
+                    yield f"event: {stream_type}\ndata: {payload}\n\n"
 
                 except TimeoutError:
                     # Keep-alive (comments are ignored by EventSource)
