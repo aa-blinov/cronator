@@ -317,12 +317,11 @@ class ExecutorService:
                                                 notify_title = notify_title.strip()
                                                 notify_body = notify_body.strip()
                                                 # Custom title — show it explicitly
-                                                display_msg = f"[notify] {notify_title}: {notify_body}"
+                                                display_msg = f"{notify_title}: {notify_body}"
                                             else:
                                                 notify_title = script.name
                                                 notify_body = payload.strip()
-                                                # No custom title — just the message
-                                                display_msg = f"[notify] {notify_body}"
+                                                display_msg = notify_body
                                             asyncio.create_task(
                                                 self._send_manual_alert(
                                                     execution_id,
