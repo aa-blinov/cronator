@@ -110,6 +110,11 @@
         <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
             <h3 class="text-lg font-semibold flex items-center gap-2">
                 {{ icons.terminal("w-5 h-5 text-success") }} stdout
+                {% if execution.status == 'running' %}
+                <span id="sse-live-badge" class="hidden items-center gap-1 text-xs font-medium text-success">
+                    <span class="inline-block w-2 h-2 rounded-full bg-success animate-pulse"></span> Live
+                </span>
+                {% endif %}
             </h3>
             <div class="flex items-center gap-2">
                 <span class="text-xs text-base-content/50">{{ execution.stdout | length }} chars</span>
@@ -457,14 +462,12 @@
     
     function startStreaming() {
         if (!isRunning) return;
-        
-        const stdoutLog = document.getElementById('stdout-log');
-        const stderrLog = document.getElementById('stderr-log');
-        
-        // Clear placeholder
-        if (stdoutLog) stdoutLog.textContent = '';
-        if (stderrLog) stderrLog.textContent = '';
-        
+
+        // Track whether 'done' was received so onerror doesn't trigger a second reload
+        let doneReceived = false;
+
+        const liveBadge = document.getElementById('sse-live-badge');
+
         eventSource = new EventSource(`/api/executions/${execId}/stream`);
 
         eventSource.addEventListener('stdout', (event) => {
@@ -476,26 +479,41 @@
             const formatted = formatJsonLogs(event.data);
             if (formatted) appendToLog('stderr-log', formatted + '<br>');
         });
-        
+
         eventSource.addEventListener('done', (event) => {
+            doneReceived = true;
             eventSource.close();
             eventSource = null;
-            
+            if (liveBadge) liveBadge.classList.add('hidden');
+
             const data = JSON.parse(event.data);
             window.showToast?.(`Execution finished: ${data.status}`, data.status === 'success' ? 'success' : 'error');
-            
-            // Reload page to show final status
-            setTimeout(() => location.reload(), 1500);
+
+            // Give user 3s to read the last lines before reloading to final status
+            setTimeout(() => location.reload(), 3000);
         });
-        
+
         eventSource.onerror = (error) => {
+            // EventSource fires onerror on normal close (after done) — ignore that case
+            if (doneReceived) return;
+
             console.error('SSE Error:', error);
             if (eventSource) {
                 eventSource.close();
                 eventSource = null;
             }
-            // Try to reload to check if execution finished
+            if (liveBadge) liveBadge.classList.add('hidden');
+
+            // Reload to check if execution finished while we were disconnected
             setTimeout(() => location.reload(), 3000);
+        };
+
+        // Show live indicator once connection is open
+        eventSource.onopen = () => {
+            if (liveBadge) {
+                liveBadge.classList.remove('hidden');
+                liveBadge.classList.add('flex');
+            }
         };
     }
     
