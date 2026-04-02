@@ -79,7 +79,7 @@
     </div>
 
     <!-- Toasts -->
-    <div id="toast-container" style="position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; min-width: 320px; pointer-events: none;"></div>
+    <div id="toast-container" style="position: fixed; right: 1rem; bottom: 1rem; z-index: 9999; display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; width: min(24rem, calc(100vw - 2rem)); pointer-events: none;"></div>
     
     <script>
         const flashToastStorageKey = 'cronator:flash-toast';
@@ -90,41 +90,79 @@
                 return;
             }
 
-            const el = document.createElement('div');
-            const typeClass = {
-                success: 'alert-success',
-                error: 'alert-error',
-                warning: 'alert-warning',
-                info: 'alert-info',
-            }[type] || 'alert-info';
+            const toneConfig = {
+                success: {
+                    label: 'Success',
+                    panelClass: 'border-success/30 bg-base-100/95',
+                    labelClass: 'text-success',
+                    dotClass: 'bg-success',
+                },
+                error: {
+                    label: 'Error',
+                    panelClass: 'border-error/30 bg-base-100/95',
+                    labelClass: 'text-error',
+                    dotClass: 'bg-error',
+                },
+                warning: {
+                    label: 'Warning',
+                    panelClass: 'border-warning/30 bg-base-100/95',
+                    labelClass: 'text-warning',
+                    dotClass: 'bg-warning',
+                },
+                info: {
+                    label: 'Info',
+                    panelClass: 'border-info/30 bg-base-100/95',
+                    labelClass: 'text-info',
+                    dotClass: 'bg-info',
+                },
+            };
 
-            el.className = `alert ${typeClass} shadow-lg max-w-md`;
+            const selectedTone = toneConfig[type] || toneConfig.info;
+            const tone = {
+                label: selectedTone.label,
+                panelClass: selectedTone.panelClass,
+                labelClass: selectedTone.labelClass,
+                dotClass: selectedTone.dotClass,
+            };
+
+            const el = document.createElement('div');
+            el.className = `shadow-lg border rounded-box backdrop-blur-sm ${tone.panelClass}`;
             el.style.pointerEvents = 'auto';
-            el.style.padding = '1rem';
-            el.style.borderRadius = '0.5rem';
-            el.style.marginBottom = '0.5rem';
+            el.style.width = '100%';
+            el.style.padding = '0.9rem 1rem';
+            el.style.borderRadius = '0.9rem';
             el.style.display = 'flex';
-            el.style.alignItems = 'center';
-            el.style.minHeight = '3rem';
-            el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+            el.style.flexDirection = 'column';
+            el.style.alignItems = 'flex-start';
+            el.style.gap = '0.35rem';
+            el.style.boxShadow = '0 14px 32px rgba(0,0,0,0.28)';
             el.style.transform = 'translateX(100%)';
             el.style.opacity = '0';
             el.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+            el.style.backdropFilter = 'blur(10px)';
 
-            const colors = {
-                'alert-success': { bg: '#22c55e', text: '#000' },
-                'alert-error': { bg: '#ef4444', text: '#fff' },
-                'alert-warning': { bg: '#f59e0b', text: '#000' },
-                'alert-info': { bg: '#3b82f6', text: '#fff' }
-            };
-            const color = colors[typeClass] || colors['alert-info'];
-            el.style.backgroundColor = color.bg;
-            el.style.color = color.text;
-            
-            const span = document.createElement('span');
-            span.className = 'text-sm break-words';
-            span.textContent = String(message);
-            el.appendChild(span);
+            const label = document.createElement('div');
+            label.className = `flex items-center gap-2 text-[0.72rem] font-bold uppercase tracking-[0.08em] ${tone.labelClass}`;
+
+            const dot = document.createElement('span');
+            dot.className = tone.dotClass;
+            dot.style.width = '0.55rem';
+            dot.style.height = '0.55rem';
+            dot.style.borderRadius = '9999px';
+
+            const labelText = document.createElement('span');
+            labelText.textContent = tone.label;
+
+            label.appendChild(dot);
+            label.appendChild(labelText);
+
+            const body = document.createElement('div');
+            body.className = 'text-sm break-words text-base-content';
+            body.style.lineHeight = '1.45';
+            body.textContent = String(message);
+
+            el.appendChild(label);
+            el.appendChild(body);
             container.appendChild(el);
             
             requestAnimationFrame(() => {
