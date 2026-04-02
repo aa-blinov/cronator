@@ -115,7 +115,7 @@
                 {% endif %}
             </h3>
             <div class="flex items-center gap-2">
-                <span class="text-xs text-base-content/50">{{ execution.stdout | length }} chars</span>
+                <span id="stdout-char-count" class="text-xs text-base-content/50" data-char-count="{{ execution.stdout | length }}">{{ execution.stdout | length }} chars</span>
                 <button type="button" id="copy-stdout-btn" class="btn btn-ghost btn-xs">Copy</button>
                 <button type="button" id="download-stdout-btn" class="btn btn-ghost btn-xs">Download</button>
             </div>
@@ -132,7 +132,7 @@
                 {{ icons.exclamation_triangle("w-5 h-5 text-error") }} stderr
             </h3>
             <div class="flex items-center gap-2">
-                <span class="text-xs text-base-content/50">{{ execution.stderr | length }} chars</span>
+                <span id="stderr-char-count" class="text-xs text-base-content/50" data-char-count="{{ execution.stderr | length }}">{{ execution.stderr | length }} chars</span>
                 <button type="button" id="copy-stderr-btn" class="btn btn-ghost btn-xs">Copy</button>
                 <button type="button" id="download-stderr-btn" class="btn btn-ghost btn-xs">Download</button>
             </div>
@@ -531,6 +531,30 @@
         div.textContent = text;
         return div.innerHTML;
     }
+
+    function incrementLogCharCount(counterId, chunk) {
+        const counterEl = document.getElementById(counterId);
+        if (!counterEl || chunk === null || chunk === undefined) return;
+
+        const currentCount = Number(counterEl.dataset.charCount || '0');
+        // SSE strips trailing newlines from streamed lines, so add one back for the raw log length.
+        const nextCount = currentCount + String(chunk).length + 1;
+        counterEl.dataset.charCount = String(nextCount);
+        counterEl.textContent = `${nextCount} chars`;
+    }
+
+    function finalizeLogPlaceholder(logId, counterId, emptyText) {
+        const logEl = document.getElementById(logId);
+        const counterEl = document.getElementById(counterId);
+        if (!logEl || !counterEl) return;
+
+        const charCount = Number(counterEl.dataset.charCount || '0');
+        if (charCount > 0) return;
+
+        if (logEl.textContent === 'Waiting for output...') {
+            logEl.textContent = emptyText;
+        }
+    }
     
     // ==================== SSE Streaming for Running Executions ====================
     
@@ -561,11 +585,13 @@
         eventSource = new EventSource(`/api/executions/${execId}/stream`);
 
         eventSource.addEventListener('stdout', (event) => {
+            incrementLogCharCount('stdout-char-count', event.data);
             const formatted = formatJsonLogs(event.data);
             if (formatted) appendToLog('stdout-log', formatted + '<br>');
         });
 
         eventSource.addEventListener('stderr', (event) => {
+            incrementLogCharCount('stderr-char-count', event.data);
             const formatted = formatJsonLogs(event.data);
             if (formatted) appendToLog('stderr-log', formatted + '<br>');
         });
@@ -577,6 +603,8 @@
             if (liveBadge) liveBadge.classList.add('hidden');
 
             const data = JSON.parse(event.data);
+            finalizeLogPlaceholder('stdout-log', 'stdout-char-count', 'No output');
+            finalizeLogPlaceholder('stderr-log', 'stderr-char-count', 'No errors');
             applyExecutionCompletion(data);
             loadArtifacts();
 
