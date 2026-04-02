@@ -32,8 +32,11 @@ def notify(message: str, *, title: str | None = None) -> None:
         # With custom title:
         notify("Disk usage above 90%", title="Warning")
     """
-    script_name = os.environ.get("CRONATOR_SCRIPT_NAME", "cronator_script")
-    effective_title = title or script_name
+    if title is not None:
+        # Custom title — include it so executor can use it as email subject
+        payload = f"{title}|{message}"
+    else:
+        # No title — just the message, executor uses script name for email subject
+        payload = message
 
-    payload = f"{effective_title}|{message}"
     print(f"{_NOTIFY_MARKER}{payload}", flush=True)
