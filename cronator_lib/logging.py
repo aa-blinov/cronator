@@ -79,21 +79,21 @@ class CronatorLogger(logging.Logger):
 
     def _setup_handlers(self) -> None:
         """Setup stdout and stderr handlers."""
-        # Determine if we're running in Cronator context
         is_cronator = bool(os.environ.get("CRONATOR_EXECUTION_ID"))
+        formatter = CronatorFormatter() if is_cronator else PrettyFormatter()
 
-        # Console handler
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.DEBUG)
+        # stdout: DEBUG, INFO, WARNING
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler.setLevel(logging.DEBUG)
+        stdout_handler.addFilter(lambda r: r.levelno < logging.ERROR)
+        stdout_handler.setFormatter(formatter)
+        self.addHandler(stdout_handler)
 
-        if is_cronator:
-            # Use JSON format when running under Cronator
-            console_handler.setFormatter(CronatorFormatter())
-        else:
-            # Use pretty format for local development
-            console_handler.setFormatter(PrettyFormatter())
-
-        self.addHandler(console_handler)
+        # stderr: ERROR, CRITICAL
+        stderr_handler = logging.StreamHandler(sys.stderr)
+        stderr_handler.setLevel(logging.ERROR)
+        stderr_handler.setFormatter(formatter)
+        self.addHandler(stderr_handler)
 
     def success(self, msg: str, *args, **kwargs) -> None:
         """Log a success message (INFO level with success marker)."""
