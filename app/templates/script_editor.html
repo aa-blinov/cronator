@@ -543,6 +543,13 @@
             window.showToast?.('Version restored.', 'success');
         }
     }
+
+    function navigateToScriptDetail(targetScriptId, message, type = 'success', timeoutMs = 2200) {
+        if (message) {
+            window.queueToast?.(message, type, timeoutMs);
+        }
+        window.location.assign(`/scripts/${targetScriptId}`);
+    }
     
     // === INLINE DIFF LOGIC ===
     let originalDeps = {{ (script.dependencies if script else "") | tojson }};
@@ -1131,15 +1138,17 @@ Packages: ${result.packages.join(', ')}`;
                         if (data.success) {
                             setConsoleStatus('Complete', 'badge-success');
                             appendBlockToConsole('Installation Complete', 'Dependencies installed successfully!', 'success');
-                            window.showToast?.('Script saved and dependencies installed', 'success');
                             // Update originalDeps to new value on success
                             originalDeps = depsInput.value;
                             diffContainer.style.display = 'none';
                             lastInstallFailed = false;
                             retryBtn.style.display = 'none';
-                            setTimeout(() => {
-                                window.location.href = '/scripts/' + result.id;
-                            }, 1500);
+                            navigateToScriptDetail(
+                                result.id,
+                                isNew
+                                    ? 'Script created and dependencies installed'
+                                    : 'Script saved and dependencies installed'
+                            );
                         } else {
                             setConsoleStatus('Failed', 'badge-error');
                             appendBlockToConsole('Installation Failed', 'Check logs for details', 'error');
@@ -1175,12 +1184,13 @@ Packages: ${result.packages.join(', ')}`;
                         submitBtn.innerHTML = originalBtnHtml;
                     };
                 } else {
-                    // No installation needed, redirect immediately
-                    console.log('No installation needed, redirecting...');
                     // Update originalDeps to new value
                     originalDeps = depsInput.value;
                     diffContainer.style.display = 'none';
-                    window.location.href = '/scripts/' + result.id;
+                    navigateToScriptDetail(
+                        result.id,
+                        isNew ? 'Script created successfully' : 'Script saved successfully'
+                    );
                 }
             } else {
                 const error = await response.json();
@@ -1915,19 +1925,5 @@ ${separator}
     });
     {% endif %}
     
-    // Reload versions after save
-    const originalFormSubmit = document.querySelector('form').onsubmit;
-    document.querySelector('form').addEventListener('submit', async function(e) {
-        // Let original handler run first
-        if (originalFormSubmit) {
-            const result = await originalFormSubmit.call(this, e);
-            if (result === false) return false;
-        }
-        // After successful save, reload versions
-        setTimeout(() => {
-            if (scriptId) loadVersionHistory();
-        }, 2000);
-    });
-
 </script>
 {% endblock %}

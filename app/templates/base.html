@@ -82,12 +82,11 @@
     <div id="toast-container" style="position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; min-width: 320px; pointer-events: none;"></div>
     
     <script>
-        // Global toast helper
+        const flashToastStorageKey = 'cronator:flash-toast';
+
         window.showToast = function showToast(message, type = 'info', timeoutMs = 2000) {
-            console.log('[Toast] Showing:', message, 'type:', type);
             const container = document.getElementById('toast-container');
             if (!container) {
-                console.error('[Toast] Container not found!');
                 return;
             }
 
@@ -101,7 +100,6 @@
 
             el.className = `alert ${typeClass} shadow-lg max-w-md`;
             el.style.pointerEvents = 'auto';
-            // Стили для видимости
             el.style.padding = '1rem';
             el.style.borderRadius = '0.5rem';
             el.style.marginBottom = '0.5rem';
@@ -109,11 +107,10 @@
             el.style.alignItems = 'center';
             el.style.minHeight = '3rem';
             el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-            // Анимация появления
             el.style.transform = 'translateX(100%)';
             el.style.opacity = '0';
             el.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
-            // Цвета по типу
+
             const colors = {
                 'alert-success': { bg: '#22c55e', text: '#000' },
                 'alert-error': { bg: '#ef4444', text: '#fff' },
@@ -130,16 +127,12 @@
             el.appendChild(span);
             container.appendChild(el);
             
-            // Запуск анимации появления
             requestAnimationFrame(() => {
                 el.style.transform = 'translateX(0)';
                 el.style.opacity = '1';
             });
-            
-            console.log('[Toast] Element added, classList:', el.className);
 
             const remove = () => {
-                // Плавная анимация исчезновения
                 el.style.transition = 'transform 0.5s ease-in-out, opacity 0.5s ease-in-out';
                 el.style.transform = 'translateX(50px)';
                 el.style.opacity = '0';
@@ -148,7 +141,50 @@
                 }, 500);
             };
             setTimeout(remove, timeoutMs);
+        };
+
+        window.queueToast = function queueToast(message, type = 'info', timeoutMs = 2000) {
+            if (!message) {
+                return;
+            }
+
+            try {
+                sessionStorage.setItem(
+                    flashToastStorageKey,
+                    JSON.stringify({
+                        message: String(message),
+                        type,
+                        timeoutMs,
+                    })
+                );
+            } catch (error) {
+                console.warn('Failed to queue toast for the next page', error);
+            }
+        };
+
+        function consumeQueuedToast() {
+            let rawToast = null;
+
+            try {
+                rawToast = sessionStorage.getItem(flashToastStorageKey);
+                if (!rawToast) {
+                    return;
+                }
+
+                sessionStorage.removeItem(flashToastStorageKey);
+                const toast = JSON.parse(rawToast);
+                if (toast?.message) {
+                    window.showToast(toast.message, toast.type || 'info', toast.timeoutMs || 2000);
+                }
+            } catch (error) {
+                if (rawToast) {
+                    sessionStorage.removeItem(flashToastStorageKey);
+                }
+                console.warn('Failed to restore queued toast', error);
+            }
         }
+
+        consumeQueuedToast();
 
         // Confirm dangerous actions
         document.querySelectorAll('[data-confirm]').forEach(el => {
