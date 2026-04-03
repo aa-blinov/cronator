@@ -45,13 +45,13 @@ FROM node:20-slim AS css-builder
 WORKDIR /app
 
 # Copy package files and templates for content scanning
-COPY package.json package-lock.json tailwind.config.js ./
+COPY package.json tailwind.config.js ./
 COPY app/static/input.css ./app/static/
 COPY app/templates ./app/templates
 
 # Install dependencies and build CSS with caching
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci && \
+    npm install && \
     npx tailwindcss -i ./app/static/input.css -o ./app/static/output.css --minify
 
 
@@ -116,7 +116,7 @@ COPY --from=css-builder /app/app/static/output.css /app/app/static/output.css
 COPY --from=css-builder /app/node_modules /app/node_modules
 
 # Copy package files for CSS building at runtime
-COPY package.json package-lock.json tailwind.config.js ./
+COPY package.json tailwind.config.js ./
 COPY app/static/input.css ./app/static/
 
 # Copy entrypoint script and fix Windows line endings
