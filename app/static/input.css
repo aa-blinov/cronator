@@ -51,7 +51,7 @@ body {
     background: oklch(86.078% 0.142 206.182);
 }
 
-pre.log-output {
+.log-output {
     background: oklch(22% 0.018 262.177);
     border-radius: 0.5rem;
     padding: 1rem;
@@ -61,6 +61,12 @@ pre.log-output {
     line-height: 1.5;
     max-height: 400px;
     overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.log-line {
+    min-height: 1.2em;
 }
 
 .nav-link {

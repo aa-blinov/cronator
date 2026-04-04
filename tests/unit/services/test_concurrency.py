@@ -38,6 +38,13 @@ def _make_session_maker(execution_id: int = 99, script_id: int = 1):
     return MagicMock(return_value=ctx)
 
 
+def _discard_background_task(coro):
+    """Close fire-and-forget coroutines instead of leaking them during tests."""
+    if hasattr(coro, "close"):
+        coro.close()
+    return MagicMock()
+
+
 # ─────────────────────────── per-script lock ─────────────────────────────────
 
 
@@ -78,7 +85,10 @@ class TestRunningScripts:
 
         with (
             patch("app.services.executor.async_session_maker", _make_session_maker(99)),
-            patch("asyncio.create_task"),  # блокируем _run_script
+            patch(
+                "app.services.executor.asyncio.create_task",
+                side_effect=_discard_background_task,
+            ),
         ):
             exec_id = await service.execute_script(1)
             assert exec_id == 99
@@ -102,7 +112,10 @@ class TestRunningScripts:
 
         with (
             patch("app.services.executor.async_session_maker", session_maker),
-            patch("asyncio.create_task"),
+            patch(
+                "app.services.executor.asyncio.create_task",
+                side_effect=_discard_background_task,
+            ),
         ):
             id1, id2 = await asyncio.gather(
                 service.execute_script(1),
@@ -122,7 +135,10 @@ class TestRunningScripts:
 
         with (
             patch("app.services.executor.async_session_maker", _make_session_maker(42)),
-            patch("asyncio.create_task"),
+            patch(
+                "app.services.executor.asyncio.create_task",
+                side_effect=_discard_background_task,
+            ),
         ):
             eid = await service.execute_script(1)
             assert eid == 42
@@ -132,7 +148,10 @@ class TestRunningScripts:
 
         with (
             patch("app.services.executor.async_session_maker", _make_session_maker(43)),
-            patch("asyncio.create_task"),
+            patch(
+                "app.services.executor.asyncio.create_task",
+                side_effect=_discard_background_task,
+            ),
         ):
             eid2 = await service.execute_script(1)
             assert eid2 == 43
@@ -144,7 +163,10 @@ class TestRunningScripts:
 
         with (
             patch("app.services.executor.async_session_maker", _make_session_maker(99)),
-            patch("asyncio.create_task"),
+            patch(
+                "app.services.executor.asyncio.create_task",
+                side_effect=_discard_background_task,
+            ),
         ):
             await service.execute_script(1)
 
