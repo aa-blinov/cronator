@@ -19,6 +19,7 @@ class TestExecutorService:
         service = ExecutorService()
         assert service.running_processes == {}
         assert service.output_queues == {}
+        assert service.stream_states == {}
 
     def test_is_script_running_false(self):
         """Test is_script_running when not running."""

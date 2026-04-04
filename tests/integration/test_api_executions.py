@@ -45,6 +45,74 @@ class TestExecutionsAPI:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
+    async def test_get_execution_stdout_log(
+        self, test_client: AsyncClient, execution_factory, sample_script
+    ):
+        """Test fetching full stdout log as plain text."""
+        execution = await execution_factory(
+            script_id=sample_script.id,
+            status=ExecutionStatus.SUCCESS.value,
+            stdout="alpha\nbeta\n",
+        )
+
+        response = await test_client.get(f"/api/executions/{execution.id}/logs/stdout")
+        assert response.status_code == 200
+        assert response.text == "alpha\nbeta\n"
+        assert response.headers["x-log-source"] == "stored"
+        assert response.headers["x-log-total-lines"] == "2"
+
+    @pytest.mark.asyncio
+    async def test_get_execution_stdout_log_tail_lines(
+        self, test_client: AsyncClient, execution_factory, sample_script
+    ):
+        """Test fetching only the last N stdout lines."""
+        execution = await execution_factory(
+            script_id=sample_script.id,
+            status=ExecutionStatus.SUCCESS.value,
+            stdout="one\ntwo\nthree\n",
+        )
+
+        response = await test_client.get(
+            f"/api/executions/{execution.id}/logs/stdout?tail_lines=2"
+        )
+        assert response.status_code == 200
+        assert response.text == "two\nthree\n"
+        assert response.headers["x-log-total-lines"] == "3"
+        assert response.headers["x-log-displayed-lines"] == "2"
+
+    @pytest.mark.asyncio
+    async def test_get_execution_stdout_log_uses_live_buffer_when_running(
+        self, test_client: AsyncClient, execution_factory, sample_script
+    ):
+        """Running execution log endpoint should read from in-memory live buffers."""
+        import app.api.executions as executions_module
+
+        execution = await execution_factory(
+            script_id=sample_script.id,
+            status=ExecutionStatus.RUNNING.value,
+            stdout="",
+        )
+        executions_module.executor_service.live_output_buffers[execution.id] = {
+            "stdout": ["first\n", "second\n"],
+            "stderr": [],
+        }
+        executions_module.executor_service.live_output_char_counts[execution.id] = {
+            "stdout": len("first\nsecond\n"),
+            "stderr": 0,
+        }
+
+        try:
+            response = await test_client.get(f"/api/executions/{execution.id}/logs/stdout")
+        finally:
+            executions_module.executor_service.live_output_buffers.pop(execution.id, None)
+            executions_module.executor_service.live_output_char_counts.pop(execution.id, None)
+
+        assert response.status_code == 200
+        assert response.text == "first\nsecond\n"
+        assert response.headers["x-log-source"] == "live"
+        assert response.headers["x-log-total-chars"] == str(len("first\nsecond\n"))
+
+    @pytest.mark.asyncio
     async def test_list_executions_filter_by_script(
         self, test_client: AsyncClient, sample_execution
     ):

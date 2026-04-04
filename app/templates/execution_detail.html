@@ -120,7 +120,7 @@
         </div>
         <div class="p-4">
             <div id="stdout-log-window-note" class="hidden mb-2 text-xs text-base-content/50"></div>
-            <div id="stdout-log" class="log-output">{% if execution.stdout %}{{ execution.stdout }}{% elif execution.status == 'running' %}Waiting for output...{% else %}No output{% endif %}</div>
+            <div id="stdout-log" class="log-output">{% if execution.status == 'running' %}Waiting for output...{% else %}Loading output...{% endif %}</div>
         </div>
     </div>
     
@@ -138,7 +138,7 @@
         </div>
         <div class="p-4">
             <div id="stderr-log-window-note" class="hidden mb-2 text-xs text-base-content/50"></div>
-            <div id="stderr-log" class="log-output text-error">{% if execution.stderr %}{{ execution.stderr }}{% elif execution.status == 'running' %}Waiting for output...{% else %}No errors{% endif %}</div>
+            <div id="stderr-log" class="log-output text-error">{% if execution.status == 'running' %}Waiting for output...{% else %}Loading output...{% endif %}</div>
         </div>
     </div>
 </div>
@@ -280,10 +280,6 @@
     }
 
     const execId = {{ execution.id }};
-    const rawLogs = {
-        stdout: {{ execution.stdout | tojson }},
-        stderr: {{ execution.stderr | tojson }},
-    };
     const isRunning = '{{ execution.status }}' === 'running';
     const LOG_RENDER_LINE_LIMIT = 2000;
     const LOG_AUTO_SCROLL_THRESHOLD_PX = 48;
@@ -310,16 +306,31 @@
         },
     };
 
-    function getRawLog(streamType) {
-        return rawLogs[streamType] || '';
+    function buildLogUrl(streamType, options = {}) {
+        const params = new URLSearchParams();
+        if (options.tailLines) {
+            params.set('tail_lines', String(options.tailLines));
+        }
+        if (options.download) {
+            params.set('download', '1');
+        }
+
+        const query = params.toString();
+        return `/api/executions/${execId}/logs/${streamType}${query ? `?${query}` : ''}`;
     }
 
-    function appendRawLog(streamType, chunk) {
-        if (!(streamType in rawLogs) || chunk === null || chunk === undefined) return;
-        rawLogs[streamType] += `${chunk}\n`;
-        if (logStates[streamType]) {
-            logStates[streamType].totalLines += 1;
+    async function fetchLogText(streamType, options = {}) {
+        const response = await fetch(buildLogUrl(streamType, options));
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
         }
+
+        return {
+            text: await response.text(),
+            totalChars: Number(response.headers.get('X-Log-Total-Chars') || '0'),
+            totalLines: Number(response.headers.get('X-Log-Total-Lines') || '0'),
+            displayedLines: Number(response.headers.get('X-Log-Displayed-Lines') || '0'),
+        };
     }
 
     function formatCount(value) {
@@ -511,7 +522,7 @@
         const { showErrorToast = false } = options;
 
         try {
-            const response = await fetch(`/api/executions/${execId}`);
+            const response = await fetch(`/api/executions/${execId}?include_logs=0`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -550,35 +561,40 @@
         }
     });
 
-    // Stdout helpers
-    document.getElementById('copy-stdout-btn')?.addEventListener('click', async () => {
-        const text = getRawLog('stdout');
+    function triggerLogDownload(streamType) {
+        const a = document.createElement('a');
+        a.href = buildLogUrl(streamType, { download: true });
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }
+
+    async function copyLog(streamType) {
         try {
+            const { text } = await fetchLogText(streamType);
             await copyText(text);
-            window.showToast?.('Stdout copied', 'success');
+            window.showToast?.(`${streamType === 'stdout' ? 'Stdout' : 'Stderr'} copied`, 'success');
         } catch (err) {
-            window.showToast?.('Copy failed (clipboard permissions)', 'error');
+            console.error(`Failed to copy ${streamType}:`, err);
+            window.showToast?.('Copy failed', 'error');
         }
+    }
+
+    // Stdout helpers
+    document.getElementById('copy-stdout-btn')?.addEventListener('click', () => {
+        void copyLog('stdout');
     });
     document.getElementById('download-stdout-btn')?.addEventListener('click', () => {
-        const text = getRawLog('stdout');
-        downloadText(`execution-${execId}-stdout.log`, text);
+        triggerLogDownload('stdout');
         window.showToast?.('Download started', 'info');
     });
 
     // Stderr helpers
-    document.getElementById('copy-stderr-btn')?.addEventListener('click', async () => {
-        const text = getRawLog('stderr');
-        try {
-            await copyText(text);
-            window.showToast?.('Stderr copied', 'success');
-        } catch (err) {
-            window.showToast?.('Copy failed (clipboard permissions)', 'error');
-        }
+    document.getElementById('copy-stderr-btn')?.addEventListener('click', () => {
+        void copyLog('stderr');
     });
     document.getElementById('download-stderr-btn')?.addEventListener('click', () => {
-        const text = getRawLog('stderr');
-        downloadText(`execution-${execId}-stderr.log`, text);
+        triggerLogDownload('stderr');
         window.showToast?.('Download started', 'info');
     });
     
@@ -734,34 +750,40 @@
         return (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight) <= LOG_AUTO_SCROLL_THRESHOLD_PX;
     }
 
-    function renderInitialLog(streamType) {
+    async function renderInitialLog(streamType) {
         const state = logStates[streamType];
         const logEl = document.getElementById(state?.elementId);
         if (!state || !logEl) return;
 
-        const rawText = getRawLog(streamType);
-        const allLines = splitLogLines(rawText);
-        state.totalLines = allLines.length;
-        updateCharCountDisplay(state.counterId, rawText.length);
+        try {
+            const { text, totalChars, totalLines } = await fetchLogText(streamType, {
+                tailLines: LOG_RENDER_LINE_LIMIT,
+            });
+            const visibleLines = splitLogLines(text);
+            state.totalLines = totalLines;
+            updateCharCountDisplay(state.counterId, totalChars);
 
-        if (allLines.length === 0) {
-            setLogPlaceholder(streamType, isRunning ? 'Waiting for output...' : state.emptyText);
-            return;
+            if (visibleLines.length === 0) {
+                setLogPlaceholder(streamType, isRunning ? 'Waiting for output...' : state.emptyText);
+                return;
+            }
+
+            clearRenderedLog(streamType);
+
+            const fragment = document.createDocumentFragment();
+            for (const line of visibleLines) {
+                const lineEl = createLogLineNode(line);
+                fragment.appendChild(lineEl);
+                state.renderedNodes.push(lineEl);
+            }
+
+            logEl.appendChild(fragment);
+            updateLogWindowNote(streamType);
+            logEl.scrollTop = logEl.scrollHeight;
+        } catch (err) {
+            console.error(`Failed to load ${streamType} log:`, err);
+            setLogPlaceholder(streamType, 'Failed to load output');
         }
-
-        clearRenderedLog(streamType);
-
-        const visibleLines = allLines.slice(-LOG_RENDER_LINE_LIMIT);
-        const fragment = document.createDocumentFragment();
-        for (const line of visibleLines) {
-            const lineEl = createLogLineNode(line);
-            fragment.appendChild(lineEl);
-            state.renderedNodes.push(lineEl);
-        }
-
-        logEl.appendChild(fragment);
-        updateLogWindowNote(streamType);
-        logEl.scrollTop = logEl.scrollHeight;
     }
 
     function flushPendingLogLines(streamType) {
@@ -834,6 +856,14 @@
     // ==================== SSE Streaming for Running Executions ====================
     
     let eventSource = null;
+    let lastStreamSeq = 0;
+
+    function recordStreamSeq(event) {
+        const seq = Number(event?.lastEventId || '0');
+        if (!Number.isNaN(seq) && seq > 0) {
+            lastStreamSeq = Math.max(lastStreamSeq, seq);
+        }
+    }
     
     function startStreaming() {
         if (!isRunning) return;
@@ -842,22 +872,28 @@
         let doneReceived = false;
 
         const liveBadge = document.getElementById('sse-live-badge');
+        const streamUrl = lastStreamSeq > 0
+            ? `/api/executions/${execId}/stream?after_seq=${lastStreamSeq}`
+            : `/api/executions/${execId}/stream`;
 
-        eventSource = new EventSource(`/api/executions/${execId}/stream`);
+        eventSource = new EventSource(streamUrl);
 
         eventSource.addEventListener('stdout', (event) => {
-            appendRawLog('stdout', event.data);
+            recordStreamSeq(event);
+            logStates.stdout.totalLines += 1;
             incrementLogCharCount('stdout-char-count', event.data);
             enqueueRenderedLogLine('stdout', event.data);
         });
 
         eventSource.addEventListener('stderr', (event) => {
-            appendRawLog('stderr', event.data);
+            recordStreamSeq(event);
+            logStates.stderr.totalLines += 1;
             incrementLogCharCount('stderr-char-count', event.data);
             enqueueRenderedLogLine('stderr', event.data);
         });
 
         eventSource.addEventListener('done', (event) => {
+            recordStreamSeq(event);
             doneReceived = true;
             eventSource.close();
             eventSource = null;
@@ -926,8 +962,10 @@
     
     // Load artifacts on page load
     window.addEventListener('DOMContentLoaded', () => {
-        renderInitialLog('stdout');
-        renderInitialLog('stderr');
+        if (!isRunning) {
+            void renderInitialLog('stdout');
+            void renderInitialLog('stderr');
+        }
         loadArtifacts();
         startStreaming();
     });

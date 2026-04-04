@@ -202,6 +202,17 @@ class TestTimer:
         assert parsed["level"] == "TIMER"
         assert "db query" in parsed["message"]
 
+    def test_timer_json_preserves_unicode_characters(self, capsys):
+        """Timer JSON should keep Cyrillic readable in raw stdout."""
+        with patch.dict(os.environ, {"CRONATOR_EXECUTION_ID": "1"}):
+            with timer("загрузка данных"):
+                pass
+        out = capsys.readouterr().out
+        parsed = json.loads(out.strip())
+        assert "загрузка данных" in out
+        assert "\\u0437" not in out
+        assert "загрузка данных" in parsed["message"]
+
     def test_logs_even_on_exception(self):
         """Время логируется даже если блок завершился исключением."""
         mock_logger = MagicMock()
