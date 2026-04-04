@@ -170,6 +170,28 @@ class TestFormatters:
         assert "exception" in parsed
         assert "ValueError" in parsed["exception"]
 
+    def test_cronator_formatter_preserves_unicode_characters(self):
+        """JSON formatter should keep readable UTF-8 characters instead of \\u escapes."""
+        import json
+
+        formatter = CronatorFormatter()
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Готово: 45 строк",
+            args=(),
+            exc_info=None,
+        )
+
+        output = formatter.format(record)
+        parsed = json.loads(output.strip())
+
+        assert "Готово: 45 строк" in output
+        assert "\\u0413" not in output
+        assert parsed["message"] == "Готово: 45 строк"
+
     def test_pretty_formatter_outputs_human_readable(self):
         """Локальный форматтер выдаёт строку без JSON."""
         import json

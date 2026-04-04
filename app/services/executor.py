@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -22,14 +23,145 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+@dataclass(slots=True)
+class ExecutionStreamEvent:
+    """One replayable SSE event for an execution stream."""
+
+    seq: int
+    event: str
+    data: str
+
+
+@dataclass
+class ExecutionStreamState:
+    """In-memory broadcast state for SSE reconnects."""
+
+    events: list[ExecutionStreamEvent] = field(default_factory=list)
+    next_seq: int = 1
+    done_seq: int | None = None
+    closed: bool = False
+    condition: asyncio.Condition = field(default_factory=asyncio.Condition)
+
+
 class ExecutorService:
     """Service for executing Python scripts."""
 
     def __init__(self) -> None:
         self.running_processes: dict[int, asyncio.subprocess.Process] = {}
+        # Deprecated compatibility field; live streaming now uses `stream_states`.
         self.output_queues: dict[int, asyncio.Queue] = {}
+        self.stream_states: dict[int, ExecutionStreamState] = {}
+        self._stream_cleanup_tasks: dict[int, asyncio.Task] = {}
+        self.live_output_buffers: dict[int, dict[str, list[str]]] = {}
+        self.live_output_char_counts: dict[int, dict[str, int]] = {}
         self._script_locks: dict[int, asyncio.Lock] = {}
         self._running_scripts: set[int] = set()
+
+    def ensure_stream_state(self, execution_id: int) -> ExecutionStreamState:
+        """Get or create replayable stream state for an execution."""
+        state = self.stream_states.get(execution_id)
+        if state is None:
+            state = ExecutionStreamState()
+            self.stream_states[execution_id] = state
+        return state
+
+    def get_stream_state(self, execution_id: int) -> ExecutionStreamState | None:
+        """Return in-memory stream state for a running or recently finished execution."""
+        return self.stream_states.get(execution_id)
+
+    def get_stream_events_after(
+        self,
+        execution_id: int,
+        after_seq: int,
+    ) -> tuple[list[ExecutionStreamEvent], bool, int | None]:
+        """Return buffered events after the given sequence number."""
+        state = self.stream_states.get(execution_id)
+        if state is None:
+            return [], False, None
+
+        start_index = max(after_seq, 0)
+        return state.events[start_index:], state.closed, state.done_seq
+
+    async def wait_for_stream_events(
+        self,
+        execution_id: int,
+        after_seq: int,
+        timeout: float = 15.0,
+    ) -> tuple[list[ExecutionStreamEvent], bool, int | None]:
+        """Wait until new buffered events are available or the stream closes."""
+        state = self.stream_states.get(execution_id)
+        if state is None:
+            return [], False, None
+
+        async with state.condition:
+            if len(state.events) > after_seq or state.closed:
+                start_index = max(after_seq, 0)
+                return state.events[start_index:], state.closed, state.done_seq
+
+            try:
+                await asyncio.wait_for(
+                    state.condition.wait_for(
+                        lambda: len(state.events) > after_seq or state.closed
+                    ),
+                    timeout=timeout,
+                )
+            except TimeoutError:
+                return [], state.closed, state.done_seq
+
+            start_index = max(after_seq, 0)
+            return state.events[start_index:], state.closed, state.done_seq
+
+    async def publish_stream_event(self, execution_id: int, event_type: str, data: str = "") -> int:
+        """Append a replayable stream event and wake all waiting listeners."""
+        state = self.ensure_stream_state(execution_id)
+        async with state.condition:
+            seq = state.next_seq
+            state.next_seq += 1
+            state.events.append(ExecutionStreamEvent(seq=seq, event=event_type, data=data))
+            state.condition.notify_all()
+            return seq
+
+    async def close_stream(self, execution_id: int) -> int | None:
+        """Mark a stream closed and reserve a final synthetic `done` sequence id."""
+        state = self.stream_states.get(execution_id)
+        if state is None:
+            return None
+
+        async with state.condition:
+            if state.done_seq is None:
+                state.done_seq = state.next_seq
+                state.next_seq += 1
+            state.closed = True
+            state.condition.notify_all()
+            done_seq = state.done_seq
+
+        cleanup_task = self._stream_cleanup_tasks.get(execution_id)
+        if cleanup_task is None or cleanup_task.done():
+            self._stream_cleanup_tasks[execution_id] = asyncio.create_task(
+                self._expire_stream_state(execution_id)
+            )
+
+        return done_seq
+
+    async def _expire_stream_state(self, execution_id: int, delay_seconds: int = 300) -> None:
+        """Keep stream state around briefly so reconnects can replay missed events."""
+        try:
+            await asyncio.sleep(delay_seconds)
+        except asyncio.CancelledError:
+            return
+        finally:
+            self._stream_cleanup_tasks.pop(execution_id, None)
+
+        self.stream_states.pop(execution_id, None)
+
+    def get_live_output(self, execution_id: int, stream_type: str) -> tuple[str | None, int | None]:
+        """Return live output snapshot for a running execution when available."""
+        buffers = self.live_output_buffers.get(execution_id)
+        if not buffers or stream_type not in buffers:
+            return None, None
+
+        char_counts = self.live_output_char_counts.get(execution_id, {})
+        return "".join(buffers[stream_type]), char_counts.get(stream_type)
 
     def _get_script_lock(self, script_id: int) -> asyncio.Lock:
         """Get or create a lock for a specific script."""
@@ -87,6 +219,7 @@ class ExecutorService:
             await db.refresh(execution)
 
             execution_id = execution.id
+            self.ensure_stream_state(execution_id)
 
         # Run execution in background
         asyncio.create_task(self._run_script(script_id, execution_id))
@@ -112,11 +245,6 @@ class ExecutorService:
                     logger.error(f"Script or execution not found: {script_id}, {execution_id}")
                     return
 
-                # Create output queue early so SSE stream can receive 'done' message
-                # even if execution fails
-                output_queue = asyncio.Queue()
-                self.output_queues[execution_id] = output_queue
-
                 # Determine script path
                 script_path = self._get_script_path(script)
                 if not script_path.exists():
@@ -126,9 +254,7 @@ class ExecutorService:
                         status=ExecutionStatus.FAILED,
                         error_message=f"Script file not found: {script_path}",
                     )
-                    # Signal end of stream
-                    await asyncio.sleep(0.1)  # Small delay to ensure DB commit is visible
-                    await output_queue.put(("done", None))
+                    await self.close_stream(execution_id)
                     return
 
                 # Ensure environment exists
@@ -146,9 +272,7 @@ class ExecutorService:
                             status=ExecutionStatus.FAILED,
                             error_message=f"Failed to setup environment: {msg}",
                         )
-                        # Signal end of stream
-                        await asyncio.sleep(0.1)  # Small delay to ensure DB commit is visible
-                        await output_queue.put(("done", None))
+                        await self.close_stream(execution_id)
                         return
 
                 # Get Python path
@@ -160,9 +284,7 @@ class ExecutorService:
                         status=ExecutionStatus.FAILED,
                         error_message=f"Python not found at {python_path}",
                     )
-                    # Signal end of stream
-                    await asyncio.sleep(0.1)  # Small delay to ensure DB commit is visible
-                    await output_queue.put(("done", None))
+                    await self.close_stream(execution_id)
                     return
 
                 # Prepare environment variables
@@ -243,15 +365,21 @@ class ExecutorService:
 
                     self.running_processes[execution_id] = process
 
-                    # Output queue already created above
-
-                    # Collect output and stream to queue
+                    # Collect output and keep a replayable stream buffer in memory.
                     stdout_lines = []
                     stderr_lines = []
+                    self.live_output_buffers[execution_id] = {
+                        "stdout": stdout_lines,
+                        "stderr": stderr_lines,
+                    }
+                    self.live_output_char_counts[execution_id] = {
+                        "stdout": 0,
+                        "stderr": 0,
+                    }
                     artifacts_metadata = []  # Track artifacts created during execution
 
                     async def read_stream(stream, is_stderr=False):
-                        """Read stream line by line and add to queue."""
+                        """Read stream line by line and publish replayable output events."""
                         while True:
                             line = await stream.readline()
                             if not line:
@@ -263,6 +391,7 @@ class ExecutorService:
                             )
                             if is_stderr:
                                 stderr_lines.append(decoded)
+                                self.live_output_char_counts[execution_id]["stderr"] += len(decoded)
                             else:
                                 # Parse for artifact markers
                                 if "ARTIFACT_SAVED:" in decoded:
@@ -335,19 +464,29 @@ class ExecutorService:
                                                 "level": "NOTIFY",
                                                 "message": display_msg,
                                                 "logger": "cronator.notify",
-                                            }) + "\n"
+                                            }, ensure_ascii=False) + "\n"
                                             stdout_lines.append(log_line)
-                                            await output_queue.put(("stdout", log_line))
+                                            self.live_output_char_counts[execution_id]["stdout"] += len(log_line)
+                                            await self.publish_stream_event(
+                                                execution_id,
+                                                "stdout",
+                                                log_line,
+                                            )
                                     except Exception as e:
                                         logger.warning(f"Failed to parse notify marker: {e}")
 
                                 else:
                                     # Regular stdout line — store and stream
                                     stdout_lines.append(decoded)
+                                    self.live_output_char_counts[execution_id]["stdout"] += len(decoded)
 
-                            # Stream to UI — skip internal markers
+                            # Stream to UI: skip internal markers converted elsewhere.
                             if not is_internal_marker:
-                                await output_queue.put(("stderr" if is_stderr else "stdout", decoded))
+                                await self.publish_stream_event(
+                                    execution_id,
+                                    "stderr" if is_stderr else "stdout",
+                                    decoded,
+                                )
 
                     # Read both streams concurrently
                     await asyncio.gather(
@@ -403,25 +542,12 @@ class ExecutorService:
                 finally:
                     # Cleanup
                     self.running_processes.pop(execution_id, None)
-                    # Signal end of stream
-                    # Note: Don't delete the queue here - let the SSE handler clean it up
-                    # after consuming the 'done' message to prevent race condition
-                    if execution_id in self.output_queues:
-                        try:
-                            # Small delay to ensure DB commit is visible to other sessions
-                            await asyncio.sleep(0.1)
-                            await self.output_queues[execution_id].put(("done", None))
-                        except Exception:
-                            pass
+                    # Small delay helps reconnecting clients observe committed final state.
+                    await asyncio.sleep(0.1)
+                    await self.close_stream(execution_id)
 
             except Exception as e:
                 logger.exception(f"Error executing script {script_id}")
-                # Create queue if it doesn't exist (for early errors)
-                if execution_id not in self.output_queues:
-                    output_queue = asyncio.Queue()
-                    self.output_queues[execution_id] = output_queue
-                else:
-                    output_queue = self.output_queues[execution_id]
 
                 # Try to get execution if not already available
                 if "execution" not in locals():
@@ -435,31 +561,16 @@ class ExecutorService:
                         status=ExecutionStatus.FAILED,
                         error_message=str(e),
                     )
-                    # Signal end of stream
-                    try:
-                        await asyncio.sleep(0.1)  # Small delay to ensure DB commit is visible
-                        await output_queue.put(("done", None))
-                    except Exception:
-                        pass
-                else:
-                    # If we can't get execution, just signal done
-                    try:
-                        await output_queue.put(("done", None))
-                    except Exception:
-                        pass
+                await asyncio.sleep(0.1)
+                await self.close_stream(execution_id)
             finally:
                 # Cleanup resources
                 self._running_scripts.discard(script_id)
                 if execution_id in self.running_processes:
                     del self.running_processes[execution_id]
-                
-                # Cleanup output queue
-                # We do this here so it persists as long as the execution runs,
-                # even if clients disconnect
-                if execution_id in self.output_queues:
-                    # Verify it's the same queue (just in case of race condition/restart)
-                    if self.output_queues[execution_id] is output_queue:
-                        del self.output_queues[execution_id]
+
+                self.live_output_buffers.pop(execution_id, None)
+                self.live_output_char_counts.pop(execution_id, None)
 
     def _get_script_path(self, script: Script) -> Path:
         """Get the path to the script file."""
@@ -696,14 +807,6 @@ class ExecutorService:
             logger.warning(f"Process for execution {execution_id} already terminated")
         except Exception as e:
             logger.error(f"Error killing process for execution {execution_id}: {e}")
-
-        # Signal end of stream if queue exists (for SSE)
-        if execution_id in self.output_queues:
-            try:
-                await asyncio.sleep(0.1)  # Small delay to ensure DB commit is visible
-                await self.output_queues[execution_id].put(("done", None))
-            except Exception:
-                pass
 
         # Cleanup
         self.running_processes.pop(execution_id, None)

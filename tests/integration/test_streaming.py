@@ -1,6 +1,5 @@
 """Integration tests for SSE streaming endpoint: GET /api/executions/{id}/stream."""
 
-import asyncio
 import json
 from datetime import UTC, datetime
 
@@ -26,7 +25,9 @@ def parse_sse(raw: bytes | str) -> list[dict]:
             continue
         event: dict = {}
         for line in block.split("\n"):
-            if line.startswith("event: "):
+            if line.startswith("id: "):
+                event["id"] = line[4:]
+            elif line.startswith("event: "):
                 event["event"] = line[7:]
             elif line.startswith("data:"):
                 event["data"] = line[5:].lstrip(" ")
@@ -79,7 +80,7 @@ class TestStreamingSSE:
             stdout="ok\n",
         )
         async with test_client.stream("GET", f"/api/executions/{execution.id}/stream") as response:
-            assert response.headers.get("cache-control") == "no-cache"
+            assert response.headers.get("cache-control") == "no-cache, no-store"
             await response.aread()
 
     @pytest.mark.asyncio
@@ -232,15 +233,14 @@ class TestStreamingSSE:
                     f"SSE data line contains embedded newline: {sse_line!r}"
                 )
 
-    # ── live queue path (активное выполнение) ────────────────────────────────
+    # ── live replay path (active execution) ──────────────────────────────────
 
     @pytest.mark.asyncio
-    async def test_stream_live_execution_via_queue(
+    async def test_stream_live_execution_via_replay_buffer(
         self, test_client: AsyncClient, execution_factory, sample_script
     ):
         """
-        Активное выполнение: данные читаются из asyncio.Queue.
-        Заполняем очередь заранее — endpoint вычитывает и отдаёт SSE.
+        Active execution uses the in-memory replay buffer instead of a single queue.
         """
         import app.api.executions as executions_module
 
@@ -251,12 +251,17 @@ class TestStreamingSSE:
             stderr="",
         )
 
-        queue: asyncio.Queue = asyncio.Queue()
-        await queue.put(("stdout", "live_alpha\n"))
-        await queue.put(("stdout", "live_beta\n"))
-        await queue.put(("done", None))
-
-        executions_module.executor_service.output_queues[execution.id] = queue
+        await executions_module.executor_service.publish_stream_event(
+            execution.id,
+            "stdout",
+            "live_alpha\n",
+        )
+        await executions_module.executor_service.publish_stream_event(
+            execution.id,
+            "stdout",
+            "live_beta\n",
+        )
+        await executions_module.executor_service.close_stream(execution.id)
 
         try:
             async with test_client.stream(
@@ -265,7 +270,13 @@ class TestStreamingSSE:
                 assert response.status_code == 200
                 raw = await response.aread()
         finally:
-            executions_module.executor_service.output_queues.pop(execution.id, None)
+            cleanup_task = executions_module.executor_service._stream_cleanup_tasks.pop(
+                execution.id,
+                None,
+            )
+            if cleanup_task:
+                cleanup_task.cancel()
+            executions_module.executor_service.stream_states.pop(execution.id, None)
 
         events = parse_sse(raw)
         data_lines = [e["data"] for e in events if e.get("event") == "stdout"]
@@ -276,7 +287,7 @@ class TestStreamingSSE:
     async def test_stream_live_execution_x_accel_buffering_header(
         self, test_client: AsyncClient, execution_factory, sample_script
     ):
-        """Активное выполнение (live queue) → X-Accel-Buffering: no (для nginx)."""
+        """Active execution streaming keeps X-Accel-Buffering disabled for nginx."""
         import app.api.executions as executions_module
 
         execution = await execution_factory(
@@ -284,10 +295,8 @@ class TestStreamingSSE:
             status=ExecutionStatus.RUNNING.value,
         )
 
-        queue: asyncio.Queue = asyncio.Queue()
-        await queue.put(("done", None))
-
-        executions_module.executor_service.output_queues[execution.id] = queue
+        executions_module.executor_service.ensure_stream_state(execution.id)
+        await executions_module.executor_service.close_stream(execution.id)
 
         try:
             async with test_client.stream(
@@ -296,13 +305,19 @@ class TestStreamingSSE:
                 assert response.headers.get("x-accel-buffering") == "no"
                 await response.aread()
         finally:
-            executions_module.executor_service.output_queues.pop(execution.id, None)
+            cleanup_task = executions_module.executor_service._stream_cleanup_tasks.pop(
+                execution.id,
+                None,
+            )
+            if cleanup_task:
+                cleanup_task.cancel()
+            executions_module.executor_service.stream_states.pop(execution.id, None)
 
     @pytest.mark.asyncio
     async def test_stream_live_done_event_includes_completion_metadata(
         self, test_client: AsyncClient, execution_factory, sample_script, db_session
     ):
-        """Live queue path: done payload подтягивает финальные поля из БД."""
+        """Live replay path: done payload pulls final completion fields from the DB."""
         import app.api.executions as executions_module
 
         finished_at = datetime(2026, 2, 3, 4, 5, 6, tzinfo=UTC)
@@ -320,9 +335,8 @@ class TestStreamingSSE:
         execution.duration_ms = 2500
         await db_session.commit()
 
-        queue: asyncio.Queue = asyncio.Queue()
-        await queue.put(("done", None))
-        executions_module.executor_service.output_queues[execution.id] = queue
+        executions_module.executor_service.ensure_stream_state(execution.id)
+        await executions_module.executor_service.close_stream(execution.id)
 
         try:
             async with test_client.stream(
@@ -330,7 +344,13 @@ class TestStreamingSSE:
             ) as response:
                 raw = await response.aread()
         finally:
-            executions_module.executor_service.output_queues.pop(execution.id, None)
+            cleanup_task = executions_module.executor_service._stream_cleanup_tasks.pop(
+                execution.id,
+                None,
+            )
+            if cleanup_task:
+                cleanup_task.cancel()
+            executions_module.executor_service.stream_states.pop(execution.id, None)
 
         events = parse_sse(raw)
         done_events = [e for e in events if e.get("event") == "done"]
@@ -343,3 +363,53 @@ class TestStreamingSSE:
         assert payload["finished_at_display"] == "2026-02-03 04:05:06 UTC"
         assert payload["duration_ms"] == 2500
         assert payload["duration_formatted"] == "2.5s"
+
+    @pytest.mark.asyncio
+    async def test_stream_live_reconnect_replays_only_events_after_sequence(
+        self, test_client: AsyncClient, execution_factory, sample_script
+    ):
+        """Reconnect with after_seq should only deliver missed events plus done."""
+        import app.api.executions as executions_module
+
+        execution = await execution_factory(
+            script_id=sample_script.id,
+            status=ExecutionStatus.RUNNING.value,
+            stdout="",
+            stderr="",
+        )
+
+        await executions_module.executor_service.publish_stream_event(
+            execution.id,
+            "stdout",
+            "first_line\n",
+        )
+        await executions_module.executor_service.publish_stream_event(
+            execution.id,
+            "stdout",
+            "second_line\n",
+        )
+        await executions_module.executor_service.close_stream(execution.id)
+
+        try:
+            async with test_client.stream(
+                "GET",
+                f"/api/executions/{execution.id}/stream?after_seq=1",
+            ) as response:
+                raw = await response.aread()
+        finally:
+            cleanup_task = executions_module.executor_service._stream_cleanup_tasks.pop(
+                execution.id,
+                None,
+            )
+            if cleanup_task:
+                cleanup_task.cancel()
+            executions_module.executor_service.stream_states.pop(execution.id, None)
+
+        events = parse_sse(raw)
+        stdout_events = [e for e in events if e.get("event") == "stdout"]
+        done_events = [e for e in events if e.get("event") == "done"]
+
+        assert [event["data"] for event in stdout_events] == ["second_line"]
+        assert stdout_events[0]["id"] == "2"
+        assert len(done_events) == 1
+        assert done_events[0]["id"] == "3"
