@@ -119,7 +119,8 @@
             </div>
         </div>
         <div class="p-4">
-            <pre id="stdout-log" class="log-output">{% if execution.stdout %}{{ execution.stdout }}{% elif execution.status == 'running' %}Waiting for output...{% else %}No output{% endif %}</pre>
+            <div id="stdout-log-window-note" class="hidden mb-2 text-xs text-base-content/50"></div>
+            <div id="stdout-log" class="log-output">{% if execution.stdout %}{{ execution.stdout }}{% elif execution.status == 'running' %}Waiting for output...{% else %}No output{% endif %}</div>
         </div>
     </div>
     
@@ -136,7 +137,8 @@
             </div>
         </div>
         <div class="p-4">
-            <pre id="stderr-log" class="log-output text-error">{% if execution.stderr %}{{ execution.stderr }}{% elif execution.status == 'running' %}Waiting for output...{% else %}No errors{% endif %}</pre>
+            <div id="stderr-log-window-note" class="hidden mb-2 text-xs text-base-content/50"></div>
+            <div id="stderr-log" class="log-output text-error">{% if execution.stderr %}{{ execution.stderr }}{% elif execution.status == 'running' %}Waiting for output...{% else %}No errors{% endif %}</div>
         </div>
     </div>
 </div>
@@ -245,21 +247,7 @@
         return formatted.join('<br>');
     }
 
-    // Apply formatting to logs on page load
-    document.addEventListener('DOMContentLoaded', () => {
-        const stdoutLog = document.getElementById('stdout-log');
-        const stderrLog = document.getElementById('stderr-log');
-        
-        if (stdoutLog && stdoutLog.textContent) {
-            stdoutLog.innerHTML = formatJsonLogs(stdoutLog.textContent);
-            stdoutLog.style.lineHeight = '1.2';
-        }
-        
-        if (stderrLog && stderrLog.textContent) {
-            stderrLog.innerHTML = formatJsonLogs(stderrLog.textContent);
-            stderrLog.style.lineHeight = '1.2';
-        }
-    });
+    // Initial log rendering is handled by the bounded renderer below.
 
     async function copyText(text) {
         // Try modern clipboard API first
@@ -296,6 +284,31 @@
         stdout: {{ execution.stdout | tojson }},
         stderr: {{ execution.stderr | tojson }},
     };
+    const isRunning = '{{ execution.status }}' === 'running';
+    const LOG_RENDER_LINE_LIMIT = 2000;
+    const LOG_AUTO_SCROLL_THRESHOLD_PX = 48;
+    const logStates = {
+        stdout: {
+            elementId: 'stdout-log',
+            counterId: 'stdout-char-count',
+            noteId: 'stdout-log-window-note',
+            emptyText: 'No output',
+            pendingLines: [],
+            renderedNodes: [],
+            totalLines: 0,
+            flushHandle: null,
+        },
+        stderr: {
+            elementId: 'stderr-log',
+            counterId: 'stderr-char-count',
+            noteId: 'stderr-log-window-note',
+            emptyText: 'No errors',
+            pendingLines: [],
+            renderedNodes: [],
+            totalLines: 0,
+            flushHandle: null,
+        },
+    };
 
     function getRawLog(streamType) {
         return rawLogs[streamType] || '';
@@ -304,6 +317,70 @@
     function appendRawLog(streamType, chunk) {
         if (!(streamType in rawLogs) || chunk === null || chunk === undefined) return;
         rawLogs[streamType] += `${chunk}\n`;
+        if (logStates[streamType]) {
+            logStates[streamType].totalLines += 1;
+        }
+    }
+
+    function formatCount(value) {
+        return Number(value || 0).toLocaleString();
+    }
+
+    function splitLogLines(text) {
+        if (!text) return [];
+
+        const normalized = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const lines = normalized.split('\n');
+        if (lines.length > 0 && lines[lines.length - 1] === '') {
+            lines.pop();
+        }
+        return lines;
+    }
+
+    function formatJsonLogLine(line) {
+        if (line === null || line === undefined || line === '') {
+            return '&nbsp;';
+        }
+
+        const levelColors = {
+            'DEBUG':    '#6b7280',
+            'INFO':     '#10b981',
+            'WARNING':  '#f59e0b',
+            'ERROR':    '#ef4444',
+            'CRITICAL': '#dc2626',
+            'TIMER':    '#60a5fa',
+            'NOTIFY':   '#a78bfa',
+        };
+
+        try {
+            const log = JSON.parse(line);
+            const parsedDate = log.timestamp ? new Date(log.timestamp) : null;
+            const timestamp = parsedDate && !Number.isNaN(parsedDate.getTime())
+                ? parsedDate.toLocaleString('ru-RU', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                })
+                : (log.timestamp || '');
+            const level = log.level || 'INFO';
+            const color = levelColors[level] || '#6b7280';
+            const parts = [
+                `<span style="color: #9ca3af">[${escapeHtml(timestamp)}]</span>`,
+                `<span style="color: ${color}; font-weight: bold">${escapeHtml(level)}</span>`,
+                escapeHtml(log.message || ''),
+            ];
+
+            if (log.exception) {
+                parts.push(`<span style="color: #ef4444">${escapeHtml(log.exception)}</span>`);
+            }
+
+            return parts.join(' ');
+        } catch (e) {
+            return escapeHtml(line);
+        }
     }
 
     function formatUtcTimestamp(value) {
@@ -596,6 +673,143 @@
         return div.innerHTML;
     }
 
+    function updateCharCountDisplay(counterId, value) {
+        const counterEl = document.getElementById(counterId);
+        if (!counterEl) return;
+
+        counterEl.dataset.charCount = String(value);
+        counterEl.textContent = `${formatCount(value)} chars`;
+    }
+
+    function isPlaceholderText(text) {
+        const normalized = String(text || '').trim();
+        return normalized === 'Waiting for output...'
+            || normalized === 'No output'
+            || normalized === 'No errors';
+    }
+
+    function clearRenderedLog(streamType) {
+        const state = logStates[streamType];
+        const logEl = document.getElementById(state?.elementId);
+        if (!state || !logEl) return;
+
+        logEl.innerHTML = '';
+        state.renderedNodes = [];
+    }
+
+    function setLogPlaceholder(streamType, text) {
+        const state = logStates[streamType];
+        const logEl = document.getElementById(state?.elementId);
+        if (!state || !logEl) return;
+
+        clearRenderedLog(streamType);
+        logEl.textContent = text;
+        updateLogWindowNote(streamType);
+    }
+
+    function createLogLineNode(line) {
+        const lineEl = document.createElement('div');
+        lineEl.className = 'log-line';
+        lineEl.innerHTML = formatJsonLogLine(line);
+        return lineEl;
+    }
+
+    function updateLogWindowNote(streamType) {
+        const state = logStates[streamType];
+        const noteEl = document.getElementById(state?.noteId);
+        if (!state || !noteEl) return;
+
+        const visibleLines = state.renderedNodes.length;
+        if (state.totalLines > visibleLines && visibleLines > 0) {
+            noteEl.textContent = `Showing last ${formatCount(visibleLines)} of ${formatCount(state.totalLines)} lines for performance`;
+            noteEl.classList.remove('hidden');
+            return;
+        }
+
+        noteEl.textContent = '';
+        noteEl.classList.add('hidden');
+    }
+
+    function shouldAutoScroll(logEl) {
+        return (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight) <= LOG_AUTO_SCROLL_THRESHOLD_PX;
+    }
+
+    function renderInitialLog(streamType) {
+        const state = logStates[streamType];
+        const logEl = document.getElementById(state?.elementId);
+        if (!state || !logEl) return;
+
+        const rawText = getRawLog(streamType);
+        const allLines = splitLogLines(rawText);
+        state.totalLines = allLines.length;
+        updateCharCountDisplay(state.counterId, rawText.length);
+
+        if (allLines.length === 0) {
+            setLogPlaceholder(streamType, isRunning ? 'Waiting for output...' : state.emptyText);
+            return;
+        }
+
+        clearRenderedLog(streamType);
+
+        const visibleLines = allLines.slice(-LOG_RENDER_LINE_LIMIT);
+        const fragment = document.createDocumentFragment();
+        for (const line of visibleLines) {
+            const lineEl = createLogLineNode(line);
+            fragment.appendChild(lineEl);
+            state.renderedNodes.push(lineEl);
+        }
+
+        logEl.appendChild(fragment);
+        updateLogWindowNote(streamType);
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function flushPendingLogLines(streamType) {
+        const state = logStates[streamType];
+        const logEl = document.getElementById(state?.elementId);
+        if (!state || !logEl) return;
+
+        state.flushHandle = null;
+        if (state.pendingLines.length === 0) return;
+
+        const shouldStickToBottom = shouldAutoScroll(logEl);
+        if (isPlaceholderText(logEl.textContent)) {
+            clearRenderedLog(streamType);
+        }
+
+        const fragment = document.createDocumentFragment();
+        for (const line of state.pendingLines.splice(0)) {
+            const lineEl = createLogLineNode(line);
+            fragment.appendChild(lineEl);
+            state.renderedNodes.push(lineEl);
+        }
+
+        logEl.appendChild(fragment);
+
+        while (state.renderedNodes.length > LOG_RENDER_LINE_LIMIT) {
+            const oldestLine = state.renderedNodes.shift();
+            oldestLine?.remove();
+        }
+
+        updateLogWindowNote(streamType);
+
+        if (shouldStickToBottom) {
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+    }
+
+    function enqueueRenderedLogLine(streamType, line) {
+        const state = logStates[streamType];
+        if (!state) return;
+
+        state.pendingLines.push(line ?? '');
+        if (state.flushHandle !== null) return;
+
+        state.flushHandle = window.requestAnimationFrame(() => {
+            flushPendingLogLines(streamType);
+        });
+    }
+
     function incrementLogCharCount(counterId, chunk) {
         const counterEl = document.getElementById(counterId);
         if (!counterEl || chunk === null || chunk === undefined) return;
@@ -603,40 +817,23 @@
         const currentCount = Number(counterEl.dataset.charCount || '0');
         // SSE strips trailing newlines from streamed lines, so add one back for the raw log length.
         const nextCount = currentCount + String(chunk).length + 1;
-        counterEl.dataset.charCount = String(nextCount);
-        counterEl.textContent = `${nextCount} chars`;
+        updateCharCountDisplay(counterId, nextCount);
     }
 
-    function finalizeLogPlaceholder(logId, counterId, emptyText) {
-        const logEl = document.getElementById(logId);
-        const counterEl = document.getElementById(counterId);
-        if (!logEl || !counterEl) return;
+    function finalizeLogPlaceholder(streamType) {
+        const state = logStates[streamType];
+        const counterEl = document.getElementById(state?.counterId);
+        if (!state || !counterEl) return;
 
         const charCount = Number(counterEl.dataset.charCount || '0');
-        if (charCount > 0) return;
+        if (charCount > 0 || state.totalLines > 0) return;
 
-        if (logEl.textContent === 'Waiting for output...') {
-            logEl.textContent = emptyText;
-        }
+        setLogPlaceholder(streamType, state.emptyText);
     }
     
     // ==================== SSE Streaming for Running Executions ====================
     
-    const isRunning = '{{ execution.status }}' === 'running';
     let eventSource = null;
-    
-    function appendToLog(elementId, html) {
-        const logEl = document.getElementById(elementId);
-        if (!logEl) return;
-        
-        // Clear placeholder text on first real output
-        if (logEl.textContent === 'Waiting for output...' || logEl.textContent === 'No output' || logEl.textContent === 'No errors') {
-            logEl.innerHTML = '';
-        }
-        
-        logEl.insertAdjacentHTML('beforeend', html);
-        logEl.scrollTop = logEl.scrollHeight;
-    }
     
     function startStreaming() {
         if (!isRunning) return;
@@ -651,15 +848,13 @@
         eventSource.addEventListener('stdout', (event) => {
             appendRawLog('stdout', event.data);
             incrementLogCharCount('stdout-char-count', event.data);
-            const formatted = formatJsonLogs(event.data);
-            if (formatted) appendToLog('stdout-log', formatted + '<br>');
+            enqueueRenderedLogLine('stdout', event.data);
         });
 
         eventSource.addEventListener('stderr', (event) => {
             appendRawLog('stderr', event.data);
             incrementLogCharCount('stderr-char-count', event.data);
-            const formatted = formatJsonLogs(event.data);
-            if (formatted) appendToLog('stderr-log', formatted + '<br>');
+            enqueueRenderedLogLine('stderr', event.data);
         });
 
         eventSource.addEventListener('done', (event) => {
@@ -669,8 +864,10 @@
             if (liveBadge) liveBadge.classList.add('hidden');
 
             const data = JSON.parse(event.data);
-            finalizeLogPlaceholder('stdout-log', 'stdout-char-count', 'No output');
-            finalizeLogPlaceholder('stderr-log', 'stderr-char-count', 'No errors');
+            flushPendingLogLines('stdout');
+            flushPendingLogLines('stderr');
+            finalizeLogPlaceholder('stdout');
+            finalizeLogPlaceholder('stderr');
             applyExecutionCompletion(data);
             void refreshExecutionDetails();
             loadArtifacts();
@@ -699,8 +896,10 @@
                 if (!execution) return;
 
                 if (execution.status !== 'running') {
-                    finalizeLogPlaceholder('stdout-log', 'stdout-char-count', 'No output');
-                    finalizeLogPlaceholder('stderr-log', 'stderr-char-count', 'No errors');
+                    flushPendingLogLines('stdout');
+                    flushPendingLogLines('stderr');
+                    finalizeLogPlaceholder('stdout');
+                    finalizeLogPlaceholder('stderr');
                     loadArtifacts();
                     return;
                 }
@@ -727,6 +926,8 @@
     
     // Load artifacts on page load
     window.addEventListener('DOMContentLoaded', () => {
+        renderInitialLog('stdout');
+        renderInitialLog('stderr');
         loadArtifacts();
         startStreaming();
     });
