@@ -6,8 +6,8 @@ import os
 import shutil
 from datetime import UTC
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -46,6 +46,28 @@ def _build_done_payload(execution: Execution | None) -> str:
             "duration_formatted": execution.duration_formatted if execution else "-",
         }
     )
+
+
+def _split_log_lines(text: str) -> list[str]:
+    """Split log text into lines while ignoring the final trailing newline."""
+    if not text:
+        return []
+
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    lines = normalized.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
+def _get_execution_log_text(execution: Execution, stream_type: str) -> tuple[str, str, int]:
+    """Return execution log text from live memory when running, otherwise from the DB."""
+    live_text, live_char_count = executor_service.get_live_output(execution.id, stream_type)
+    if live_text is not None:
+        return live_text, "live", live_char_count or len(live_text)
+
+    stored_text = getattr(execution, stream_type) or ""
+    return stored_text, "stored", len(stored_text)
 
 
 @router.get("", response_model=ExecutionList)
@@ -156,6 +178,7 @@ async def get_execution_stats(
 @router.get("/{execution_id}", response_model=ExecutionRead)
 async def get_execution(
     execution_id: int,
+    include_logs: bool = Query(True),
     db: AsyncSession = Depends(get_db),
 ):
     """Get execution details."""
@@ -170,8 +193,52 @@ async def get_execution(
     data = ExecutionRead.model_validate(execution)
     data.duration_formatted = execution.duration_formatted
     data.script_name = execution.script.name if execution.script else None
+    if not include_logs:
+        data.stdout = ""
+        data.stderr = ""
 
     return data
+
+
+@router.get("/{execution_id}/logs/{stream_type}")
+async def get_execution_log(
+    execution_id: int,
+    stream_type: str,
+    tail_lines: int | None = Query(None, ge=1, le=10000),
+    download: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return stdout/stderr as plain text, optionally limited to the last N lines."""
+    if stream_type not in {"stdout", "stderr"}:
+        raise HTTPException(status_code=404, detail="Log stream not found")
+
+    result = await db.execute(select(Execution).where(Execution.id == execution_id))
+    execution = result.scalar_one_or_none()
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    full_text, source, total_chars = _get_execution_log_text(execution, stream_type)
+    all_lines = _split_log_lines(full_text)
+    displayed_lines = all_lines[-tail_lines:] if tail_lines else all_lines
+    displayed_text = "\n".join(displayed_lines)
+    if displayed_text and full_text.endswith("\n"):
+        displayed_text += "\n"
+
+    headers = {
+        "Cache-Control": "no-store",
+        "X-Log-Source": source,
+        "X-Log-Total-Chars": str(total_chars),
+        "X-Log-Total-Lines": str(len(all_lines)),
+        "X-Log-Displayed-Lines": str(len(displayed_lines)),
+    }
+
+    if download:
+        headers["Content-Disposition"] = (
+            f'attachment; filename="execution-{execution_id}-{stream_type}.log"'
+        )
+
+    return PlainTextResponse(displayed_text, headers=headers)
 
 
 @router.post("/{execution_id}/cancel")
@@ -211,6 +278,8 @@ async def cancel_execution(
 @router.get("/{execution_id}/stream")
 async def stream_execution_output(
     execution_id: int,
+    after_seq: int = Query(0, ge=0),
+    last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
     db: AsyncSession = Depends(get_db),
 ):
     """Stream execution output using Server-Sent Events."""
@@ -221,11 +290,24 @@ async def stream_execution_output(
     if not execution:
         raise HTTPException(status_code=404, detail="Execution not found")
 
-    # Check if output queue exists
-    if execution_id not in executor_service.output_queues:
+    resume_after = after_seq
+    if last_event_id and last_event_id.isdigit():
+        resume_after = max(resume_after, int(last_event_id))
+
+    stream_state = executor_service.get_stream_state(execution_id)
+
+    # Fall back to stored output when live replay state is no longer retained.
+    # For already-finished executions, prefer canonical DB output on a fresh connect.
+    if stream_state is None or (
+        execution.status != ExecutionStatus.RUNNING.value and resume_after == 0
+    ):
         # Execution might have finished before streaming started
         # Return stored output
         async def send_stored_output():
+            seq = 0
+
+            yield "retry: 3000\n\n"
+
             def iter_lines(text: str):
                 # Preserve empty lines while avoiding trailing \r/\n in SSE payload
                 for raw in text.splitlines(keepends=True):
@@ -235,70 +317,71 @@ async def stream_execution_output(
                     yield ""
 
             for line in iter_lines(execution.stdout or ""):
-                yield f"event: stdout\ndata: {line}\n\n"
+                seq += 1
+                if seq <= resume_after:
+                    continue
+                yield f"id: {seq}\nevent: stdout\ndata: {line}\n\n"
             for line in iter_lines(execution.stderr or ""):
-                yield f"event: stderr\ndata: {line}\n\n"
+                seq += 1
+                if seq <= resume_after:
+                    continue
+                yield f"id: {seq}\nevent: stderr\ndata: {line}\n\n"
 
             done_payload = _build_done_payload(execution)
-            yield f"event: done\ndata: {done_payload}\n\n"
+            seq += 1
+            if seq > resume_after:
+                yield f"id: {seq}\nevent: done\ndata: {done_payload}\n\n"
 
         return StreamingResponse(
             send_stored_output(),
             media_type="text/event-stream",
             headers={
-                "Cache-Control": "no-cache",
+                "Cache-Control": "no-cache, no-store",
                 "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
             },
         )
 
     async def event_generator():
-        """Generate SSE events from output queue."""
-        queue = executor_service.output_queues[execution_id]
+        """Generate replayable SSE events from in-memory stream state."""
+        current_seq = resume_after
         last_activity = asyncio.get_event_loop().time()
 
-        try:
-            while True:
-                try:
-                    # Wait for output; periodically send keep-alive comments
-                    stream_type, line = await asyncio.wait_for(
-                        queue.get(),
-                        timeout=15.0,
-                    )
-                    last_activity = asyncio.get_event_loop().time()
+        yield "retry: 3000\n\n"
 
-                    if stream_type == "done":
-                        # Re-fetch execution from DB to get final status
-                        result = await db.execute(
-                            select(Execution).where(Execution.id == execution_id)
-                        )
-                        updated_execution = result.scalar_one_or_none()
-                        done_payload = _build_done_payload(updated_execution)
-                        yield f"event: done\ndata: {done_payload}\n\n"
-                        break
+        while True:
+            events, closed, done_seq = await executor_service.wait_for_stream_events(
+                execution_id,
+                current_seq,
+                timeout=15.0,
+            )
 
-                    # IMPORTANT: do not embed newlines inside an SSE `data:` line.
-                    # Send one log line per SSE message.
-                    payload = (line or "").rstrip("\r\n")
-                    yield f"event: {stream_type}\ndata: {payload}\n\n"
+            if events:
+                last_activity = asyncio.get_event_loop().time()
+                for event in events:
+                    current_seq = event.seq
+                    payload = (event.data or "").rstrip("\r\n")
+                    yield f"id: {event.seq}\nevent: {event.event}\ndata: {payload}\n\n"
+                continue
 
-                except TimeoutError:
-                    # Keep-alive (comments are ignored by EventSource)
-                    current_time = asyncio.get_event_loop().time()
-                    if current_time - last_activity >= 15.0:
-                        yield ": keep-alive\n\n"
-                        last_activity = current_time
-                    continue
+            if closed:
+                if done_seq is not None and current_seq < done_seq:
+                    result = await db.execute(select(Execution).where(Execution.id == execution_id))
+                    updated_execution = result.scalar_one_or_none()
+                    done_payload = _build_done_payload(updated_execution)
+                    yield f"id: {done_seq}\nevent: done\ndata: {done_payload}\n\n"
+                break
 
-        finally:
-            # Cleanup is now handled by ExecutorService when execution finishes
-            # preventing premature deletion on client disconnect
-            pass
+            current_time = asyncio.get_event_loop().time()
+            if current_time - last_activity >= 15.0:
+                yield ": keep-alive\n\n"
+                last_activity = current_time
 
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },

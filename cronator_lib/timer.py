@@ -65,7 +65,7 @@ def timer(label: str = "", logger=None) -> Generator[dict, None, None]:
                     "level": "TIMER",
                     "message": msg,
                     "logger": "cronator.timer",
-                }),
+                }, ensure_ascii=False),
                 flush=True,
             )
         else:

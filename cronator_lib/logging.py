@@ -40,7 +40,7 @@ class CronatorFormatter(logging.Formatter):
         if hasattr(record, "extra_data"):
             log_entry["extra"] = record.extra_data
 
-        return json.dumps(log_entry)
+        return json.dumps(log_entry, ensure_ascii=False)
 
 
 class PrettyFormatter(logging.Formatter):
