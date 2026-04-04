@@ -199,6 +199,24 @@ class TestFormatters:
         for handler in logger.handlers:
             assert isinstance(handler.formatter, CronatorFormatter)
 
+    def test_cronator_logger_writes_single_newline_per_json_record(self):
+        """JSON-лог не должен оставлять пустые строки между событиями."""
+        stdout, stderr = StringIO(), StringIO()
+
+        with patch.dict(os.environ, {"CRONATOR_EXECUTION_ID": "1"}):
+            logger = CronatorLogger("test_json_newline")
+
+        logger.handlers[0].stream = stdout
+        logger.handlers[1].stream = stderr
+
+        logger.info("first")
+        logger.info("second")
+
+        stdout_lines = stdout.getvalue().splitlines()
+        assert len(stdout_lines) == 2
+        assert all(line.strip() for line in stdout_lines)
+        assert stderr.getvalue() == ""
+
     def test_outside_cronator_context_uses_pretty_formatter(self):
         """Без CRONATOR_EXECUTION_ID — хэндлеры используют PrettyFormatter."""
         env = os.environ.copy()
