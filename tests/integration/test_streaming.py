@@ -13,9 +13,9 @@ from app.models.execution import ExecutionStatus
 
 def parse_sse(raw: bytes | str) -> list[dict]:
     """
-    Разбивает SSE-текст на список событий.
-    Каждое событие — dict с ключами 'event', 'data', 'comment' (любые из них могут отсутствовать).
-    Блоки разделяются пустой строкой (\\n\\n).
+    Parse raw SSE text into a list of events.
+    Each event is a dict with keys 'event', 'data', 'comment' (any may be absent).
+    Blocks are separated by double newlines (\\n\\n).
     """
     text = raw.decode() if isinstance(raw, bytes) else raw
     events: list[dict] = []
@@ -42,23 +42,23 @@ def parse_sse(raw: bytes | str) -> list[dict]:
 
 
 class TestStreamingSSE:
-    """Интеграционные тесты SSE-стриминга логов выполнения скрипта."""
+    """Integration tests for SSE log streaming of script executions."""
 
-    # ── 404 / базовые ────────────────────────────────────────────────────────
+    # ── 404 / basic ──────────────────────────────────────────────────────────
 
     @pytest.mark.asyncio
     async def test_stream_returns_404_for_unknown_execution(self, test_client: AsyncClient):
-        """Стриминг несуществующего execution → 404."""
+        """Streaming a non-existent execution → 404."""
         response = await test_client.get("/api/executions/99999/stream")
         assert response.status_code == 404
 
-    # ── stored-output path (завершённое выполнение, очереди нет) ─────────────
+    # ── stored-output path (completed execution, no queue) ────────────────────
 
     @pytest.mark.asyncio
     async def test_stream_returns_200_with_sse_content_type(
         self, test_client: AsyncClient, execution_factory, sample_script
     ):
-        """Стриминг завершённого execution → 200 text/event-stream."""
+        """Streaming a completed execution → 200 text/event-stream."""
         execution = await execution_factory(
             script_id=sample_script.id,
             status=ExecutionStatus.SUCCESS.value,
@@ -73,7 +73,7 @@ class TestStreamingSSE:
     async def test_stream_sse_no_cache_header(
         self, test_client: AsyncClient, execution_factory, sample_script
     ):
-        """Стриминговый ответ содержит Cache-Control: no-cache."""
+        """Streaming response contains Cache-Control: no-cache."""
         execution = await execution_factory(
             script_id=sample_script.id,
             status=ExecutionStatus.SUCCESS.value,
@@ -87,7 +87,7 @@ class TestStreamingSSE:
     async def test_stream_stdout_lines_from_completed_execution(
         self, test_client: AsyncClient, execution_factory, sample_script
     ):
-        """Стриминг завершённого execution → все строки stdout приходят как data-события."""
+        """Streaming a completed execution → all stdout lines arrive as data events."""
         execution = await execution_factory(
             script_id=sample_script.id,
             status=ExecutionStatus.SUCCESS.value,
@@ -108,7 +108,7 @@ class TestStreamingSSE:
     async def test_stream_stderr_lines_from_failed_execution(
         self, test_client: AsyncClient, execution_factory, sample_script
     ):
-        """Стриминг упавшего execution → stderr включён в поток."""
+        """Streaming a failed execution → stderr is included in the stream."""
         execution = await execution_factory(
             script_id=sample_script.id,
             status=ExecutionStatus.FAILED.value,
@@ -142,7 +142,7 @@ class TestStreamingSSE:
         stderr,
         exit_code,
     ):
-        """event: done содержит правильные status и exit_code для success и failed."""
+        """event: done contains the correct status and exit_code for both success and failure."""
         execution = await execution_factory(
             script_id=sample_script.id,
             status=status,
@@ -165,7 +165,7 @@ class TestStreamingSSE:
     async def test_stream_empty_execution_has_only_done_event(
         self, test_client: AsyncClient, execution_factory, sample_script
     ):
-        """Execution без stdout/stderr → только event: done, никаких data-событий."""
+        """Execution with no stdout/stderr → only event: done, no data events."""
         execution = await execution_factory(
             script_id=sample_script.id,
             status=ExecutionStatus.SUCCESS.value,
@@ -186,7 +186,7 @@ class TestStreamingSSE:
     async def test_stream_done_event_includes_completion_metadata(
         self, test_client: AsyncClient, execution_factory, sample_script
     ):
-        """event: done включает finished_at и duration для завершённого execution."""
+        """event: done includes finished_at and duration for a completed execution."""
         finished_at = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
         execution = await execution_factory(
             script_id=sample_script.id,
@@ -214,8 +214,8 @@ class TestStreamingSSE:
         self, test_client: AsyncClient, execution_factory, sample_script
     ):
         """
-        SSE-протокол запрещает \\n внутри data: строки.
-        Каждая строка stdout → отдельный data-блок.
+        The SSE protocol forbids \\n inside a data: line.
+        Each stdout line must be a separate data block.
         """
         execution = await execution_factory(
             script_id=sample_script.id,
@@ -226,7 +226,7 @@ class TestStreamingSSE:
             raw = await response.aread()
 
         text = raw.decode()
-        # В SSE каждый data: payload не должен содержать \n
+        # Each data: payload must not contain \n
         for sse_line in text.split("\n"):
             if sse_line.startswith("data: "):
                 assert "\n" not in sse_line[6:], (

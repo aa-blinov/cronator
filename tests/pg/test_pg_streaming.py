@@ -1,10 +1,10 @@
 """
-SSE streaming тесты против PostgreSQL.
+SSE streaming tests against PostgreSQL.
 
-Переиспользует TestStreamingSSE из integration-тестов.
-Фикстура test_engine переопределена в tests/pg/conftest.py — все зависимые
-фикстуры (db_session, test_client, execution_factory, …) автоматически
-работают с PostgreSQL.
+Reuses TestStreamingSSE from the integration test suite.
+The test_engine fixture is overridden in tests/pg/conftest.py — all dependent
+fixtures (db_session, test_client, execution_factory, …) automatically
+run against PostgreSQL.
 """
 
 from tests.integration.test_streaming import TestStreamingSSE
