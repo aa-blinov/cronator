@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
 from app.models.script_version import ScriptVersion
+from app.script_templates import get_templates
 from app.services.executor import executor_service
 from app.services.scheduler import scheduler_service
 
@@ -131,6 +132,7 @@ async def script_new(
                 "    main()\n"
             ),
             "python_versions": ["3.9", "3.10", "3.11", "3.12", "3.13"],
+            "script_templates": get_templates(),
         },
     )
 
