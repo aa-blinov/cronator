@@ -1,7 +1,5 @@
 """Manual notification support for Cronator scripts."""
 
-import os
-import sys
 
 
 # Marker parsed by the executor to trigger an email alert

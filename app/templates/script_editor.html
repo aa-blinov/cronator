@@ -336,15 +336,77 @@
                     
                     <div class="form-control">
                         <label class="label cursor-pointer">
-                            <span class="label-text">Enabled</span>
+                            <span class="label-text">Run on schedule</span>
                             <input type="checkbox" name="enabled" value="true"
-                                   class="toggle toggle-primary"
+                                   class="toggle toggle-success"
                                    {% if not script or script.enabled %}checked{% endif %}>
+                        </label>
+                        <label class="label">
+                            <span class="label-text-alt text-gray-500">Enable automatic cron execution</span>
                         </label>
                     </div>
                 </div>
             </div>
-            
+
+            <!-- Reliability -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4">Reliability</h3>
+                <div class="space-y-4">
+                    <div class="form-control">
+                        <label class="label cursor-pointer">
+                            <span class="label-text">Prevent Overlap</span>
+                            <input type="checkbox" name="prevent_overlap" id="prevent-overlap" value="true"
+                                   class="toggle toggle-success"
+                                   {% if not script or script.prevent_overlap %}checked{% endif %}>
+                        </label>
+                        <label class="label">
+                            <span class="label-text-alt text-gray-500">Skip execution if script is already running</span>
+                        </label>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Retry Count</span>
+                        </label>
+                        <input type="number" name="retry_count" id="retry-count"
+                               value="{{ script.retry_count if script else 0 }}"
+                               min="0" max="10"
+                               class="input input-bordered w-full">
+                        <label class="label">
+                            <span class="label-text-alt text-gray-500">Number of retries on failure (0 = no retries)</span>
+                        </label>
+                    </div>
+
+                    <div id="retry-options" style="{% if not script or script.retry_count == 0 %}display: none;{% endif %}">
+                        <div class="form-control mb-4">
+                            <label class="label">
+                                <span class="label-text">Retry Delay (seconds)</span>
+                            </label>
+                            <input type="number" name="retry_delay"
+                                   value="{{ script.retry_delay if script else 60 }}"
+                                   min="5" max="3600"
+                                   class="input input-bordered w-full">
+                            <label class="label">
+                                <span class="label-text-alt text-gray-500">Seconds to wait between retry attempts</span>
+                            </label>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Max Retry Window (seconds)</span>
+                            </label>
+                            <input type="number" name="max_retry_window"
+                                   value="{{ script.max_retry_window if script else 3600 }}"
+                                   min="60" max="86400"
+                                   class="input input-bordered w-full">
+                            <label class="label">
+                                <span class="label-text-alt text-gray-500">Stop retrying after this many seconds from first attempt</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="glass-card rounded-xl p-6">
                 <h3 class="text-lg font-semibold mb-4">Dependencies</h3>
                 <div class="form-control">
@@ -435,7 +497,7 @@
                         <label class="label cursor-pointer">
                             <span class="label-text">Alert on failure</span>
                             <input type="checkbox" name="alert_on_failure" value="true"
-                                   class="toggle toggle-error"
+                                   class="toggle toggle-success"
                                    {% if not script or script.alert_on_failure %}checked{% endif %}>
                         </label>
                     </div>
@@ -503,6 +565,21 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+    // Show/hide retry options based on retry_count
+    (function() {
+        const retryCountInput = document.getElementById('retry-count');
+        const retryOptions = document.getElementById('retry-options');
+        if (retryCountInput && retryOptions) {
+            function updateRetryOptions() {
+                const count = parseInt(retryCountInput.value, 10) || 0;
+                retryOptions.style.display = count > 0 ? '' : 'none';
+            }
+            retryCountInput.addEventListener('input', updateRetryOptions);
+            updateRetryOptions();
+        }
+    })();
+</script>
 <script>
     // Script ID for API calls (read from form data attribute)
     const scriptForm = document.getElementById('script-form');

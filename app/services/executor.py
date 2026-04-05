@@ -3,7 +3,6 @@
 import asyncio
 import json
 import logging
-import os
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -174,14 +173,18 @@ class ExecutorService:
         script_id: int,
         triggered_by: str = "scheduler",
         is_test: bool = False,
+        attempt: int = 1,
+        first_attempt_at: datetime | None = None,
     ) -> int:
         """
         Execute a script and return the execution ID.
 
         Args:
             script_id: ID of the script to execute
-            triggered_by: Who triggered the execution (scheduler, manual, api, test)
+            triggered_by: Who triggered the execution (scheduler, manual, api, test, retry)
             is_test: Whether this is a test execution
+            attempt: Which attempt this is (1 = first run, 2 = first retry, etc.)
+            first_attempt_at: Timestamp of the first attempt (for retry window tracking)
 
         Returns:
             Execution ID
@@ -189,10 +192,44 @@ class ExecutorService:
         # Acquire lock to prevent race condition
         lock = self._get_script_lock(script_id)
         async with lock:
-            # Check if script is already running (prevent concurrent execution of same script)
-            if script_id in self._running_scripts:
-                logger.warning(f"Script {script_id} is already running, skipping execution")
-                raise ValueError(f"Script {script_id} is already running")
+            # Check if script is already running
+            script_is_running = script_id in self._running_scripts
+
+            if script_is_running:
+                # Check prevent_overlap: fetch script to see if overlap is prevented
+                async with async_session_maker() as overlap_db:
+                    overlap_result = await overlap_db.execute(
+                        select(Script).where(Script.id == script_id)
+                    )
+                    overlap_script = overlap_result.scalar_one_or_none()
+
+                if overlap_script and overlap_script.prevent_overlap:
+                    # Create a SKIPPED execution record
+                    logger.warning(
+                        f"Script {script_id} is already running, "
+                        "skipping execution (prevent_overlap=true)"
+                    )
+                    async with async_session_maker() as skip_db:
+                        skipped = Execution(
+                            script_id=script_id,
+                            status=ExecutionStatus.SKIPPED.value,
+                            triggered_by=triggered_by,
+                            started_at=datetime.now(UTC),
+                            finished_at=datetime.now(UTC),
+                            duration_ms=0,
+                            stdout=(
+                                "Skipped: another instance is already running"
+                                " (prevent_overlap=true)"
+                            ),
+                            attempt=attempt,
+                        )
+                        skip_db.add(skipped)
+                        await skip_db.commit()
+                        await skip_db.refresh(skipped)
+                        return skipped.id
+                else:
+                    logger.warning(f"Script {script_id} is already running, skipping execution")
+                    raise ValueError(f"Script {script_id} is already running")
 
             # Mark script as running immediately while holding lock
             self._running_scripts.add(script_id)
@@ -213,6 +250,7 @@ class ExecutorService:
                 triggered_by=triggered_by,
                 is_test=is_test,
                 started_at=datetime.now(UTC),
+                attempt=attempt,
             )
             db.add(execution)
             await db.commit()
@@ -222,7 +260,14 @@ class ExecutorService:
             self.ensure_stream_state(execution_id)
 
         # Run execution in background
-        asyncio.create_task(self._run_script(script_id, execution_id))
+        asyncio.create_task(
+            self._run_script(
+                script_id,
+                execution_id,
+                attempt=attempt,
+                first_attempt_at=first_attempt_at or datetime.now(UTC),
+            )
+        )
 
         return execution_id
 
@@ -230,7 +275,33 @@ class ExecutorService:
         """Check if a script is currently running."""
         return script_id in self._running_scripts
 
-    async def _run_script(self, script_id: int, execution_id: int) -> None:
+    async def _delayed_retry(
+        self,
+        script_id: int,
+        triggered_by: str,
+        attempt: int,
+        delay: int,
+        first_attempt_at: datetime,
+    ) -> None:
+        """Sleep for delay seconds then retry the script."""
+        await asyncio.sleep(delay)
+        try:
+            await self.execute_script(
+                script_id=script_id,
+                triggered_by=triggered_by,
+                attempt=attempt,
+                first_attempt_at=first_attempt_at,
+            )
+        except Exception as exc:
+            logger.error(f"Retry attempt {attempt} for script {script_id} failed: {exc}")
+
+    async def _run_script(
+        self,
+        script_id: int,
+        execution_id: int,
+        attempt: int = 1,
+        first_attempt_at: datetime | None = None,
+    ) -> None:
         """Actually run the script (called in background)."""
         async with async_session_maker() as db:
             try:
@@ -440,7 +511,8 @@ class ExecutorService:
                                                 pass
                                         marker_idx = message.find("CRONATOR_NOTIFY:")
                                         if marker_idx != -1:
-                                            payload = message[marker_idx + len("CRONATOR_NOTIFY:"):].strip()
+                                            marker_len = len("CRONATOR_NOTIFY:")
+                                            payload = message[marker_idx + marker_len :].strip()
                                             if "|" in payload:
                                                 notify_title, notify_body = payload.split("|", 1)
                                                 notify_title = notify_title.strip()
@@ -466,7 +538,9 @@ class ExecutorService:
                                                 "logger": "cronator.notify",
                                             }, ensure_ascii=False) + "\n"
                                             stdout_lines.append(log_line)
-                                            self.live_output_char_counts[execution_id]["stdout"] += len(log_line)
+                                            char_count = len(log_line)
+                                            counts = self.live_output_char_counts[execution_id]
+                                            counts["stdout"] += char_count
                                             await self.publish_stream_event(
                                                 execution_id,
                                                 "stdout",
@@ -478,7 +552,7 @@ class ExecutorService:
                                 else:
                                     # Regular stdout line — store and stream
                                     stdout_lines.append(decoded)
-                                    self.live_output_char_counts[execution_id]["stdout"] += len(decoded)
+                                    self.live_output_char_counts[execution_id]["stdout"] += len(decoded)  # noqa: E501
 
                             # Stream to UI: skip internal markers converted elsewhere.
                             if not is_internal_marker:
@@ -531,13 +605,58 @@ class ExecutorService:
                     except TimeoutError:
                         process.kill()
                         await process.wait()
+                        status = ExecutionStatus.TIMEOUT
                         await self._finish_execution(
                             db,
                             execution,
-                            status=ExecutionStatus.TIMEOUT,
+                            status=status,
                             error_message=f"Script timed out after {script.timeout} seconds",
                             start_time=start_time,
                         )
+
+                    # Update script reliability stats
+                    final_status = execution.status
+                    async with async_session_maker() as stats_db:
+                        stats_result = await stats_db.execute(
+                            select(Script).where(Script.id == script_id)
+                        )
+                        script_obj = stats_result.scalar_one_or_none()
+                        if script_obj:
+                            now = datetime.now(UTC)
+                            if final_status == ExecutionStatus.SUCCESS.value:
+                                script_obj.last_success_at = now
+                                script_obj.consecutive_failures = 0
+                            elif final_status in (
+                                ExecutionStatus.FAILED.value,
+                                ExecutionStatus.TIMEOUT.value,
+                            ):
+                                script_obj.last_failure_at = now
+                                script_obj.consecutive_failures += 1
+                            await stats_db.commit()
+
+                    # Schedule retry if applicable
+                    if final_status in (
+                        ExecutionStatus.FAILED.value,
+                        ExecutionStatus.TIMEOUT.value,
+                    ):
+                        retries_left = script.retry_count - (attempt - 1)
+                        _first_attempt_at = first_attempt_at or start_time or datetime.now(UTC)
+                        time_elapsed = (datetime.now(UTC) - _first_attempt_at).total_seconds()
+                        if retries_left > 0 and time_elapsed < script.max_retry_window:
+                            delay = script.retry_delay
+                            logger.info(
+                                f"Script {script_id} failed, scheduling retry "
+                                f"{attempt + 1}/{script.retry_count + 1} in {delay}s"
+                            )
+                            asyncio.create_task(
+                                self._delayed_retry(
+                                    script_id=script_id,
+                                    triggered_by="retry",
+                                    attempt=attempt + 1,
+                                    delay=delay,
+                                    first_attempt_at=_first_attempt_at,
+                                )
+                            )
 
                 finally:
                     # Cleanup

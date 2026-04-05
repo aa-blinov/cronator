@@ -3,15 +3,13 @@
 import json
 import os
 import time
-from io import StringIO
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cronator_lib.context import CronatorContext, get_context
+from cronator_lib.context import get_context
 from cronator_lib.notify import notify
 from cronator_lib.timer import timer
-
 
 # ─────────────────────────── CronatorContext ─────────────────────────────────
 

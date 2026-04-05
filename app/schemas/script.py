@@ -20,6 +20,14 @@ class ScriptBase(BaseModel):
     misfire_grace_time: int = Field(default=60, ge=0, le=3600)
     working_directory: str = Field(default="")
     environment_vars: str = Field(default="")
+    retry_count: int = Field(default=0, ge=0, le=10, description="Retry attempts on failure")
+    retry_delay: int = Field(default=60, ge=5, le=3600, description="Seconds between retries")
+    max_retry_window: int = Field(
+        default=3600, ge=60, le=86400, description="Max seconds window for retries"
+    )
+    prevent_overlap: bool = Field(
+        default=True, description="Skip if another instance is already running"
+    )
 
     @field_validator("cron_expression")
     @classmethod
@@ -111,6 +119,10 @@ class ScriptUpdate(BaseModel):
     misfire_grace_time: int | None = Field(default=None, ge=0, le=3600)
     working_directory: str | None = None
     environment_vars: str | None = None
+    retry_count: int | None = Field(default=None, ge=0, le=10)
+    retry_delay: int | None = Field(default=None, ge=5, le=3600)
+    max_retry_window: int | None = Field(default=None, ge=60, le=86400)
+    prevent_overlap: bool | None = None
     change_summary: str | None = None  # Optional description of changes for versioning
 
     @field_validator("name")
@@ -148,6 +160,11 @@ class ScriptRead(ScriptBase):
     last_run_at: datetime | None = None
     next_run_at: datetime | None = None
     last_alert_at: datetime | None = None
+
+    # Stats (read-only)
+    last_success_at: datetime | None = None
+    last_failure_at: datetime | None = None
+    consecutive_failures: int = 0
 
     model_config = {"from_attributes": True}
 

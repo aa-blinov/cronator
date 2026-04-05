@@ -7,7 +7,6 @@ import pytest
 
 from app.services.executor import ExecutorService
 
-
 # ─────────────────────────── helpers ─────────────────────────────────────────
 
 
