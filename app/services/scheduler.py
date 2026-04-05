@@ -44,6 +44,9 @@ class SchedulerService:
             for script in scripts:
                 await self.add_job(script)
 
+        # Re-register internal system jobs (removed by remove_all_jobs above)
+        self._register_internal_jobs()
+
         logger.info(f"Loaded {len(scripts)} scheduled jobs")
 
     async def add_job(self, script: Script) -> bool:
@@ -124,6 +127,25 @@ class SchedulerService:
         except Exception as e:
             logger.error(f"Error parsing cron expression '{cron_expression}': {e}")
             return None
+
+    def _register_internal_jobs(self) -> None:
+        """Register built-in system jobs (cleanup, etc.)."""
+        self.scheduler.add_job(
+            self._run_cleanup,
+            trigger=CronTrigger(hour=3, minute=0, timezone="UTC"),
+            id="internal_cleanup",
+            name="Execution History Cleanup",
+            replace_existing=True,
+        )
+
+    async def _run_cleanup(self) -> None:
+        """Run the daily status-aware execution history cleanup."""
+        from app.services.cleanup_service import cleanup_service
+
+        try:
+            await cleanup_service.cleanup_by_status()
+        except Exception:
+            logger.exception("Error during scheduled execution history cleanup")
 
     async def _execute_script(self, script_id: int) -> None:
         """Execute a script (called by scheduler)."""
