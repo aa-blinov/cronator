@@ -147,6 +147,14 @@
                         <p class="text-xs text-base-content/50 mt-1">Autocomplete: `Ctrl+Space` or just keep typing</p>
                     </div>
                     <div class="flex gap-2">
+                        {% if not script %}
+                        <button type="button" id="from-template-btn" class="btn btn-outline btn-secondary btn-sm gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+                            </svg>
+                            From Template
+                        </button>
+                        {% endif %}
                         <button type="button" id="validate-btn" class="btn btn-outline btn-info btn-sm gap-2">
                             {{ icons.check_circle("w-4 h-4") }}
                             Validate
@@ -466,6 +474,32 @@
         </div>
     </div>
 </form>
+
+<!-- Template Picker Modal -->
+<dialog id="template-modal" class="modal">
+    <div class="modal-box w-11/12 max-w-4xl">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="font-bold text-xl mb-1">Start from a Template</h3>
+        <p class="text-sm text-base-content/50 mb-5">Pick a template — all fields will be pre-filled. You can change anything before saving.</p>
+
+        <!-- Category filter -->
+        <div class="flex flex-wrap gap-2 mb-5" id="template-filters">
+            <button type="button" class="btn btn-xs btn-primary tpl-filter-btn" data-cat="all">All</button>
+            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="monitoring">Monitoring</button>
+            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="data">Data</button>
+            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="maintenance">Maintenance</button>
+            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="notification">Notification</button>
+        </div>
+
+        <div id="template-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div class="text-center py-10 text-base-content/40 col-span-3">Loading templates…</div>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
 {% endblock %}
 
 {% block extra_scripts %}
@@ -509,6 +543,7 @@
             'Ctrl-Space': 'autocomplete',
         },
     });
+    window.editor = editor;  // expose for template picker
 
     function collectPythonAutocompleteWords(cm) {
         const words = new Set(pythonAutocompleteWords);
@@ -2047,6 +2082,139 @@ ${separator}
         loadVersionHistory();
     });
     {% endif %}
-    
+
+    // ==================== Template Picker ====================
+    {% if not script %}
+    (function () {
+        const modal = document.getElementById('template-modal');
+        const grid  = document.getElementById('template-grid');
+        let templates = [];
+        let activeCategory = 'all';
+
+        const CATEGORY_COLORS = {
+            monitoring:   'badge-info',
+            data:         'badge-success',
+            maintenance:  'badge-warning',
+            notification: 'badge-secondary',
+        };
+
+        // SVG icons rendered server-side via Jinja2 macros
+        const TEMPLATE_ICONS = {
+            check_circle:         `{{ icons.check_circle("w-7 h-7") }}`,
+            exclamation_triangle: `{{ icons.exclamation_triangle("w-7 h-7") }}`,
+            archive_box:          `{{ icons.archive_box("w-7 h-7") }}`,
+            clipboard:            `{{ icons.clipboard("w-7 h-7") }}`,
+            arrow_path:           `{{ icons.arrow_path("w-7 h-7") }}`,
+            trash:                `{{ icons.trash("w-7 h-7") }}`,
+            envelope:             `{{ icons.envelope("w-7 h-7") }}`,
+            bolt:                 `{{ icons.bolt("w-7 h-7") }}`,
+            lock_closed:          `{{ icons.lock_closed("w-7 h-7") }}`,
+            signal:               `{{ icons.signal("w-7 h-7") }}`,
+            globe_alt:            `{{ icons.globe_alt("w-7 h-7") }}`,
+            heart:                `{{ icons.heart("w-7 h-7") }}`,
+            arrow_up_tray:        `{{ icons.arrow_up_tray("w-7 h-7") }}`,
+            bell:                 `{{ icons.bell("w-7 h-7") }}`,
+            device_phone_mobile:  `{{ icons.device_phone_mobile("w-7 h-7") }}`,
+            document:             `{{ icons.document("w-7 h-7") }}`,
+            cog:                  `{{ icons.cog("w-7 h-7") }}`,
+        };
+
+        function renderGrid(cat) {
+            const visible = cat === 'all' ? templates : templates.filter(t => t.category === cat);
+            if (!visible.length) {
+                grid.innerHTML = '<div class="text-center py-10 text-base-content/40 col-span-3">No templates in this category.</div>';
+                return;
+            }
+            grid.innerHTML = visible.map(t => {
+                const badgeClass = CATEGORY_COLORS[t.category] || 'badge-ghost';
+                return `
+                <button type="button"
+                        class="tpl-card text-left p-4 rounded-xl border border-base-content/10 hover:border-primary hover:bg-primary/5 transition-all"
+                        data-id="${t.id}">
+                    <div class="flex items-start gap-3">
+                        <span class="shrink-0 text-base-content/70 mt-0.5">${TEMPLATE_ICONS[t.icon] ?? t.icon}</span>
+                        <div class="min-w-0">
+                            <div class="font-semibold text-sm truncate">${t.name}</div>
+                            <div class="mt-1"><span class="badge badge-xs ${badgeClass}">${t.category}</span></div>
+                            <p class="text-xs text-base-content/50 mt-2 leading-snug">${t.description}</p>
+                        </div>
+                    </div>
+                </button>`;
+            }).join('');
+
+            grid.querySelectorAll('.tpl-card').forEach(card => {
+                card.addEventListener('click', () => applyTemplate(card.dataset.id));
+            });
+        }
+
+        function applyTemplate(id) {
+            const t = templates.find(x => x.id === id);
+            if (!t) return;
+
+            // Name
+            const nameInput = document.querySelector('[name="name"]');
+            if (nameInput && !nameInput.readOnly) nameInput.value = t.name;
+
+            // Description
+            const descInput = document.querySelector('[name="description"]');
+            if (descInput) descInput.value = t.description;
+
+            // Code (CodeMirror)
+            if (window.editor) {
+                window.editor.setValue(t.code);
+                window.editor.clearHistory();
+            }
+
+            // Dependencies
+            const depsInput = document.getElementById('dependencies-input');
+            if (depsInput) depsInput.value = t.dependencies;
+
+            // Cron
+            const cronInput = document.getElementById('cron-input');
+            if (cronInput) {
+                cronInput.value = t.cron_expression;
+                cronInput.dispatchEvent(new Event('input'));
+            }
+
+            // Python version
+            const pySelect = document.querySelector('[name="python_version"]');
+            if (pySelect) pySelect.value = t.python_version;
+
+            // Timeout
+            const timeoutInput = document.querySelector('[name="timeout"]');
+            if (timeoutInput) timeoutInput.value = t.timeout;
+
+            // Environment vars
+            const envInput = document.querySelector('[name="environment_vars"]');
+            if (envInput) envInput.value = t.environment_vars;
+
+            modal.close();
+            window.showToast?.(`Template "${t.name}" applied`, 'success');
+        }
+
+        // Filter buttons
+        document.getElementById('template-filters')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.tpl-filter-btn');
+            if (!btn) return;
+            activeCategory = btn.dataset.cat;
+            document.querySelectorAll('.tpl-filter-btn').forEach(b => {
+                b.classList.toggle('btn-primary', b.dataset.cat === activeCategory);
+                b.classList.toggle('btn-outline', b.dataset.cat !== activeCategory);
+            });
+            renderGrid(activeCategory);
+        });
+
+        // Templates baked in from server — no fetch needed
+        templates = {{ script_templates | tojson }};
+
+        // Open modal
+        document.getElementById('from-template-btn')?.addEventListener('click', () => {
+            modal.showModal();
+            if (grid.querySelector('.tpl-card')) return;  // already rendered
+            renderGrid(activeCategory);
+        });
+    })();
+    {% endif %}
+
 </script>
 {% endblock %}
