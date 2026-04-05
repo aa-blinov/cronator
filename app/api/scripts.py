@@ -27,6 +27,7 @@ from app.schemas.script_version import (
     ScriptVersionList,
     ScriptVersionRead,
 )
+from app.script_templates import get_templates
 from app.services.environment import environment_service
 from app.services.executor import executor_service
 from app.services.scheduler import scheduler_service
@@ -34,6 +35,12 @@ from app.services.scheduler import scheduler_service
 logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
+
+
+@router.get("/templates")
+async def list_script_templates():
+    """Return built-in script templates for the new-script picker."""
+    return {"items": get_templates()}
 
 
 @router.get("", response_model=ScriptList)
