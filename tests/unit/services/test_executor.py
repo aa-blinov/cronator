@@ -236,8 +236,8 @@ class TestExecutorServiceScriptPath:
 
 class TestSubprocessEnvIsolation:
     """
-    Проверяет что subprocess получает только явно разрешённые переменные окружения,
-    а секреты Cronator (DATABASE_URL, ADMIN_PASSWORD и т.д.) не утекают в пользовательские скрипты.
+    Verify that the subprocess only receives explicitly allowed environment variables,
+    and that Cronator secrets (DATABASE_URL, ADMIN_PASSWORD, etc.) do not leak into user scripts.
     """
 
     # ------------------------------------------------------------------ helpers
@@ -246,7 +246,7 @@ class TestSubprocessEnvIsolation:
         script = MagicMock()
         script.id = 1
         script.name = "test_script"
-        script.path = None  # генерируется автоматически
+        script.path = None  # auto-generated
         script.python_version = "3.12"
         script.dependencies = None
         script.timeout = 60
@@ -265,7 +265,7 @@ class TestSubprocessEnvIsolation:
         return execution
 
     def _make_db_ctx(self, script: MagicMock, execution: MagicMock) -> MagicMock:
-        """Мок async_session_maker(): два вызова execute() → script, execution."""
+        """Mock async_session_maker(): two execute() calls → script, then execution."""
         res_script = MagicMock()
         res_script.scalar_one_or_none.return_value = script
 
@@ -275,7 +275,7 @@ class TestSubprocessEnvIsolation:
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(side_effect=[res_script, res_exec])
         mock_db.commit = AsyncMock()
-        mock_db.refresh = AsyncMock()  # _finish_execution вызывает db.refresh(execution)
+        mock_db.refresh = AsyncMock()  # _finish_execution calls db.refresh(execution)
         mock_db.add = MagicMock()
 
         ctx = AsyncMock()
@@ -284,7 +284,7 @@ class TestSubprocessEnvIsolation:
         return ctx
 
     def _make_process(self) -> MagicMock:
-        """Мок subprocess — завершается мгновенно, вывода нет."""
+        """Mock subprocess — exits immediately with no output."""
         proc = MagicMock()
         proc.pid = 12345
         proc.returncode = 0
@@ -296,7 +296,7 @@ class TestSubprocessEnvIsolation:
         return proc
 
     def _make_settings(self) -> MagicMock:
-        """Мок settings с нужными путями."""
+        """Mock settings with required paths."""
         exec_artifacts = MagicMock(spec=Path)
         exec_artifacts.mkdir = MagicMock()
         exec_artifacts.__str__ = lambda self: "/tmp/artifacts/42"
@@ -316,8 +316,8 @@ class TestSubprocessEnvIsolation:
         execution: MagicMock,
     ) -> dict:
         """
-        Запускает _run_script с замоканным окружением и возвращает
-        словарь env, который был передан в asyncio.create_subprocess_exec.
+        Runs _run_script with a mocked environment and returns the env dict
+        that was passed to asyncio.create_subprocess_exec.
         """
         captured: dict = {}
 
@@ -345,7 +345,7 @@ class TestSubprocessEnvIsolation:
             patch.object(ExecutorService, "_get_script_path", return_value=script_path),
             patch("asyncio.create_subprocess_exec", new=AsyncMock(side_effect=fake_subprocess)),
             patch("app.services.executor.settings", self._make_settings()),
-            # Отключаем алертинг — открывает отдельные сессии, не нужен для env-тестов
+            # Disable alerting — it opens separate sessions and is not needed for env tests
             patch.object(ExecutorService, "_send_success_alert", new=AsyncMock()),
             patch.object(ExecutorService, "_send_failure_alert", new=AsyncMock()),
         ):
@@ -360,7 +360,7 @@ class TestSubprocessEnvIsolation:
 
     @pytest.mark.asyncio
     async def test_parent_secrets_not_leaked_to_subprocess(self, monkeypatch):
-        """Секреты Cronator не должны попадать в subprocess пользовательского скрипта."""
+        """Cronator secrets must not be passed to the user script subprocess."""
         monkeypatch.setenv("DATABASE_URL", "postgresql://admin:supersecret@db/cronator")
         monkeypatch.setenv("ADMIN_PASSWORD", "super_secret_password")
         monkeypatch.setenv("SECRET_KEY", "my_very_secret_key")
@@ -368,14 +368,14 @@ class TestSubprocessEnvIsolation:
 
         env = await self._run_and_capture_env(self._make_script(), self._make_execution())
 
-        assert "DATABASE_URL" not in env, "DATABASE_URL утёк в subprocess!"
-        assert "ADMIN_PASSWORD" not in env, "ADMIN_PASSWORD утёк в subprocess!"
-        assert "SECRET_KEY" not in env, "SECRET_KEY утёк в subprocess!"
-        assert "CRONATOR_INTERNAL_TOKEN" not in env, "CRONATOR_INTERNAL_TOKEN утёк в subprocess!"
+        assert "DATABASE_URL" not in env, "DATABASE_URL leaked into subprocess!"
+        assert "ADMIN_PASSWORD" not in env, "ADMIN_PASSWORD leaked into subprocess!"
+        assert "SECRET_KEY" not in env, "SECRET_KEY leaked into subprocess!"
+        assert "CRONATOR_INTERNAL_TOKEN" not in env, "CRONATOR_INTERNAL_TOKEN leaked into subprocess!"
 
     @pytest.mark.asyncio
     async def test_oracle_client_vars_present_in_subprocess(self):
-        """Subprocess должен получить переменные Oracle client для работы cx_Oracle."""
+        """Subprocess must receive Oracle client variables for cx_Oracle to work."""
         env = await self._run_and_capture_env(self._make_script(), self._make_execution())
 
         assert "LD_LIBRARY_PATH" in env
@@ -386,7 +386,7 @@ class TestSubprocessEnvIsolation:
 
     @pytest.mark.asyncio
     async def test_user_defined_env_vars_passed_to_subprocess(self):
-        """Пользовательские переменные из script.environment_vars должны попасть в subprocess."""
+        """User-defined variables from script.environment_vars must reach the subprocess."""
         script = self._make_script(
             environment_vars='{"MY_API_KEY": "hello123", "DB_HOST": "prod-db"}'
         )
@@ -398,7 +398,7 @@ class TestSubprocessEnvIsolation:
 
     @pytest.mark.asyncio
     async def test_cronator_context_vars_passed_to_subprocess(self):
-        """Контекстные переменные Cronator (script_id, execution_id и т.д.) должны быть в subprocess."""
+        """Cronator context variables (script_id, execution_id, etc.) must be present in the subprocess."""
         env = await self._run_and_capture_env(self._make_script(), self._make_execution())
 
         assert env.get("CRONATOR_SCRIPT_ID") == "1"
@@ -408,10 +408,10 @@ class TestSubprocessEnvIsolation:
     @pytest.mark.asyncio
     async def test_only_allowed_system_vars_present(self, monkeypatch):
         """
-        Проверяет что в subprocess попадают только разрешённые системные переменные
-        (PATH, HOME, LANG, TZ), а не весь os.environ родительского процесса.
+        Only allowed system variables (PATH, HOME, LANG, TZ) are passed to the subprocess;
+        the rest of the parent process os.environ is not forwarded.
         """
-        # Добавляем "лишние" системные переменные в родительский процесс
+        # Add extra system variables to the parent process
         monkeypatch.setenv("RANDOM_SYSTEM_VAR", "should_not_leak")
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
         monkeypatch.setenv("VIRTUAL_ENV", "/some/venv")
@@ -421,7 +421,7 @@ class TestSubprocessEnvIsolation:
         assert "RANDOM_SYSTEM_VAR" not in env
         assert "VIRTUAL_ENV" not in env
 
-        # Разрешённые системные переменные на месте
+        # Allowed system variables must be present
         assert "PATH" in env
         assert "HOME" in env
         assert "LANG" in env

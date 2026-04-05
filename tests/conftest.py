@@ -155,7 +155,7 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
 
 @pytest_asyncio.fixture
 async def exec_service(test_engine, monkeypatch):  # -> ExecutorService
-    """ExecutorService подключённый к тестовой БД (SQLite или PostgreSQL)."""
+    """ExecutorService connected to the test database (SQLite or PostgreSQL)."""
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     import app.services.executor as executor_module
@@ -172,7 +172,7 @@ async def exec_service(test_engine, monkeypatch):  # -> ExecutorService
 
 @pytest_asyncio.fixture
 async def db_script(db_session: AsyncSession) -> "Script":
-    """Реальный Script в тестовой БД для тестов concurrency."""
+    """Real Script in the test database for concurrency tests."""
     from app.models.script import Script
 
     script = Script(

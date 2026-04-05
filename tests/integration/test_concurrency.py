@@ -1,12 +1,12 @@
 """
-Integration tests for ExecutorService concurrency — реальная БД, без subprocess.
+Integration tests for ExecutorService concurrency — real database, no subprocess.
 
-Проверяем:
-  - что запись Execution создаётся в БД при запуске
-  - что второй вызов для того же скрипта → ValueError пока первый ещё «работает»
-  - что разные скрипты запускаются параллельно без конфликта
-  - что после завершения скрипт можно перезапустить (новая запись в БД)
-  - что начальный статус Execution = RUNNING
+Verifies:
+  - that an Execution record is created in the DB when a script is started
+  - that a second call for the same script raises ValueError while the first is still "running"
+  - that different scripts can run in parallel without conflict
+  - that after completion a script can be re-run (new DB record created)
+  - that the initial Execution status is RUNNING
 """
 
 import asyncio
@@ -24,7 +24,7 @@ from app.services.executor import ExecutorService
 
 
 class TestConcurrencyIntegration:
-    """Интеграционные тесты блокировки повторного запуска скрипта."""
+    """Integration tests for duplicate-run prevention."""
 
     @pytest.mark.asyncio
     async def test_execute_script_creates_execution_in_db(
@@ -33,13 +33,13 @@ class TestConcurrencyIntegration:
         db_script: Script,
         db_session: AsyncSession,
     ):
-        """execute_script() создаёт запись Execution в БД с правильным script_id."""
-        script_id = db_script.id  # сохраняем до expire
+        """execute_script() creates an Execution record in the DB with the correct script_id."""
+        script_id = db_script.id  # save before potential expire
         with patch.object(exec_service, "_run_script", new=AsyncMock()):
             eid = await exec_service.execute_script(script_id)
 
         assert eid is not None
-        # rollback завершает текущую транзакцию → новая видит коммит exec_service
+        # rollback ends the current transaction → new one sees the exec_service commit
         await db_session.rollback()
         execution = await db_session.get(Execution, eid)
         assert execution is not None
@@ -52,7 +52,7 @@ class TestConcurrencyIntegration:
         db_script: Script,
         db_session: AsyncSession,
     ):
-        """Сразу после запуска статус Execution = RUNNING."""
+        """Immediately after launch, the Execution status is RUNNING."""
         script_id = db_script.id
         with patch.object(exec_service, "_run_script", new=AsyncMock()):
             eid = await exec_service.execute_script(script_id)
@@ -67,7 +67,7 @@ class TestConcurrencyIntegration:
         exec_service: ExecutorService,
         db_script: Script,
     ):
-        """Второй вызов execute_script для того же скрипта → ValueError."""
+        """A second execute_script call for the same script raises ValueError."""
         with patch.object(exec_service, "_run_script", new=AsyncMock()):
             await exec_service.execute_script(db_script.id)
 
@@ -81,7 +81,7 @@ class TestConcurrencyIntegration:
         exec_service: ExecutorService,
         db_session: AsyncSession,
     ):
-        """Два разных скрипта запускаются параллельно — оба получают Execution в БД."""
+        """Two different scripts launched in parallel both get Execution records in the DB."""
         script_a = Script(
             name="conc_int_a",
             content="print('a')",
@@ -105,7 +105,7 @@ class TestConcurrencyIntegration:
         await db_session.refresh(script_a)
         await db_session.refresh(script_b)
 
-        sid_a, sid_b = script_a.id, script_b.id  # сохраняем до expire
+        sid_a, sid_b = script_a.id, script_b.id  # save before expire
 
         with patch.object(exec_service, "_run_script", new=AsyncMock()):
             id_a, id_b = await asyncio.gather(
@@ -130,7 +130,7 @@ class TestConcurrencyIntegration:
         db_script: Script,
         db_session: AsyncSession,
     ):
-        """После удаления из _running_scripts скрипт запускается повторно — создаётся новая Execution."""
+        """After removal from _running_scripts, the script can be re-run, creating a new Execution."""
         script_id = db_script.id
 
         with patch.object(exec_service, "_run_script", new=AsyncMock()):
@@ -155,11 +155,11 @@ class TestConcurrencyIntegration:
         self,
         exec_service: ExecutorService,
     ):
-        """Если скрипт не найден в БД — исключение, script_id убран из _running_scripts."""
+        """If the script is not found in the DB, an exception is raised and script_id is removed from _running_scripts."""
         non_existent_id = 99999
 
         with pytest.raises(ValueError, match="not found"):
             await exec_service.execute_script(non_existent_id)
 
-        # После ошибки скрипт не должен «зависнуть» как запущенный
+        # After the error, the script must not remain stuck as "running"
         assert not exec_service.is_script_running(non_existent_id)

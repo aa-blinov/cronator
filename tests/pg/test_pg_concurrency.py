@@ -1,9 +1,9 @@
 """
-Concurrency интеграционные тесты против PostgreSQL.
+Concurrency integration tests against PostgreSQL.
 
-Переиспользует TestConcurrencyIntegration из integration-тестов.
-Фикстура test_engine переопределена в tests/pg/conftest.py —
-все зависимые фикстуры работают с PostgreSQL через testcontainers.
+Reuses TestConcurrencyIntegration from the integration test suite.
+The test_engine fixture is overridden in tests/pg/conftest.py —
+all dependent fixtures run against PostgreSQL via testcontainers.
 """
 
 from tests.integration.test_concurrency import TestConcurrencyIntegration
