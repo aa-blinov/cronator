@@ -1,7 +1,7 @@
 """
-Versioning тесты против PostgreSQL.
+Versioning tests against PostgreSQL.
 
-Переиспользует TestScriptVersioning из integration-тестов.
+Reuses TestScriptVersioning from the integration test suite.
 """
 
 from tests.integration.test_versioning import TestScriptVersioning

@@ -1,121 +1,99 @@
 # Cronator
 
-Cronator — это self-hosted планировщик Python-скриптов с веб-интерфейсом, изолированными окружениями для каждого скрипта и email-алертами.
+**The home for your recurring Python automations.**
 
-## Скриншоты
+Run, isolate, monitor, and fix scheduled scripts — without crontab hell, broken venvs, or silent failures at 3 AM.
+
+---
+
+Cronator is not an alternative to Airflow or Prefect. It fills the gap between bare `cron` and heavy orchestrators: you have a handful of Python scripts that need to run on a schedule, you want them isolated, observable, and resilient — and you don't want to set up a data platform to get there.
+
+## Screenshots
 
 ### Dashboard
 
 ![Dashboard](docs/screenshots/dashboard.png)
-*Главная страница с последними выполнениями скриптов*
+_Last executions at a glance — status, duration, output_
 
 ### Executions
 
 ![Executions](docs/screenshots/executions.png)
-*История всех выполнений с фильтрацией и поиском*
+_Full execution history with filtering and live log streaming_
 
-### New Script
+### Script Editor
 
 ![New Script Editor](docs/screenshots/editor.png)
-*Редактор для создания и настройки скриптов с подсветкой синтаксиса*
+_Write, schedule, and configure each script in one place_
 
 ### Settings
 
 ![Settings](docs/screenshots/settings.png)
-*Управление настройками приложения и email-алертами*
+_SMTP alerts, timeouts, and app-wide configuration_
 
-## Особенности
+## Features
 
-- **Hot-reload** — новые скрипты подхватываются без перезапуска
-- **Изоляция** — каждый скрипт работает в своём виртуальном окружении (uv)
-- **Python версии** — выбор любой версии Python (uv автоматически скачает нужную)
-- **Web UI** — современный интерфейс для управления скриптами
-- **Алерты** — уведомления на почту при ошибках
-- **Бэкапы** — все данные хранятся в папках-вольюмах, плюс есть кнопка выгрузки БД
-- **Docker** — простой деплой одной командой
+- **Python-first** — write a plain Python script, Cronator handles the rest
+- **Isolated environments** — every script gets its own `uv` virtualenv; Python version is selectable per script
+- **19 built-in templates** — HTTP health checks, database maintenance, backups, notifications, and more
+- **Execution history** — every run is stored with stdout, stderr, exit code, duration, and trigger source
+- **Live log streaming** — watch output appear in real time over SSE
+- **Reliability controls** — per-script retries, retry delay, max retry window, overlap prevention
+- **Alerting** — email notifications on failure (SMTP, configurable per script)
+- **"Run again" button** — re-run any past execution instantly from the history view
+- **Script versioning** — full content stored per execution for reproducibility
+- **REST API** — every action available via API with Basic Auth
+- **Docker-first** — one `docker compose up` to production; PostgreSQL + daily backups included
+- **SQLite for dev** — no database setup needed for local development
 
-## Быстрый старт
+## Quick Start
 
-### Production с Docker и PostgreSQL (рекомендуется)
+### Production (Docker + PostgreSQL)
 
 ```bash
-# 1. Клонировать репозиторий
 git clone https://github.com/yourusername/cronator.git
 cd cronator
 
-# 2. Создать .env из примера и настроить пароли
 cp .env.example .env
-nano .env  # Установить POSTGRES_PASSWORD, ADMIN_PASSWORD, SECRET_KEY
+# Set POSTGRES_PASSWORD, ADMIN_PASSWORD, SECRET_KEY in .env
 
-# 3. Запустить сервисы (PostgreSQL + Cronator + Backup)
 docker compose up -d
 
-# 4. Проверить логи
-docker compose logs -f cronator
-
-# 5. Открыть в браузере
+# Open in browser
 open http://localhost:8080
 ```
 
-По умолчанию: `admin` / `admin` (измените в .env!)
+Default credentials: `admin` / `admin` — change them in `.env` before going live.
 
-**Что включено:**
+**Included out of the box:**
 
-- PostgreSQL 16 с автоматическими миграциями
-- Ежедневные бэкапы БД в 2 AM (хранятся 7 дней)
-- Persistent volumes для данных
-- Health checks для всех сервисов
+- PostgreSQL 16 with automatic Alembic migrations on startup
+- Daily database backups at 2 AM, retained for 7 days
+- Persistent volumes for scripts, environments, logs, and data
+- Health checks on all services
 
-### Локальная разработка с SQLite
+### Local Development (SQLite)
 
 ```bash
-# Установить uv если ещё не установлен
+# Install uv if not already installed
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Установить зависимости
 uv sync
-
-# Запустить миграции БД
 uv run alembic upgrade head
-
-# Запустить приложение
 uv run python -m uvicorn app.main:app --reload --port 8080
 ```
 
-## Структура скриптов
+## Writing Scripts
 
-### Через UI
+### Via the UI
 
-1. Откройте <http://localhost:8080>
-2. Нажмите "New Script"
-3. Напишите код, укажите расписание и зависимости
-4. Сохраните
+1. Open `http://localhost:8080`
+2. Click **New Script** (or pick one of the 19 templates)
+3. Write your code, set a cron schedule, list any pip dependencies
+4. Save — it's live immediately
 
-### Через файловую систему
+### Script structure
 
-Создайте папку в `scripts/` с файлом `cronator.yaml`:
-
-```plain
-scripts/
-└── my-task/
-    ├── cronator.yaml
-    ├── script.py
-    └── requirements.txt (опционально)
-```
-
-**cronator.yaml:**
-
-```yaml
-name: my-task
-description: Описание задачи
-schedule: "0 * * * *"  # Каждый час
-python: "3.12"
-enabled: true
-timeout: 3600
-alert_on_failure: true
-```
-
-**script.py:**
+Each script is a plain Python file with a `main()` function:
 
 ```python
 from cronator_lib import get_logger
@@ -123,269 +101,258 @@ from cronator_lib import get_logger
 log = get_logger()
 
 def main():
-    log.info("Starting task...")
-    # Ваш код
-    log.success("Task completed!")
+    log.info("Starting...")
+    # your code here
+    log.success("Done!")
 
 if __name__ == "__main__":
     main()
 ```
 
-## Конфигурация
-
-### Первый запуск
-
-При первом запуске создайте `.env` файл с базовыми настройками:
-
-```bash
-cp .env.example .env
-# Отредактировать .env, изменить ADMIN_PASSWORD и SECRET_KEY
-```
-
-**Важно:** `.env` нужен только для первого запуска и задает начальные значения. После первого запуска все настройки можно менять через веб-интерфейс в разделе Settings.
-
-### Управление настройками
-
-После первого запуска все настройки хранятся в базе данных и редактируются через UI:
-
-1. Откройте <http://localhost:8080/settings>
-2. Нажмите "Edit Settings"
-3. Измените нужные настройки (SMTP, таймауты)
-4. Сохраните изменения
-
-Настройки применяются немедленно без перезапуска контейнера.
-
-### Основные настройки
-
-| Переменная | Описание | По умолчанию |
-| --- | --- | --- |
-| `ADMIN_USERNAME` | Логин администратора | `admin` |
-| `ADMIN_PASSWORD` | Пароль администратора | `admin` |
-| `SECRET_KEY` | Секретный ключ (для шифрования) | `change-me` |
-| `DATABASE_URL` | URL базы данных | SQLite (локально) / PostgreSQL (Docker) |
-| `POSTGRES_PASSWORD` | Пароль PostgreSQL (только Docker) | `cronator_dev_password` |
-| `BACKUP_RETENTION_DAYS` | Срок хранения бэкапов (дни) | `7` |
-| `SMTP_ENABLED` | Включить email-алерты | `false` |
-| `DEFAULT_TIMEOUT` | Таймаут скриптов (сек) | `3600` |
-
-См. `.env.example` для полного списка.
-
-## База данных
-
-### PostgreSQL (Production)
-
-В Docker используется PostgreSQL 16 с автоматическими миграциями:
-
-```bash
-# Миграции применяются автоматически при старте контейнера
-docker compose up -d
-
-# Просмотр текущей версии БД
-docker compose exec cronator uv run alembic current
-
-# История миграций
-docker compose exec cronator uv run alembic history
-```
-
-### SQLite (Development)
-
-Для локальной разработки используется SQLite:
-
-```bash
-# Применить миграции
-uv run alembic upgrade head
-
-# Откатить последнюю миграцию
-uv run alembic downgrade -1
-
-# Создать новую миграцию после изменения моделей
-uv run alembic revision --autogenerate -m "Description of changes"
-```
-
-### Миграции (Alembic)
-
-Проект использует Alembic для управления схемой БД:
-
-```bash
-# Создать новую миграцию после изменения моделей
-uv run alembic revision --autogenerate -m "Add new column"
-
-# Применить все миграции
-uv run alembic upgrade head
-
-# Откатить последнюю миграцию
-uv run alembic downgrade -1
-
-# Откатить до конкретной версии
-uv run alembic downgrade <revision_id>
-
-# Показать текущую версию БД
-uv run alembic current
-
-# Показать историю миграций
-uv run alembic history --verbose
-```
-
-**Структура миграций:**
-
-```plain
-alembic/
-├── versions/
-│   └── 7a45991c91e2_initial_schema_with_all_tables.py
-├── env.py           # Конфигурация для async SQLAlchemy
-└── script.py.mako   # Шаблон для новых миграций
-```
-
-### Бэкапы PostgreSQL
-
-Бэкапы создаются автоматически сервисом `db-backup`:
-
-**Расписание:** Ежедневно в 2:00 AM  
-**Хранение:** 7 дней (настраивается через `BACKUP_RETENTION_DAYS`)  
-**Формат:** `backups/cronator_YYYYMMDD_HHMMSS.sql.gz`
-
-#### Ручной бэкап
-
-```bash
-# Создать бэкап
-docker compose exec db pg_dump -U cronator cronator | gzip > backups/manual_$(date +%Y%m%d).sql.gz
-
-# Список бэкапов
-ls -lh backups/
-```
-
-#### Восстановление из бэкапа
-
-```bash
-# 1. Остановить приложение
-docker compose stop cronator
-
-# 2. Восстановить БД
-gunzip < backups/cronator_20260125_020000.sql.gz | docker compose exec -T db psql -U cronator cronator
-
-# 3. Запустить приложение
-docker compose start cronator
-
-# Или полная пересборка:
-docker compose down
-docker compose up -d
-```
-
-#### Миграция с SQLite на PostgreSQL
-
-Если у вас есть данные в SQLite и вы хотите мигрировать на PostgreSQL:
-
-```bash
-# 1. Экспорт данных из SQLite (создайте скрипт)
-# 2. Запустить PostgreSQL
-docker compose up -d db
-
-# 3. Применить миграции
-docker compose run --rm cronator uv run alembic upgrade head
-
-# 4. Импорт данных через SQL или Python скрипт
-# 5. Запустить приложение
-docker compose up -d cronator
-```
-
-**Примечание:** Миграция данных не включена в автоматический процесс. При переходе с SQLite на PostgreSQL данные не переносятся автоматически.
-
-## API
-
-Cronator предоставляет REST API:
-
-```bash
-# Список скриптов
-curl -u admin:password http://localhost:8080/api/scripts
-
-# Запустить скрипт
-curl -X POST -u admin:password http://localhost:8080/api/scripts/1/run
-
-# Получить историю выполнений
-curl -u admin:password http://localhost:8080/api/executions?script_id=1
-```
-
 ## cronator_lib
 
-Библиотека для удобного логирования в скриптах:
+Every script has access to `cronator_lib` — a lightweight logging and utility library that works the same locally and inside Cronator.
 
 ```python
-from cronator_lib import get_logger
+from cronator_lib import get_logger, save_artifact, notify, timer
 
 log = get_logger()
 
-log.info("Информационное сообщение")
-log.warning("Предупреждение")
-log.error("Ошибка", exc_info=True)
-log.success("Успешно!")
+# Log levels — DEBUG/INFO/WARNING go to stdout, ERROR/CRITICAL to stderr
+log.info("Fetching data...")
+log.warning("Rate limit approaching")
+log.error("Connection failed", exc_info=True)
+log.success("All records processed!")
 
-# Прогресс
+# Structured log entry with extra fields
+log.with_data("Batch complete", count=1500, duration_ms=823)
+
+# Progress tracking
 for i, item in enumerate(items):
-    log.progress(i + 1, len(items), "Processing items")
+    log.progress(i + 1, len(items), "Processing")
 
-# Структурированные данные
-log.with_data("Processed", count=100, duration_ms=1234)
+# Task lifecycle markers
+log.task_start("export")
+# ... do work ...
+log.task_end("export", success=True)
+
+# Time a code block (logs elapsed time automatically)
+with timer("db query"):
+    results = db.execute(query)
+
+# Send a manual notification (triggers the same alert channel as failures)
+notify("Export complete: 1 500 rows", title="Daily Export")
+
+# Save a file as an execution artifact (appears in the UI)
+save_artifact("report.csv", csv_bytes)
 ```
 
-## Тестирование
+When running inside Cronator, logs are emitted as structured JSON (one object per line) so the UI can parse and display them. Outside Cronator — in your local terminal — the same calls produce human-readable colored output.
 
-Проект включает комплексный набор тестов: unit-тесты и интеграционные тесты API.
+## Templates
 
-### Запуск тестов
+Cronator ships with 19 ready-to-use templates:
 
-Вы можете запускать тесты локально (SQLite) или в изолированном контейнере (PostgreSQL):
+| Template           | Category     | Description                                               |
+| ------------------ | ------------ | --------------------------------------------------------- |
+| `api-health-check` | monitoring   | Ping HTTP endpoints, alert on errors or timeouts          |
+| `disk-monitor`     | monitoring   | Check disk usage, alert on threshold breach               |
+| `ssl-cert-check`   | monitoring   | Alert before SSL certificates expire                      |
+| `port-check`       | monitoring   | TCP reachability check (Redis, MySQL, any service)        |
+| `dns-check`        | monitoring   | Verify DNS resolution, alert on IP changes                |
+| `heartbeat`        | monitoring   | Run job logic and ping a watchdog URL on result           |
+| `file-cleanup`     | maintenance  | Delete files older than N days (supports dry-run)         |
+| `db-vacuum`        | maintenance  | PostgreSQL VACUUM ANALYZE                                 |
+| `pg-backup`        | data         | pg_dump a PostgreSQL database, save as artifact           |
+| `mysql-backup`     | data         | mysqldump a MySQL/MariaDB database, save as artifact      |
+| `s3-upload`        | data         | Fetch data from a URL and upload to S3-compatible storage |
+| `csv-export`       | data         | Fetch JSON from an API and export as a CSV artifact       |
+| `http-data-sync`   | data         | Fetch records from a source API and push to a target      |
+| `db-query-report`  | data         | Run a SQL query, export results as CSV artifact           |
+| `email-report`     | notification | Send an HTML report email via SMTP                        |
+| `slack-notify`     | notification | Post to Slack / Discord / Teams via webhook               |
+| `telegram-notify`  | notification | Send a Telegram message via Bot API                       |
+| `ntfy-notify`      | notification | Push notification via ntfy.sh                             |
+| `pushover-notify`  | notification | Push notification via Pushover API                        |
 
-#### Локально (SQLite)
+Each template includes inline comments, a working `main()` function, and a `__name__ == "__main__"` guard so it can be tested locally before scheduling.
+
+## Reliability
+
+Each script has individual reliability controls:
+
+| Setting            | Default | Description                                            |
+| ------------------ | ------- | ------------------------------------------------------ |
+| `retry_count`      | 0       | Number of retry attempts after a failure (0–10)        |
+| `retry_delay`      | 60 s    | Seconds to wait between retry attempts                 |
+| `max_retry_window` | 3600 s  | Maximum time window within which retries are allowed   |
+| `prevent_overlap`  | true    | Skip the run if a previous instance is still executing |
+
+When `prevent_overlap` is enabled and a script is already running, the scheduler creates a `SKIPPED` execution record (with full context) instead of starting a second instance. Skipped executions appear in the history so you can see when and why they were skipped.
+
+Retry state is tracked per execution chain: `attempt`, `first_attempt_at`, and `retries_left` are recorded so you can see exactly what happened in the execution history.
+
+Script-level statistics are updated after every run:
+
+| Field                  | Description                                           |
+| ---------------------- | ----------------------------------------------------- |
+| `last_success_at`      | Timestamp of the most recent successful execution     |
+| `last_failure_at`      | Timestamp of the most recent failed execution         |
+| `consecutive_failures` | Counter reset to 0 on success, incremented on failure |
+
+## Configuration
+
+### First run
 
 ```bash
-# Установить dev зависимости
-uv sync --all-extras
+cp .env.example .env
+# Edit .env: set ADMIN_PASSWORD and SECRET_KEY at minimum
+```
 
-# Запустить все тесты
+`.env` seeds the initial values. After the first start, all settings are stored in the database and can be changed through **Settings → Edit Settings** without restarting the container.
+
+### Environment variables
+
+| Variable                | Default                               | Description                            |
+| ----------------------- | ------------------------------------- | -------------------------------------- |
+| `ADMIN_USERNAME`        | `admin`                               | Admin login                            |
+| `ADMIN_PASSWORD`        | `admin`                               | Admin password — **change this**       |
+| `SECRET_KEY`            | `change-me`                           | Encryption key for sensitive settings  |
+| `DATABASE_URL`          | SQLite locally / PostgreSQL in Docker | Database connection string             |
+| `POSTGRES_PASSWORD`     | `cronator_dev_password`               | PostgreSQL password (Docker only)      |
+| `BACKUP_RETENTION_DAYS` | `7`                                   | How many days to keep database backups |
+| `SMTP_ENABLED`          | `false`                               | Enable email alerts                    |
+| `DEFAULT_TIMEOUT`       | `3600`                                | Default script timeout in seconds      |
+
+See `.env.example` for the full list.
+
+## API
+
+All actions are available via REST API with Basic Auth:
+
+```bash
+# List scripts
+curl -u admin:password http://localhost:8080/api/scripts
+
+# Create a script
+curl -u admin:password -X POST http://localhost:8080/api/scripts \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-script","content":"print(1)","cron_expression":"0 * * * *"}'
+
+# Run a script immediately
+curl -u admin:password -X POST http://localhost:8080/api/scripts/1/run
+
+# Re-run a specific past execution
+curl -u admin:password -X POST http://localhost:8080/api/scripts/1/rerun
+
+# Get execution history
+curl -u admin:password http://localhost:8080/api/executions?script_id=1
+
+# Get available templates
+curl -u admin:password http://localhost:8080/api/scripts/templates
+```
+
+## Database
+
+### PostgreSQL (production)
+
+Alembic migrations run automatically on container start:
+
+```bash
+# Check current migration version
+docker compose exec cronator uv run alembic current
+
+# View migration history
+docker compose exec cronator uv run alembic history
+```
+
+### SQLite (development)
+
+```bash
+uv run alembic upgrade head    # apply migrations
+uv run alembic downgrade -1    # roll back one migration
+uv run alembic revision --autogenerate -m "describe change"
+```
+
+### Backups
+
+Automated daily backups via the `db-backup` service:
+
+- **Schedule:** every day at 2:00 AM
+- **Retention:** 7 days (set via `BACKUP_RETENTION_DAYS`)
+- **Format:** `backups/cronator_YYYYMMDD_HHMMSS.sql.gz`
+
+Manual backup:
+
+```bash
+docker compose exec db pg_dump -U cronator cronator | gzip > backups/manual_$(date +%Y%m%d).sql.gz
+```
+
+Restore:
+
+```bash
+docker compose stop cronator
+gunzip < backups/cronator_20260125_020000.sql.gz | docker compose exec -T db psql -U cronator cronator
+docker compose start cronator
+```
+
+## Testing
+
+### Run locally (SQLite)
+
+```bash
+uv sync --all-extras
 uv run pytest tests/ -v
 ```
 
-#### В Docker (PostgreSQL) — Рекомендуется
-
-Этот метод гарантирует полную идентичность окружения с production и тестирует работу с реальной БД PostgreSQL.
-
-```bash
-npm run test:docker
-```
-
-Или вручную:
+### Run in Docker (PostgreSQL) — recommended
 
 ```bash
 docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
 ```
 
-### Структура тестов
+### Test structure
 
-```plain
+```
 tests/
-├── conftest.py              # Фикстуры и настройка тестовой БД
+├── conftest.py                        # fixtures, test DB setup
 ├── unit/
-│   ├── test_models.py       # Тесты моделей Script, Execution
+│   ├── test_models.py                 # Script and Execution model tests
+│   ├── test_cronator_lib.py           # CronatorLogger, get_logger, save_artifact
+│   ├── test_cronator_lib_new.py       # CronatorContext, timer, notify
+│   ├── test_script_templates.py       # all 19 templates: fields, syntax, structure
+│   ├── test_reliability_schema.py     # Pydantic schema validation for reliability fields
 │   └── services/
-│       ├── test_scheduler.py    # Тесты SchedulerService
-│       └── test_executor.py     # Тесты ExecutorService
+│       ├── test_scheduler.py          # SchedulerService
+│       ├── test_executor.py           # ExecutorService, subprocess env isolation
+│       ├── test_alerts.py             # _send_success_alert, _send_failure_alert
+│       ├── test_concurrency.py        # per-script lock, _running_scripts
+│       └── test_reliability.py        # retries, overlap prevention, stat tracking
 └── integration/
-    ├── test_api_scripts.py      # API /api/scripts
-    ├── test_api_executions.py   # API /api/executions
-    └── test_api_settings.py     # API /api/settings
+    ├── test_api_scripts.py            # /api/scripts CRUD
+    ├── test_api_executions.py         # /api/executions
+    ├── test_api_settings.py           # /api/settings
+    ├── test_api_reliability.py        # templates endpoint, rerun, SKIPPED status
+    ├── test_api_artifacts.py          # artifact upload, download, delete
+    ├── test_concurrency.py            # concurrent execution with real DB
+    ├── test_versioning.py             # script version history and revert
+    ├── test_streaming.py              # SSE live log streaming
+    ├── test_env_protection.py         # subprocess env isolation (integration)
+    └── test_diagnostic.py             # /api/diagnostics endpoint
+pg/                                    # same tests re-run against PostgreSQL
+    ├── conftest.py                    # testcontainers PostgreSQL fixture
+    ├── test_pg_concurrency.py
+    ├── test_pg_versioning.py
+    └── test_pg_streaming.py
 ```
 
-**Важно:**
+Tests use SQLite in-memory by default. The `tests/pg/` suite spins up a real PostgreSQL 16 container via `testcontainers`. In both cases, `SKIP_ALEMBIC_MIGRATIONS=1` is set and the schema is created directly from SQLAlchemy models.
 
-- При локальном запуске используется файл `test_app.db` (SQLite), который удаляется после тестов.
-- При запуске в Docker используется отдельный контейнер `db-test` (PostgreSQL 16).
-- Во всех тестах автоматически устанавливается `SKIP_ALEMBIC_MIGRATIONS=1`, схема БД создается напрямую из моделей SQLAlchemy для скорости.
+## Security
 
-## Безопасность
+Before going to production:
 
-Перед использованием в production:
-
-- Измените `ADMIN_PASSWORD`, `POSTGRES_PASSWORD` и `SECRET_KEY` в `.env`
-- Не коммитьте `.env` в Git
-- Используйте HTTPS через reverse proxy (nginx/Caddy/traefik)
-- Чувствительные данные автоматически шифруются в БД (Fernet)
+- Set strong values for `ADMIN_PASSWORD`, `POSTGRES_PASSWORD`, and `SECRET_KEY` in `.env`
+- Never commit `.env` to git (it is in `.gitignore`)
+- Put Cronator behind a TLS-terminating reverse proxy (nginx, Caddy, Traefik)
+- Sensitive settings (SMTP password, API keys) are encrypted at rest with Fernet

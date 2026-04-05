@@ -1,33 +1,31 @@
-# Artifacts System - User Guide
+# Artifacts System — User Guide
 
 ## Overview
 
-Система артефактов в Cronator позволяет сохранять файлы во время выполнения скриптов. Артефакты могут включать отчеты, логи, изображения, данные и любые другие файлы, которые необходимо сохранить и скачать через UI.
+The artifacts system lets scripts save files during execution. Artifacts can include reports, logs, images, data files, or any other output you want to persist and download from the UI.
 
-## Основные возможности
+## Features
 
-- ✅ Сохранение файлов до 10 МБ
-- ✅ Автоматическая генерация уникальных имен файлов
-- ✅ Валидация и санитизация имен файлов
-- ✅ Проверка свободного места на диске (минимум 100 МБ)
-- ✅ Метаданные артефактов в базе данных для быстрого доступа
-- ✅ Скачивание через UI с оригинальными именами файлов
-- ✅ Удаление отдельных артефактов
-- ✅ Массовая очистка всех артефактов через Settings
+- ✅ Save files up to 10 MB each
+- ✅ Automatic unique filename generation with timestamp suffix
+- ✅ Filename validation and sanitization
+- ✅ Disk space check before saving (minimum 100 MB free required)
+- ✅ Artifact metadata stored in the database for fast access
+- ✅ Download via UI with original filenames
+- ✅ Delete individual artifacts
+- ✅ Bulk clear all artifacts via Settings
 
-## Использование в скриптах
+## Usage in scripts
 
-### Базовый пример
+### Basic example
 
 ```python
 from cronator_lib import get_logger, save_artifact
 
 log = get_logger()
 
-# Создание данных
 data = "Hello, World!".encode('utf-8')
 
-# Сохранение артефакта
 try:
     saved_name = save_artifact("report.txt", data)
     log.success(f"Artifact saved as {saved_name}")
@@ -35,26 +33,24 @@ except Exception as e:
     log.error(f"Failed to save artifact: {e}")
 ```
 
-### CSV отчет
+### CSV report
 
 ```python
 import csv
 from io import StringIO
 from cronator_lib import save_artifact
 
-# Создание CSV в памяти
 csv_buffer = StringIO()
 writer = csv.writer(csv_buffer)
 writer.writerow(['Date', 'Metric', 'Value'])
 writer.writerow(['2026-01-27', 'Users', 1523])
 writer.writerow(['2026-01-27', 'Revenue', 45236.50])
 
-# Сохранение как артефакт
 csv_data = csv_buffer.getvalue().encode('utf-8')
 save_artifact("daily_report.csv", csv_data)
 ```
 
-### JSON конфигурация
+### JSON snapshot
 
 ```python
 import json
@@ -71,12 +67,12 @@ json_data = json.dumps(config, indent=2).encode('utf-8')
 save_artifact("config_backup.json", json_data)
 ```
 
-### Изображения и бинарные файлы
+### Binary files (images, etc.)
 
 ```python
 from cronator_lib import save_artifact
 
-# Пример с изображением (используя библиотеку PIL/Pillow)
+# Example with PIL/Pillow
 # from PIL import Image
 # import io
 
@@ -88,69 +84,67 @@ from cronator_lib import save_artifact
 # save_artifact("chart.png", image_data)
 ```
 
-## Ограничения и валидация
+## Limits and validation
 
-### Размер файла
-- **Максимум:** 10 МБ на файл
-- Если файл превышает лимит, выбрасывается `ValueError` с детальным сообщением
+### File size
+- **Maximum:** 10 MB per file
+- Exceeding the limit raises `ValueError` with a descriptive message
 
-### Имя файла
-- **Максимальная длина:** 200 символов
-- **Разрешенные символы:** буквы (a-z, A-Z), цифры (0-9), точка (.), дефис (-), underscore (_)
-- **Запрещенные расширения:** .exe, .bat, .sh, .cmd, .com, .pif, .scr, .vbs, .ps1 (исполняемые файлы)
-- Пробелы автоматически заменяются на underscore
-- Пути (../, абсолютные пути) запрещены
+### Filename
+- **Maximum length:** 200 characters
+- **Allowed characters:** letters (a-z, A-Z), digits (0-9), dot (.), dash (-), underscore (_)
+- **Blocked extensions:** `.exe`, `.bat`, `.sh`, `.cmd`, `.com`, `.pif`, `.scr`, `.vbs`, `.ps1`
+- Spaces are automatically replaced with underscores
+- Path traversal (`../`, absolute paths) is rejected
 
-### Свободное место
-- **Минимум:** 100 МБ свободного места на диске
-- Проверяется перед сохранением каждого файла
+### Disk space
+- **Minimum:** 100 MB free disk space
+- Checked before saving each file
 
-### Уникальность имен
-Файлы автоматически получают уникальные имена с временной меткой:
-- Входное имя: `report.csv`
-- Сохраненное имя: `report_1738012345.csv`
+### Unique names
+Files are automatically saved with a timestamp suffix to avoid conflicts:
+- Input name: `report.csv`
+- Saved name: `report_1738012345.csv`
 
-Это предотвращает конфликты имен и позволяет сохранять множество артефактов с одинаковыми оригинальными именами.
+## Managing artifacts via the UI
 
-## Управление через UI
+### Viewing artifacts for an execution
 
-### Просмотр артефактов execution
+1. Go to the **Executions** page
+2. Click an execution (executions with artifacts have a 📦 badge)
+3. Scroll down to the **Artifacts** section
+4. Each artifact shows:
+   - Original filename
+   - File size
+   - Creation date
+   - **Download** and **Delete** buttons
 
-1. Перейдите на страницу **Executions**
-2. Выберите execution (у executions с артефактами есть бейдж 📦)
-3. Прокрутите вниз до секции **Artifacts**
-4. Здесь отображаются:
-   - Оригинальное имя файла
-   - Размер файла
-   - Дата создания
-   - Кнопки **Download** и **Delete**
+### Downloading artifacts
 
-### Скачивание артефактов
+Click **Download** next to an artifact. The file is served with its original filename.
 
-Нажмите кнопку **Download** рядом с артефактом. Файл скачается с оригинальным именем.
+### Deleting artifacts
 
-### Удаление артефактов
+- **Single artifact:** click **Delete** → confirm
+- **All artifacts for an execution:** delete the execution (artifacts are cascade-deleted)
+- **All artifacts in the system:** Settings → Artifacts Storage → **Clear All Artifacts**
 
-- **Отдельный артефакт:** Нажмите **Delete** → подтвердите
-- **Все артефакты execution:** Удалите execution (артефакты удаляются автоматически)
-- **Все артефакты системы:** Settings → Artifacts Storage → **Clear All Artifacts**
+### Storage statistics
 
-### Статистика хранилища
+On the **Settings** page, the **Artifacts Storage** section shows:
+- Total number of artifacts
+- Total space used
+- Number of executions that have artifacts
+- Free disk space remaining
 
-На странице **Settings** в секции **Artifacts Storage** доступны:
-- Общее количество артефактов
-- Использованное место
-- Количество executions с артефактами
-- Свободное место на диске
+## API endpoints
 
-## API Endpoints
-
-### Список артефактов execution
+### List artifacts for an execution
 ```http
 GET /api/executions/{execution_id}/artifacts
 ```
 
-Ответ:
+Response:
 ```json
 {
   "items": [
@@ -167,31 +161,31 @@ GET /api/executions/{execution_id}/artifacts
 }
 ```
 
-### Скачивание артефакта
+### Download an artifact
 ```http
 GET /api/executions/{execution_id}/artifacts/{artifact_id}
 ```
 
-Возвращает файл с `Content-Disposition: attachment; filename="<original_filename>"`
+Returns the file with `Content-Disposition: attachment; filename="<original_filename>"`.
 
-### Удаление артефакта
+### Delete an artifact
 ```http
 DELETE /api/executions/{execution_id}/artifacts/{artifact_id}
 ```
 
-### Статистика артефактов
+### Artifact storage stats
 ```http
 GET /api/settings/artifacts-stats
 ```
 
-### Очистка всех артефактов
+### Clear all artifacts
 ```http
 POST /api/settings/clear-artifacts
 ```
 
-## Хранение данных
+## Storage layout
 
-### Структура директорий
+### Directory structure
 ```
 data/
 └── artifacts/
@@ -203,36 +197,38 @@ data/
     ...
 ```
 
-### База данных
-Таблица `artifacts`:
-- `id` - уникальный идентификатор
-- `execution_id` - связь с execution (CASCADE DELETE)
-- `filename` - имя файла на диске (с timestamp)
-- `original_filename` - оригинальное имя от пользователя
-- `size_bytes` - размер файла
-- `created_at` - дата создания
+### Database schema
 
-Таблица `executions` дополнена полями:
-- `artifacts_count` - количество артефактов
-- `artifacts_size_bytes` - общий размер артефактов
+`artifacts` table columns:
+- `id` — primary key
+- `execution_id` — foreign key to executions (CASCADE DELETE)
+- `filename` — on-disk filename (with timestamp suffix)
+- `original_filename` — original name provided by the script
+- `size_bytes` — file size in bytes
+- `created_at` — creation timestamp
 
-## Обработка ошибок
+`executions` table additional columns:
+- `artifacts_count` — number of artifacts for this execution
+- `artifacts_size_bytes` — total size of all artifacts
+
+## Error handling
 
 ### ValueError
-Выбрасывается при:
-- Слишком длинном имени файла (>200 символов)
-- Недопустимых символах в имени
-- Превышении максимального размера (>10 МБ)
-- Отсутствии `CRONATOR_EXECUTION_ID` в окружении
-- Опасном расширении файла
+Raised when:
+- Filename exceeds 200 characters
+- Filename contains invalid characters
+- File size exceeds 10 MB
+- `CRONATOR_EXECUTION_ID` is not set in the environment
+- File has a blocked extension
 
 ### OSError
-Выбрасывается при:
-- Недостатке свободного места (<100 МБ)
-- Ошибках файловой системы
-- Проблемах с правами доступа
+Raised when:
+- Less than 100 MB disk space available
+- Filesystem write error
+- Permission denied
 
-### Пример обработки
+### Example
+
 ```python
 from cronator_lib import save_artifact, get_logger
 
@@ -249,86 +245,80 @@ except Exception as e:
     log.error(f"Unexpected error: {e}")
 ```
 
-## Миграция базы данных
+## Running migrations
 
-Для активации системы артефактов выполните:
+The artifacts system requires the `a1b2c3d4e5f6_add_artifacts_support` migration:
 
 ```bash
-# Применить миграцию
 alembic upgrade head
-
-# Или перезапустить Cronator (миграции применяются автоматически)
 ```
 
-Миграция `a1b2c3d4e5f6_add_artifacts_support.py`:
-- Создает таблицу `artifacts`
-- Добавляет поля в `executions`
-- Создает необходимые индексы
+When running via Docker Compose, migrations are applied automatically on startup.
 
-## Пример полного скрипта
+The migration:
+- Creates the `artifacts` table
+- Adds `artifacts_count` and `artifacts_size_bytes` columns to `executions`
+- Creates required indexes
 
-См. `scripts/artifacts_demo/script.py` для полного рабочего примера, демонстрирующего:
-- Сохранение CSV отчетов
-- Сохранение JSON конфигураций
-- Сохранение текстовых логов
-- Обработку ошибок
-- Использование логгера
+## Full example script
 
-## Best Practices
+See `scripts/artifacts_demo/script.py` for a complete working example demonstrating:
+- Saving CSV reports
+- Saving JSON snapshots
+- Saving text logs
+- Error handling
+- Logger integration
 
-1. **Размер файлов:** Держите артефакты небольшими (<1 МБ когда возможно)
-2. **Именование:** Используйте описательные имена (`daily_report.csv` лучше чем `report.csv`)
-3. **Очистка:** Регулярно удаляйте старые артефакты через Settings
-4. **Обработка ошибок:** Всегда оборачивайте `save_artifact()` в try/except
-5. **Логирование:** Логируйте успешное сохранение и ошибки
-6. **Формат данных:** Предпочитайте текстовые форматы (CSV, JSON, TXT) бинарным
+## Best practices
+
+1. **File size:** Keep artifacts small (under 1 MB when possible)
+2. **Naming:** Use descriptive names (`daily_report.csv` rather than `report.csv`)
+3. **Cleanup:** Regularly remove old artifacts via Settings
+4. **Error handling:** Always wrap `save_artifact()` in try/except
+5. **Logging:** Log both successful saves and failures
+6. **Format:** Prefer text formats (CSV, JSON, TXT) over binary when you have a choice
 
 ## Troubleshooting
 
-### Артефакт не отображается в UI
-- Проверьте логи execution на наличие `ARTIFACT_SAVED:` сообщений
-- Убедитесь что файл существует в `data/artifacts/{execution_id}/`
-- Проверьте таблицу `artifacts` в БД
+### Artifact not appearing in the UI
+- Check execution logs for `ARTIFACT_SAVED:` messages
+- Verify the file exists under `data/artifacts/{execution_id}/`
+- Check the `artifacts` table in the database
 
-### "Недостаточно места на диске"
-- Освободите место или увеличьте раздел
-- Очистите старые артефакты через Settings
-- Проверьте квоты диска
+### "Not enough disk space"
+- Free up disk space or expand the volume
+- Clear old artifacts via Settings → Clear All Artifacts
+- Check disk quotas
 
-### "Имя файла слишком длинное"
-Сократите имя до 200 символов или меньше
+### "Filename too long"
+Shorten the name to 200 characters or fewer.
 
-### "Превышен максимальный размер"
-- Сожмите данные перед сохранением (gzip, zip)
-- Разбейте на несколько меньших артефактов
-- Сохраните только критичные данные
+### "File exceeds maximum size"
+- Compress data before saving (gzip, zip)
+- Split into multiple smaller artifacts
+- Save only the critical subset of data
 
-## Конфигурация
+## Configuration
 
-В `app/config.py`:
+In `app/config.py`:
 ```python
-# Директория для артефактов
+# Directory for artifact storage
 artifacts_dir: Path = Path("./data/artifacts")
 
-# Максимальный размер файла (МБ)
+# Maximum file size in MB
 max_artifact_size_mb: int = 10
 
-# Минимальное свободное место (МБ)
+# Minimum free disk space in MB
 min_free_space_mb: int = 100
 
-# Максимальная длина имени файла
+# Maximum filename length
 max_filename_length: int = 200
 ```
 
-## Безопасность
+## Security
 
-✅ **Валидация путей:** Предотвращает path traversal атаки  
-✅ **Санитизация имен:** Удаляет опасные символы  
-✅ **Расширения:** Блокирует исполняемые файлы  
-✅ **Изоляция:** Каждый execution имеет свою директорию  
-✅ **Ограничения:** Лимиты на размер и количество файлов
-
----
-
-**Версия:** 1.0  
-**Дата:** 2026-01-27
+✅ **Path validation:** Prevents path traversal attacks
+✅ **Filename sanitization:** Strips dangerous characters
+✅ **Extension blocking:** Rejects executable file types
+✅ **Execution isolation:** Each execution has its own subdirectory
+✅ **Limits:** Enforced size and space constraints

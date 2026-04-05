@@ -1,18 +1,18 @@
 """
 PostgreSQL fixtures for tests/pg/.
 
-Переопределяет фикстуру test_engine из корневого conftest.py:
-все тесты в этой директории автоматически работают с PostgreSQL.
+Overrides the test_engine fixture from the root conftest.py:
+all tests in this directory automatically run against PostgreSQL.
 
-Режимы работы:
-  1. CI / docker-compose: TEST_DATABASE_URL уже postgresql+asyncpg://...
-     → используется напрямую, testcontainers не нужен.
-  2. Локально с Docker: testcontainers запускает postgres:16-alpine.
-  3. Без Docker: тесты пропускаются.
+Operating modes:
+  1. CI / docker-compose: TEST_DATABASE_URL already set to postgresql+asyncpg://...
+     → used directly, no testcontainers needed.
+  2. Local with Docker: testcontainers spins up postgres:16-alpine.
+  3. Without Docker: tests are skipped.
 
-Запуск:
-    pytest tests/pg/              # требует PostgreSQL (env var или Docker)
-    USE_TESTCONTAINERS=0 pytest tests/pg/  # принудительно пропустить
+Running:
+    pytest tests/pg/                      # requires PostgreSQL (env var or Docker)
+    USE_TESTCONTAINERS=0 pytest tests/pg/ # force-skip
 """
 
 import os
@@ -25,7 +25,7 @@ from app.database import Base
 
 
 def _normalize_pg_url(url: str) -> str:
-    """Приводит любой postgres URL к postgresql+asyncpg://..."""
+    """Normalize any postgres URL to postgresql+asyncpg://..."""
     url = url.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
@@ -38,15 +38,15 @@ def _normalize_pg_url(url: str) -> str:
 @pytest.fixture(scope="session")
 def _pg_url() -> str:
     """
-    Возвращает asyncpg URL для тестового PostgreSQL.
+    Return the asyncpg URL for the test PostgreSQL instance.
 
-    Приоритет:
-      1. TEST_DATABASE_URL из env, если уже указывает на PostgreSQL.
-      2. Testcontainers (локальный Docker).
+    Priority:
+      1. TEST_DATABASE_URL from env, if it points to PostgreSQL.
+      2. Testcontainers (local Docker).
       3. pytest.skip.
     """
     if os.getenv("USE_TESTCONTAINERS") == "0":
-        pytest.skip("USE_TESTCONTAINERS=0 — pg тесты пропущены")
+        pytest.skip("USE_TESTCONTAINERS=0 — pg tests skipped")
 
     ext_url = os.getenv("TEST_DATABASE_URL", "")
     if "postgresql" in ext_url:
@@ -56,7 +56,7 @@ def _pg_url() -> str:
     try:
         from testcontainers.postgres import PostgresContainer
     except ImportError:
-        pytest.skip("testcontainers не установлен: pip install testcontainers[postgres]")
+        pytest.skip("testcontainers not installed: pip install testcontainers[postgres]")
 
     try:
         container = PostgresContainer(
@@ -66,16 +66,16 @@ def _pg_url() -> str:
             dbname="cronator_test",
         )
         container.start()
-        # Храним контейнер в атрибуте чтобы остановить в финализаторе
+        # Store container reference for teardown
         _pg_url._container = container  # type: ignore[attr-defined]
         return _normalize_pg_url(container.get_connection_url())
     except Exception as exc:
-        pytest.skip(f"Docker недоступен для testcontainers: {exc}")
+        pytest.skip(f"Docker not available for testcontainers: {exc}")
 
 
 @pytest.fixture(scope="session", autouse=False)
 def _pg_container_cleanup(_pg_url):
-    """Останавливает testcontainers-контейнер после сессии (если он был запущен)."""
+    """Stop the testcontainers container after the session (if one was started)."""
     yield
     container = getattr(_pg_url, "_container", None)
     if container is not None:
@@ -88,8 +88,8 @@ def _pg_container_cleanup(_pg_url):
 @pytest_asyncio.fixture(scope="function")
 async def test_engine(_pg_url: str):
     """
-    Переопределяет test_engine из корневого conftest.py.
-    Каждый тест получает чистую схему (drop + create).
+    Override test_engine from the root conftest.py.
+    Each test gets a clean schema (drop + create).
     """
     engine = create_async_engine(_pg_url, echo=False, future=True)
 

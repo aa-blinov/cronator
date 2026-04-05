@@ -12,8 +12,8 @@ from app.services.executor import ExecutorService
 
 def _make_session_maker(execution_id: int = 99, script_id: int = 1):
     """
-    Мок async_session_maker: возвращает скрипт из execute(),
-    после db.refresh() устанавливает execution.id = execution_id.
+    Mock async_session_maker: returns a script from execute(),
+    and sets execution.id = execution_id after db.refresh().
     """
     script = MagicMock()
     script.id = script_id
@@ -48,17 +48,17 @@ def _discard_background_task(coro):
 
 
 class TestScriptLock:
-    """Тесты для _get_script_lock."""
+    """Tests for _get_script_lock."""
 
     def test_same_lock_returned_for_same_script(self):
-        """Один и тот же asyncio.Lock для одного script_id."""
+        """The same asyncio.Lock is returned for the same script_id."""
         service = ExecutorService()
         lock_a = service._get_script_lock(1)
         lock_b = service._get_script_lock(1)
         assert lock_a is lock_b
 
     def test_different_locks_for_different_scripts(self):
-        """Разные script_id → независимые locks."""
+        """Different script_ids get independent locks."""
         service = ExecutorService()
         assert service._get_script_lock(1) is not service._get_script_lock(2)
 
@@ -66,11 +66,11 @@ class TestScriptLock:
 
 
 class TestRunningScripts:
-    """Тесты защиты от одновременного запуска одного скрипта."""
+    """Tests for protection against concurrent execution of the same script."""
 
     @pytest.mark.asyncio
     async def test_raises_if_script_already_marked_running(self):
-        """Если script_id уже в _running_scripts — ValueError без обращения к БД."""
+        """If script_id is already in _running_scripts, raises ValueError without hitting the DB."""
         service = ExecutorService()
         service._running_scripts.add(1)
 
@@ -79,7 +79,7 @@ class TestRunningScripts:
 
     @pytest.mark.asyncio
     async def test_second_concurrent_call_raises(self):
-        """Два вызова execute_script для одного скрипта: второй → ValueError."""
+        """Two execute_script calls for the same script: the second raises ValueError."""
         service = ExecutorService()
 
         with (
@@ -92,13 +92,13 @@ class TestRunningScripts:
             exec_id = await service.execute_script(1)
             assert exec_id == 99
 
-            # script_id=1 ещё в _running_scripts
+            # script_id=1 is still in _running_scripts
             with pytest.raises(ValueError, match="already running"):
                 await service.execute_script(1)
 
     @pytest.mark.asyncio
     async def test_different_scripts_run_concurrently(self):
-        """Разные script_id запускаются параллельно без конфликта."""
+        """Different script_ids can run in parallel without conflict."""
         service = ExecutorService()
 
         call_count = 0
@@ -123,13 +123,13 @@ class TestRunningScripts:
 
         assert id1 == 10
         assert id2 == 20
-        # оба скрипта числятся запущенными
+        # both scripts are tracked as running
         assert 1 in service._running_scripts
         assert 2 in service._running_scripts
 
     @pytest.mark.asyncio
     async def test_script_can_rerun_after_completion(self):
-        """После удаления из _running_scripts скрипт можно запустить снова."""
+        """After removal from _running_scripts, the same script can be executed again."""
         service = ExecutorService()
 
         with (
@@ -142,7 +142,7 @@ class TestRunningScripts:
             eid = await service.execute_script(1)
             assert eid == 42
 
-        # Симулируем завершение _run_script
+        # Simulate _run_script completing
         service._running_scripts.discard(1)
 
         with (
@@ -157,7 +157,7 @@ class TestRunningScripts:
 
     @pytest.mark.asyncio
     async def test_is_script_running_true_while_executing(self):
-        """is_script_running() возвращает True пока скрипт числится запущенным."""
+        """is_script_running() returns True while the script is tracked as running."""
         service = ExecutorService()
 
         with (
@@ -174,28 +174,14 @@ class TestRunningScripts:
     @pytest.mark.asyncio
     async def test_script_added_to_running_before_db_call(self):
         """
-        script_id добавляется в _running_scripts до обращения к БД,
-        чтобы race-condition был невозможен.
+        script_id is added to _running_scripts before the first DB call,
+        preventing any race condition.
         """
         service = ExecutorService()
         added_before_db: list[bool] = []
 
-        async def check_and_get_db():
-            added_before_db.append(1 in service._running_scripts)
-            # вернём мок сессии
-            script_result = MagicMock()
-            script_result.scalar_one_or_none.return_value = None  # not found
-
-            mock_db = AsyncMock()
-            mock_db.execute = AsyncMock(return_value=script_result)
-
-            ctx = AsyncMock()
-            ctx.__aenter__ = AsyncMock(return_value=mock_db)
-            ctx.__aexit__ = AsyncMock(return_value=None)
-            return ctx
-
         def sync_check_and_get_db():
-            """Синхронная обёртка — возвращает async context manager, как настоящий session_maker."""
+            """Synchronous wrapper — returns an async context manager, like the real session_maker."""
             added_before_db.append(1 in service._running_scripts)
 
             script_result = MagicMock()
@@ -213,8 +199,8 @@ class TestRunningScripts:
             try:
                 await service.execute_script(1)
             except ValueError:
-                pass  # Script not found — ожидаемо
+                pass  # Script not found — expected
 
         assert added_before_db == [True], (
-            "script_id должен быть в _running_scripts ДО первого обращения к БД"
+            "script_id must be in _running_scripts BEFORE the first DB call"
         )

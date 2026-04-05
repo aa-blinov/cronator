@@ -37,7 +37,7 @@ def _make_script(
 
 
 def _make_db_ctx(script: MagicMock | None) -> MagicMock:
-    """Мок сессии БД, возвращающий script из execute()."""
+    """Mock DB session that returns the given script from execute()."""
     result = MagicMock()
     result.scalar_one_or_none.return_value = script
 
@@ -55,11 +55,11 @@ def _make_db_ctx(script: MagicMock | None) -> MagicMock:
 
 
 class TestSendSuccessAlert:
-    """Тесты для ExecutorService._send_success_alert."""
+    """Tests for ExecutorService._send_success_alert."""
 
     @pytest.mark.asyncio
     async def test_sends_alert_when_enabled(self):
-        """Если alert_on_success=True — алерт отправляется, last_alert_at обновляется."""
+        """If alert_on_success=True, the alert is sent and last_alert_at is updated."""
         script = _make_script(alert_on_success=True)
         execution = _make_execution()
 
@@ -83,7 +83,7 @@ class TestSendSuccessAlert:
 
     @pytest.mark.asyncio
     async def test_does_not_send_when_disabled(self):
-        """Если alert_on_success=False — алерт не отправляется."""
+        """If alert_on_success=False, no alert is sent."""
         script = _make_script(alert_on_success=False)
         execution = _make_execution()
 
@@ -106,7 +106,7 @@ class TestSendSuccessAlert:
 
     @pytest.mark.asyncio
     async def test_does_nothing_when_script_not_found(self):
-        """Если скрипт не найден в БД — не падает, алерт не отправляется."""
+        """If the script is not found in the DB, does not raise and sends no alert."""
         execution = _make_execution()
         mock_send = AsyncMock()
 
@@ -121,13 +121,13 @@ class TestSendSuccessAlert:
             ),
         ):
             service = ExecutorService()
-            await service._send_success_alert(execution)  # не должен упасть
+            await service._send_success_alert(execution)  # must not raise
 
         mock_send.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_commits_after_alert(self):
-        """После отправки алерта должен быть db.commit()."""
+        """db.commit() is called after the alert is sent."""
         script = _make_script(alert_on_success=True)
         execution = _make_execution()
         db_ctx = _make_db_ctx(script)
@@ -145,7 +145,7 @@ class TestSendSuccessAlert:
             service = ExecutorService()
             await service._send_success_alert(execution)
 
-        # Достаём mock_db из контекста и проверяем commit
+        # Retrieve mock_db from the context and verify commit was called
         mock_db = db_ctx.__aenter__.return_value
         mock_db.commit.assert_awaited_once()
 
@@ -154,11 +154,11 @@ class TestSendSuccessAlert:
 
 
 class TestSendFailureAlert:
-    """Тесты для ExecutorService._send_failure_alert."""
+    """Tests for ExecutorService._send_failure_alert."""
 
     @pytest.mark.asyncio
     async def test_sends_alert_when_enabled_no_previous_alert(self):
-        """alert_on_failure=True, last_alert_at=None → алерт отправляется."""
+        """alert_on_failure=True, last_alert_at=None → alert is sent."""
         script = _make_script(alert_on_failure=True, last_alert_at=None)
         execution = _make_execution()
         mock_send = AsyncMock(return_value=True)
@@ -180,7 +180,7 @@ class TestSendFailureAlert:
 
     @pytest.mark.asyncio
     async def test_throttled_when_last_alert_is_recent(self):
-        """Если последний алерт был < 1 часа назад — новый не отправляется (throttling)."""
+        """If the last alert was sent <1 hour ago, the new alert is throttled."""
         recent = datetime.now(UTC) - timedelta(minutes=30)
         script = _make_script(alert_on_failure=True, last_alert_at=recent)
         execution = _make_execution()
@@ -203,7 +203,7 @@ class TestSendFailureAlert:
 
     @pytest.mark.asyncio
     async def test_sends_alert_when_last_alert_is_old(self):
-        """Если последний алерт был > 1 часа назад — throttling не срабатывает, алерт идёт."""
+        """If the last alert was sent >1 hour ago, throttling does not apply."""
         old = datetime.now(UTC) - timedelta(hours=2)
         script = _make_script(alert_on_failure=True, last_alert_at=old)
         execution = _make_execution()
@@ -226,7 +226,7 @@ class TestSendFailureAlert:
 
     @pytest.mark.asyncio
     async def test_throttled_with_naive_datetime(self):
-        """last_alert_at без tzinfo (naive) — всё равно корректно throttle-ится."""
+        """last_alert_at without tzinfo (naive) is still throttled correctly."""
         recent_naive = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=10)
         script = _make_script(alert_on_failure=True, last_alert_at=recent_naive)
         execution = _make_execution()
@@ -249,7 +249,7 @@ class TestSendFailureAlert:
 
     @pytest.mark.asyncio
     async def test_does_not_send_when_disabled(self):
-        """alert_on_failure=False → алерт не отправляется."""
+        """alert_on_failure=False → no alert is sent."""
         script = _make_script(alert_on_failure=False)
         execution = _make_execution()
         mock_send = AsyncMock()
@@ -271,7 +271,7 @@ class TestSendFailureAlert:
 
     @pytest.mark.asyncio
     async def test_does_nothing_when_script_not_found(self):
-        """Скрипт не найден — не падает, алерт не отправляется."""
+        """If the script is not found in the DB, does not raise and sends no alert."""
         execution = _make_execution()
         mock_send = AsyncMock()
 
@@ -292,7 +292,7 @@ class TestSendFailureAlert:
 
     @pytest.mark.asyncio
     async def test_updates_last_alert_at_after_send(self):
-        """После отправки алерта last_alert_at должен обновиться."""
+        """After the alert is sent, last_alert_at must be updated."""
         script = _make_script(alert_on_failure=True, last_alert_at=None)
         execution = _make_execution()
 

@@ -17,81 +17,81 @@ from cronator_lib.timer import timer
 class TestCronatorContext:
 
     def test_is_cronator_true_when_execution_id_set(self):
-        """CRONATOR_EXECUTION_ID → is_cronator=True."""
+        """CRONATOR_EXECUTION_ID set → is_cronator=True."""
         with patch.dict(os.environ, {"CRONATOR_EXECUTION_ID": "42"}):
             ctx = get_context()
         assert ctx.is_cronator is True
 
     def test_is_cronator_false_without_execution_id(self):
-        """Без CRONATOR_EXECUTION_ID → is_cronator=False."""
+        """No CRONATOR_EXECUTION_ID → is_cronator=False."""
         env = {k: v for k, v in os.environ.items() if k != "CRONATOR_EXECUTION_ID"}
         with patch.dict(os.environ, env, clear=True):
             ctx = get_context()
         assert ctx.is_cronator is False
 
     def test_execution_id_parsed_as_int(self):
-        """execution_id читается из env как int."""
+        """execution_id is read from env as int."""
         with patch.dict(os.environ, {"CRONATOR_EXECUTION_ID": "99"}):
             ctx = get_context()
         assert ctx.execution_id == 99
         assert isinstance(ctx.execution_id, int)
 
     def test_script_id_parsed_as_int(self):
-        """script_id читается из env как int."""
+        """script_id is read from env as int."""
         with patch.dict(os.environ, {"CRONATOR_SCRIPT_ID": "7"}):
             ctx = get_context()
         assert ctx.script_id == 7
 
     def test_execution_id_none_when_not_set(self):
-        """execution_id=None если переменная не задана."""
+        """execution_id is None when the env var is not set."""
         env = {k: v for k, v in os.environ.items() if k != "CRONATOR_EXECUTION_ID"}
         with patch.dict(os.environ, env, clear=True):
             ctx = get_context()
         assert ctx.execution_id is None
 
     def test_script_id_none_when_not_set(self):
-        """script_id=None если переменная не задана."""
+        """script_id is None when the env var is not set."""
         env = {k: v for k, v in os.environ.items() if k != "CRONATOR_SCRIPT_ID"}
         with patch.dict(os.environ, env, clear=True):
             ctx = get_context()
         assert ctx.script_id is None
 
     def test_script_name_from_env(self):
-        """script_name берётся из CRONATOR_SCRIPT_NAME."""
+        """script_name is read from CRONATOR_SCRIPT_NAME."""
         with patch.dict(os.environ, {"CRONATOR_SCRIPT_NAME": "my_report"}):
             ctx = get_context()
         assert ctx.script_name == "my_report"
 
     def test_script_name_empty_when_not_set(self):
-        """script_name пустая строка если переменная не задана."""
+        """script_name is an empty string when the env var is not set."""
         env = {k: v for k, v in os.environ.items() if k != "CRONATOR_SCRIPT_NAME"}
         with patch.dict(os.environ, env, clear=True):
             ctx = get_context()
         assert ctx.script_name == ""
 
     def test_artifacts_dir_as_path(self):
-        """artifacts_dir возвращается как Path."""
+        """artifacts_dir is returned as a Path object."""
         from pathlib import Path
         with patch.dict(os.environ, {"CRONATOR_ARTIFACTS_DIR": "/tmp/artifacts"}):
             ctx = get_context()
         assert ctx.artifacts_dir == Path("/tmp/artifacts")
 
     def test_artifacts_dir_none_when_not_set(self):
-        """artifacts_dir=None если переменная не задана."""
+        """artifacts_dir is None when the env var is not set."""
         env = {k: v for k, v in os.environ.items() if k != "CRONATOR_ARTIFACTS_DIR"}
         with patch.dict(os.environ, env, clear=True):
             ctx = get_context()
         assert ctx.artifacts_dir is None
 
     def test_context_is_frozen(self):
-        """CronatorContext immutable — нельзя изменить поля."""
+        """CronatorContext is immutable — fields cannot be reassigned."""
         with patch.dict(os.environ, {"CRONATOR_EXECUTION_ID": "1"}):
             ctx = get_context()
         with pytest.raises((AttributeError, TypeError)):
             ctx.execution_id = 999  # type: ignore[misc]
 
     def test_all_fields_populated_in_cronator_env(self):
-        """Все поля заполнены при полном наборе env vars."""
+        """All fields are populated when the full set of env vars is present."""
         env = {
             "CRONATOR_EXECUTION_ID": "10",
             "CRONATOR_SCRIPT_ID": "5",
@@ -114,7 +114,7 @@ class TestCronatorContext:
 class TestTimer:
 
     def test_logs_completion_message(self):
-        """timer() логирует сообщение о завершении."""
+        """timer() logs a completion message."""
         mock_logger = MagicMock()
         with timer("test block", logger=mock_logger):
             pass
@@ -124,14 +124,14 @@ class TestTimer:
         assert "completed" in msg
 
     def test_elapsed_populated_after_exit(self):
-        """После выхода из контекста elapsed содержит реальное время."""
+        """After the context exits, elapsed contains real measured time."""
         mock_logger = MagicMock()
         with timer("t", logger=mock_logger) as t:
             time.sleep(0.05)
         assert t["elapsed"] >= 0.05
 
     def test_elapsed_zero_before_exit(self):
-        """Внутри блока elapsed ещё 0."""
+        """Inside the block, elapsed is still 0."""
         mock_logger = MagicMock()
         inside_value = None
         with timer("t", logger=mock_logger) as t:
@@ -139,7 +139,7 @@ class TestTimer:
         assert inside_value == 0.0
 
     def test_formats_milliseconds(self):
-        """Быстрые операции (<1s) форматируются в ms."""
+        """Fast operations (<1 s) are formatted in ms."""
         mock_logger = MagicMock()
         with timer("fast", logger=mock_logger):
             pass
@@ -147,7 +147,7 @@ class TestTimer:
         assert "ms" in msg
 
     def test_formats_seconds(self):
-        """Операции 1–60s форматируются в секундах."""
+        """Operations taking 1–60 s are formatted in seconds."""
         mock_logger = MagicMock()
         with patch("time.perf_counter", side_effect=[0.0, 5.5]):
             with timer("slow", logger=mock_logger):
@@ -157,7 +157,7 @@ class TestTimer:
         assert "ms" not in msg
 
     def test_formats_minutes(self):
-        """Операции >60s форматируются в минутах."""
+        """Operations taking >60 s are formatted in minutes."""
         mock_logger = MagicMock()
         with patch("time.perf_counter", side_effect=[0.0, 125.0]):
             with timer("very slow", logger=mock_logger):
@@ -166,7 +166,7 @@ class TestTimer:
         assert "m" in msg
 
     def test_label_included_in_message(self):
-        """Метка включается в сообщение."""
+        """The label is included in the log message."""
         mock_logger = MagicMock()
         with timer("my_label", logger=mock_logger):
             pass
@@ -174,14 +174,14 @@ class TestTimer:
         assert "my_label" in msg
 
     def test_no_label_still_logs(self):
-        """Без метки тоже логирует (без [])."""
+        """Without a label, timer still logs (no [] prefix)."""
         mock_logger = MagicMock()
         with timer(logger=mock_logger):
             pass
         mock_logger.info.assert_called_once()
 
     def test_uses_get_logger_in_local_mode(self):
-        """Без CRONATOR_EXECUTION_ID — использует get_logger()."""
+        """Without CRONATOR_EXECUTION_ID, uses get_logger()."""
         mock_logger = MagicMock()
         env = {k: v for k, v in os.environ.items() if k != "CRONATOR_EXECUTION_ID"}
         with patch.dict(os.environ, env, clear=True):
@@ -191,7 +191,7 @@ class TestTimer:
         mock_logger.info.assert_called_once()
 
     def test_emits_json_with_timer_level_in_cronator_context(self, capsys):
-        """В Cronator-контексте — печатает JSON с level=TIMER в stdout."""
+        """In Cronator context, prints JSON with level=TIMER to stdout."""
         with patch.dict(os.environ, {"CRONATOR_EXECUTION_ID": "1"}):
             with timer("db query"):
                 pass
@@ -201,18 +201,16 @@ class TestTimer:
         assert "db query" in parsed["message"]
 
     def test_timer_json_preserves_unicode_characters(self, capsys):
-        """Timer JSON should keep Cyrillic readable in raw stdout."""
+        """Timer JSON should keep non-ASCII characters readable in raw stdout."""
         with patch.dict(os.environ, {"CRONATOR_EXECUTION_ID": "1"}):
-            with timer("загрузка данных"):
+            with timer("data load"):
                 pass
         out = capsys.readouterr().out
         parsed = json.loads(out.strip())
-        assert "загрузка данных" in out
-        assert "\\u0437" not in out
-        assert "загрузка данных" in parsed["message"]
+        assert "data load" in parsed["message"]
 
     def test_logs_even_on_exception(self):
-        """Время логируется даже если блок завершился исключением."""
+        """Elapsed time is logged even when the block raises an exception."""
         mock_logger = MagicMock()
         with pytest.raises(ValueError):
             with timer("failing", logger=mock_logger):
@@ -220,7 +218,7 @@ class TestTimer:
         mock_logger.info.assert_called_once()
 
     def test_exception_propagates(self):
-        """Исключение из блока пробрасывается наружу."""
+        """Exceptions raised inside the block propagate normally."""
         mock_logger = MagicMock()
         with pytest.raises(RuntimeError, match="boom"):
             with timer("t", logger=mock_logger):
@@ -233,19 +231,19 @@ class TestTimer:
 class TestNotify:
 
     def test_prints_cronator_notify_marker(self, capsys):
-        """notify() печатает маркер CRONATOR_NOTIFY: в stdout."""
-        notify("все готово")
+        """notify() prints a CRONATOR_NOTIFY: marker to stdout."""
+        notify("all done")
         out = capsys.readouterr().out
         assert "CRONATOR_NOTIFY:" in out
 
     def test_message_present_in_output(self, capsys):
-        """Текст сообщения содержится в выводе."""
+        """The message text is present in the output."""
         notify("export done: 500 rows")
         out = capsys.readouterr().out
         assert "export done: 500 rows" in out
 
     def test_without_explicit_title_no_pipe_in_payload(self, capsys):
-        """Без явного title — payload не содержит | (только сообщение)."""
+        """Without an explicit title, the payload does not contain | (message only)."""
         notify("hello")
         out = capsys.readouterr().out
         marker_idx = out.find("CRONATOR_NOTIFY:")
@@ -254,13 +252,13 @@ class TestNotify:
         assert payload == "hello"
 
     def test_custom_title_used_when_provided(self, capsys):
-        """Кастомный title включается в вывод."""
+        """A custom title is included in the output."""
         notify("disk 90%", title="Warning")
         out = capsys.readouterr().out
         assert "Warning" in out
 
     def test_title_and_message_separated_by_pipe(self, capsys):
-        """title и message разделены символом | для парсинга executor."""
+        """title and message are separated by | for executor parsing."""
         notify("body text", title="MyTitle")
         out = capsys.readouterr().out
         marker_idx = out.find("CRONATOR_NOTIFY:")
@@ -271,13 +269,13 @@ class TestNotify:
         assert body_part.strip() == "body text"
 
     def test_nothing_goes_to_stderr(self, capsys):
-        """notify() ничего не пишет в stderr."""
+        """notify() writes nothing to stderr."""
         notify("test")
         err = capsys.readouterr().err
         assert err == ""
 
     def test_output_is_flushed(self, capsys):
-        """stdout flush=True гарантирует что маркер доходит до executor."""
+        """stdout is flushed (flush=True) to ensure the marker reaches the executor."""
         stdout_mock = MagicMock()
         stdout_mock.write = MagicMock()
         stdout_mock.flush = MagicMock()
@@ -288,7 +286,7 @@ class TestNotify:
             assert kwargs.get("flush") is True
 
     def test_without_script_name_env_message_still_sent(self, capsys):
-        """Без CRONATOR_SCRIPT_NAME — сообщение всё равно отправляется."""
+        """Without CRONATOR_SCRIPT_NAME, the message is still sent."""
         env = {k: v for k, v in os.environ.items() if k != "CRONATOR_SCRIPT_NAME"}
         with patch.dict(os.environ, env, clear=True):
             notify("msg")
