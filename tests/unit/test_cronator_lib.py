@@ -362,7 +362,7 @@ class TestSaveArtifact:
     def test_saves_string_as_utf8(self, tmp_path):
         """Строка сохраняется как UTF-8."""
         with patch.dict(os.environ, {"CRONATOR_ARTIFACTS_DIR": str(tmp_path)}):
-            name = save_artifact("data.txt", "привет")
+            save_artifact("data.txt", "привет")
 
         saved = list(tmp_path.glob("data_*.txt"))
         assert saved[0].read_text(encoding="utf-8") == "привет"
@@ -424,8 +424,8 @@ class TestSaveArtifact:
     def test_unique_filenames_for_same_name(self, tmp_path):
         """Два вызова с одним именем → два разных файла (timestamp в имени)."""
         with patch.dict(os.environ, {"CRONATOR_ARTIFACTS_DIR": str(tmp_path)}):
-            name1 = save_artifact("same.txt", b"first")
-            name2 = save_artifact("same.txt", b"second")
+            save_artifact("same.txt", b"first")
+            save_artifact("same.txt", b"second")
 
         # Могут совпасть если вызовы в одну секунду — проверяем что оба файла существуют
         files = list(tmp_path.glob("same_*.txt"))

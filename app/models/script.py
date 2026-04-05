@@ -44,6 +44,19 @@ class Script(Base):
     working_directory: Mapped[str] = mapped_column(String(500), default="")
     environment_vars: Mapped[str] = mapped_column(Text, default="")  # JSON format
 
+    # Reliability
+    retry_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # seconds between retry attempts
+    retry_delay: Mapped[int] = mapped_column(Integer, default=60, server_default="60")
+    # max total seconds within which retries are allowed
+    max_retry_window: Mapped[int] = mapped_column(Integer, default=3600, server_default="3600")
+    prevent_overlap: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+
+    # Stats
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
     # Alert Throttling
     last_alert_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

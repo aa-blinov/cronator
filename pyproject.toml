@@ -45,6 +45,12 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# Script templates contain code as string literals — long lines are intentional
+"app/script_templates.py" = ["E501"]
+# Test comments and docstrings in Russian may exceed the line limit
+"tests/**" = ["E501"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 filterwarnings = [

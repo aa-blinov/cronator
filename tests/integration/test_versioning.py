@@ -9,7 +9,6 @@ Endpoints:
 import pytest
 from httpx import AsyncClient
 
-
 # ─────────────────────────── helpers ─────────────────────────────────────────
 
 

@@ -414,6 +414,28 @@ async def run_script_action(
     )
 
 
+@router.post("/executions/{execution_id}/rerun")
+async def rerun_execution_action(
+    execution_id: int,
+    username: str = Depends(verify_credentials),
+    db: AsyncSession = Depends(get_db),
+):
+    """Re-run the script that produced this execution."""
+    result = await db.execute(
+        select(Execution).where(Execution.id == execution_id)
+    )
+    execution = result.scalar_one_or_none()
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+    new_execution_id = await executor_service.execute_script(
+        execution.script_id, triggered_by="manual"
+    )
+    return RedirectResponse(
+        url=f"/executions/{new_execution_id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
 @router.post("/scripts/{script_id}/toggle")
 async def toggle_script_action(
     script_id: int,
