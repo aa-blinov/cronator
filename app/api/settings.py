@@ -178,11 +178,22 @@ async def update_settings(request: UpdateSettingsRequest):
     return {"success": True, "message": "Settings updated successfully"}
 
 
+def _get_disk_free_total(path) -> tuple[int, int]:
+    """Get free and total disk space (blocking, runs in thread)."""
+    try:
+        disk = shutil.disk_usage(path)
+        return disk.free, disk.total
+    except Exception:
+        return 0, 0
+
+
 @router.get("/artifacts-stats")
 async def get_artifacts_stats():
     """Get statistics about artifacts storage."""
+    import asyncio
+
     async with async_session_maker() as db:
-        # Total artifacts count and size
+        # Total artifacts count and DB-recorded size (written at artifact creation time)
         result = await db.execute(
             select(
                 func.count(Artifact.id).label("total_artifacts"),
@@ -199,15 +210,10 @@ async def get_artifacts_stats():
         )
         executions_with_artifacts = result.scalar() or 0
 
-    # Get disk usage
+    # disk_usage is a single fast syscall — still offload to thread to be safe
     artifacts_dir = settings.artifacts_dir
-    try:
-        stat = shutil.disk_usage(artifacts_dir if artifacts_dir.exists() else settings.data_dir)
-        free_space_bytes = stat.free
-        total_space_bytes = stat.total
-    except Exception:
-        free_space_bytes = 0
-        total_space_bytes = 0
+    check_path = artifacts_dir if artifacts_dir.exists() else settings.data_dir
+    free_space_bytes, total_space_bytes = await asyncio.to_thread(_get_disk_free_total, check_path)
 
     return {
         "total_artifacts": total_artifacts,
@@ -218,6 +224,35 @@ async def get_artifacts_stats():
         "free_space_mb": round(free_space_bytes / (1024 * 1024), 2),
         "total_space_bytes": total_space_bytes,
         "total_space_mb": round(total_space_bytes / (1024 * 1024), 2),
+    }
+
+
+@router.get("/execution-stats")
+async def get_execution_stats():
+    """Get execution history statistics for the settings page."""
+    from app.services.cleanup_service import cleanup_service
+
+    return await cleanup_service.get_execution_stats()
+
+
+@router.post("/cleanup-executions")
+async def cleanup_executions(days: int = 90):
+    """Delete all executions older than `days` days (excluding running ones)."""
+    if days < 1 or days > 3650:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=400, detail="days must be between 1 and 3650")
+
+    from app.services.cleanup_service import cleanup_service
+
+    result = await cleanup_service.cleanup_older_than_days(days)
+    return {
+        "success": True,
+        "message": (
+            f"Deleted {result['deleted_executions']} executions older than {days} days"
+        ),
+        "deleted_executions": result["deleted_executions"],
+        "deleted_artifact_dirs": result["deleted_artifact_dirs"],
     }
 
 
