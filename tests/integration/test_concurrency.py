@@ -20,7 +20,6 @@ from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
 from app.services.executor import ExecutorService
 
-
 # ─────────────────────────── tests ───────────────────────────────────────────
 
 

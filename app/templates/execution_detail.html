@@ -8,6 +8,13 @@
         {{ icons.x_mark("w-4 h-4") }} Cancel
     </button>
     {% endif %}
+    {% if execution.status not in ('running', 'pending') %}
+    <form method="POST" action="/executions/{{ execution.id }}/rerun">
+        <button type="submit" class="btn btn-sm btn-primary gap-2">
+            {{ icons.arrow_path("w-4 h-4") }} Run again
+        </button>
+    </form>
+    {% endif %}
     <a href="/scripts/{{ execution.script_id }}" class="btn btn-ghost btn-sm">
         Back to Script
     </a>
@@ -67,6 +74,9 @@
             <div>
                 <p class="text-base-content/60 text-sm">Triggered By</p>
                 <span class="badge badge-ghost">{{ execution.triggered_by }}</span>
+                {% if execution.attempt > 1 %}
+                <span class="badge badge-warning ml-1">Retry #{{ execution.attempt - 1 }}</span>
+                {% endif %}
             </div>
         </div>
         

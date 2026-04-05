@@ -203,6 +203,10 @@ async def create_script(
         timeout=data.timeout,
         working_directory=data.working_directory,
         environment_vars=data.environment_vars,
+        retry_count=data.retry_count,
+        retry_delay=data.retry_delay,
+        max_retry_window=data.max_retry_window,
+        prevent_overlap=data.prevent_overlap,
     )
 
     db.add(script)
@@ -903,3 +907,17 @@ async def revert_to_version(
         "message": f"Script reverted to version {version_number}",
         "needs_install": needs_install,
     }
+
+
+@router.post("/{script_id}/rerun")
+async def rerun_script(
+    script_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Re-run the script immediately (same as manual run)."""
+    result = await db.execute(select(Script).where(Script.id == script_id))
+    script = result.scalar_one_or_none()
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+    execution_id = await executor_service.execute_script(script_id, triggered_by="manual")
+    return {"execution_id": execution_id}

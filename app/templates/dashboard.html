@@ -122,6 +122,11 @@
                         {% if item.script.description %}
                         <p class="text-xs text-gray-500 mt-0.5">{{ item.script.description[:50] }}{% if item.script.description|length > 50 %}...{% endif %}</p>
                         {% endif %}
+                        {% if item.script.consecutive_failures > 0 %}
+                        <span class="badge badge-error badge-sm mt-1" title="Last failure: {{ item.script.last_failure_at.strftime('%Y-%m-%d %H:%M UTC') if item.script.last_failure_at else 'unknown' }}">
+                            {{ item.script.consecutive_failures }} failure{{ 's' if item.script.consecutive_failures != 1 else '' }}
+                        </span>
+                        {% endif %}
                     </td>
                     <td>
                         <code class="text-xs bg-gray-800 px-2 py-1 rounded">{{ item.script.cron_expression }}</code>

@@ -111,13 +111,8 @@ COPY --from=builder /app/pyproject.toml /app/
 COPY --from=builder /app/alembic /app/alembic
 COPY --from=builder /app/alembic.ini /app/
 
-# Copy built CSS from css-builder (fallback if build fails at runtime)
+# Copy built CSS from css-builder stage — only the compiled output is needed at runtime
 COPY --from=css-builder /app/app/static/output.css /app/app/static/output.css
-COPY --from=css-builder /app/node_modules /app/node_modules
-
-# Copy package files for CSS building at runtime
-COPY package.json tailwind.config.js ./
-COPY app/static/input.css ./app/static/
 
 # Copy entrypoint script and fix Windows line endings
 COPY docker-entrypoint.sh /usr/local/bin/

@@ -42,9 +42,9 @@ services:
       - db
     healthcheck:
       test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/health')"]
-      interval: 30s
-      timeout: 10s
-      start_period: 40s
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
       retries: 3
     networks:
       - cronator-network

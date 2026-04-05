@@ -3,9 +3,9 @@
 import json
 import os
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from typing import Generator
 
 from cronator_lib.logging import get_logger
 

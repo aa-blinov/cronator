@@ -1,7 +1,7 @@
 """Execution model for storing script run history."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from app.models.script import Script
 
 
-class ExecutionStatus(str, Enum):
+class ExecutionStatus(StrEnum):
     """Status of a script execution."""
 
     PENDING = "pending"
@@ -26,6 +26,7 @@ class ExecutionStatus(str, Enum):
     FAILED = "failed"
     TIMEOUT = "timeout"
     CANCELLED = "cancelled"
+    SKIPPED = "skipped"
 
 
 class Execution(Base):
@@ -90,6 +91,9 @@ class Execution(Base):
         Integer, default=0, server_default="0", nullable=False
     )
 
+    # Retry tracking
+    attempt: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+
     # Relationships
     script: Mapped["Script"] = relationship("Script", back_populates="executions")
     artifacts: Mapped[list["Artifact"]] = relationship(
@@ -109,6 +113,7 @@ class Execution(Base):
             ExecutionStatus.FAILED.value,
             ExecutionStatus.TIMEOUT.value,
             ExecutionStatus.CANCELLED.value,
+            ExecutionStatus.SKIPPED.value,
         )
 
     @property
