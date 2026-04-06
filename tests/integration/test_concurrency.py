@@ -3,7 +3,7 @@ Integration tests for ExecutorService concurrency — real database, no subproce
 
 Verifies:
   - that an Execution record is created in the DB when a script is started
-  - that a second call for the same script raises ValueError while the first is still "running"
+  - that a second call for the same script creates a SKIPPED execution (prevent_overlap=True)
   - that different scripts can run in parallel without conflict
   - that after completion a script can be re-run (new DB record created)
   - that the initial Execution status is RUNNING
@@ -62,18 +62,24 @@ class TestConcurrencyIntegration:
         assert execution.status == ExecutionStatus.RUNNING.value
 
     @pytest.mark.asyncio
-    async def test_second_call_same_script_raises(
+    async def test_second_call_same_script_creates_skipped_execution(
         self,
         exec_service: ExecutorService,
         db_script: Script,
+        db_session: AsyncSession,
     ):
-        """A second execute_script call for the same script raises ValueError."""
+        """A second execute_script call for a running script (prevent_overlap=True) creates a SKIPPED execution."""
+        script_id = db_script.id
         with patch.object(exec_service, "_run_script", new=AsyncMock()):
-            await exec_service.execute_script(db_script.id)
+            await exec_service.execute_script(script_id)
 
-        with pytest.raises(ValueError, match="already running"):
-            with patch.object(exec_service, "_run_script", new=AsyncMock()):
-                await exec_service.execute_script(db_script.id)
+        skipped_id = await exec_service.execute_script(script_id)
+        assert skipped_id is not None
+
+        await db_session.rollback()
+        skipped_exec = await db_session.get(Execution, skipped_id)
+        assert skipped_exec is not None
+        assert skipped_exec.status == ExecutionStatus.SKIPPED.value
 
     @pytest.mark.asyncio
     async def test_concurrent_different_scripts_both_succeed(
