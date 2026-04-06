@@ -10,13 +10,14 @@ from app.services.executor import ExecutorService
 # ─────────────────────────── helpers ─────────────────────────────────────────
 
 
-def _make_session_maker(execution_id: int = 99, script_id: int = 1):
+def _make_session_maker(execution_id: int = 99, script_id: int = 1, prevent_overlap: bool = True):
     """
     Mock async_session_maker: returns a script from execute(),
     and sets execution.id = execution_id after db.refresh().
     """
     script = MagicMock()
     script.id = script_id
+    script.prevent_overlap = prevent_overlap
 
     script_result = MagicMock()
     script_result.scalar_one_or_none.return_value = script
@@ -69,21 +70,41 @@ class TestRunningScripts:
     """Tests for protection against concurrent execution of the same script."""
 
     @pytest.mark.asyncio
-    async def test_raises_if_script_already_marked_running(self):
-        """If script_id is already in _running_scripts, raises ValueError without hitting the DB."""
+    async def test_raises_if_script_already_marked_running_no_prevent_overlap(self):
+        """If prevent_overlap=False and script is in _running_scripts, raises ValueError."""
         service = ExecutorService()
         service._running_scripts.add(1)
 
-        with pytest.raises(ValueError, match="already running"):
-            await service.execute_script(1)
+        with patch("app.services.executor.async_session_maker", _make_session_maker(prevent_overlap=False)):
+            with pytest.raises(ValueError, match="already running"):
+                await service.execute_script(1)
 
     @pytest.mark.asyncio
-    async def test_second_concurrent_call_raises(self):
-        """Two execute_script calls for the same script: the second raises ValueError."""
+    async def test_second_concurrent_call_creates_skipped_when_prevent_overlap(self):
+        """With prevent_overlap=True, a second execute_script call returns a SKIPPED execution ID."""
         service = ExecutorService()
 
         with (
             patch("app.services.executor.async_session_maker", _make_session_maker(99)),
+            patch(
+                "app.services.executor.asyncio.create_task",
+                side_effect=_discard_background_task,
+            ),
+        ):
+            exec_id = await service.execute_script(1)
+            assert exec_id == 99
+
+            # script_id=1 is still in _running_scripts — second call creates SKIPPED
+            skipped_id = await service.execute_script(1)
+            assert skipped_id == 99  # mock refresh sets id=execution_id
+
+    @pytest.mark.asyncio
+    async def test_second_concurrent_call_raises_without_prevent_overlap(self):
+        """With prevent_overlap=False, a second execute_script call raises ValueError."""
+        service = ExecutorService()
+
+        with (
+            patch("app.services.executor.async_session_maker", _make_session_maker(99, prevent_overlap=False)),
             patch(
                 "app.services.executor.asyncio.create_task",
                 side_effect=_discard_background_task,
