@@ -50,7 +50,7 @@ _SMTP alerts, timeouts, and app-wide configuration_
 ### Production (Docker + PostgreSQL)
 
 ```bash
-git clone https://github.com/yourusername/cronator.git
+git clone https://github.com/aa-blinov/cronator.git
 cd cronator
 
 cp .env.example .env
@@ -356,3 +356,7 @@ Before going to production:
 - Never commit `.env` to git (it is in `.gitignore`)
 - Put Cronator behind a TLS-terminating reverse proxy (nginx, Caddy, Traefik)
 - Sensitive settings (SMTP password, API keys) are encrypted at rest with Fernet
+
+## License
+
+[MIT](LICENSE) — see the [LICENSE](LICENSE) file for details.
