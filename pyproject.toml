@@ -53,6 +53,10 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# UI tests require Playwright and a running stack — they are not part of the
+# Docker-based `npm run test:docker` flow. They run on the host with
+# `pytest tests/ui/ -v` against an already-running app.
+testpaths = ["tests/unit", "tests/integration", "tests/pg"]
 filterwarnings = [
     "ignore:SECRET_KEY is using default value:UserWarning",
     "ignore:ADMIN_PASSWORD is using default value:UserWarning",
