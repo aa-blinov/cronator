@@ -366,9 +366,9 @@ async def health_check():
                 "reason": "SKIP_ALEMBIC_MIGRATIONS=1",
             }
         else:
+            from alembic.config import Config
             from alembic.runtime.migration import MigrationContext
             from alembic.script import ScriptDirectory
-            from alembic.config import Config
             from sqlalchemy import create_engine
 
             cfg = Config("alembic.ini")
@@ -409,7 +409,7 @@ async def health_check():
                 if pending:
                     checks["status"] = "degraded"
     except Exception as e:
-        checks["components"]["migrations"] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
+        checks["components"]["migrations"] = {"status": "error", "error": f"{type(e).__name__}: {e}"}  # noqa: E501
 
     # Return 503 if any component is degraded
     status_code = 200 if checks["status"] == "healthy" else 503
