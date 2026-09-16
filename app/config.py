@@ -105,6 +105,10 @@ class Settings(BaseSettings):
     min_free_space_mb: int = 100  # Minimum free disk space required
     max_filename_length: int = 200  # Maximum filename length
 
+    # Logging
+    log_format: str = "human"  # 'human' (default) or 'json'
+    log_level: str = "INFO"
+
     # UV settings
     uv_path: str = "uv"  # path to uv executable
 
