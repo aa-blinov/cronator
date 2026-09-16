@@ -102,6 +102,32 @@ class ScriptCreate(ScriptBase):
     content: str = Field(default="")  # Script content for UI-created scripts
     path: str = Field(default="")  # Optional path for file-based scripts
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "name": "daily-report",
+                "description": "Send a daily summary email at 09:00",
+                "content": (
+                    "from cronator_lib import get_logger\n"
+                    "log = get_logger()\n\n"
+                    "def main():\n"
+                    "    log.info('Generating daily report...')\n"
+                    "    # ... build report ...\n"
+                    "    return 0\n\n"
+                    "if __name__ == '__main__':\n"
+                    "    main()\n"
+                ),
+                "cron_expression": "0 9 * * *",
+                "enabled": True,
+                "python_version": "3.12",
+                "dependencies": "requests>=2.31\npandas>=2.0",
+                "alert_on_failure": True,
+                "alert_on_success": False,
+                "timeout": 600,
+            }
+        }
+    }
+
 
 class ScriptUpdate(BaseModel):
     """Schema for updating a script (all fields optional)."""
@@ -124,6 +150,16 @@ class ScriptUpdate(BaseModel):
     max_retry_window: int | None = Field(default=None, ge=60, le=86400)
     prevent_overlap: bool | None = None
     change_summary: str | None = None  # Optional description of changes for versioning
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "content": "# updated content here\nprint('updated')\n",
+                "cron_expression": "*/15 * * * *",
+                "change_summary": "Switched to every-15-minute schedule",
+            }
+        }
+    }
 
     @field_validator("name")
     @classmethod
