@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app import __version__
 from app.api.dependencies import verify_credentials
 from app.config import get_settings
 from app.database import get_db
@@ -94,6 +95,7 @@ async def dashboard(
         {
             "request": request,
             "page_title": "Dashboard",
+            "version": __version__,
             "scripts": scripts_data,
             "stats": {
                 "total_scripts": total_scripts,
@@ -118,6 +120,7 @@ async def script_new(
         {
             "request": request,
             "page_title": "New Script",
+            "version": __version__,
             "script": None,
             "content": (
                 "#!/usr/bin/env python3\n"
@@ -189,6 +192,7 @@ async def script_detail(
         {
             "request": request,
             "page_title": script.name,
+            "version": __version__,
             "script": script,
             "executions": executions,
             "next_run": scheduler_service.get_next_run_time(script.id),
@@ -237,6 +241,7 @@ async def script_edit(
         {
             "request": request,
             "page_title": f"Edit: {script.name}",
+            "version": __version__,
             "script": script,
             "content": content,
             "python_versions": ["3.9", "3.10", "3.11", "3.12", "3.13"],
@@ -279,6 +284,7 @@ async def script_version_detail(
             "page_title": f"{script.name} - Version {version_number}",
             "script": script,
             "version": version,
+            "app_version": __version__,
         },
     )
 
@@ -330,6 +336,7 @@ async def executions_list(
         {
             "request": request,
             "page_title": "Executions",
+            "version": __version__,
             "executions": executions,
             "scripts": scripts,
             "filters": {
@@ -368,6 +375,7 @@ async def execution_detail(
         {
             "request": request,
             "page_title": f"Execution #{execution_id}",
+            "version": __version__,
             "execution": execution,
         },
     )
@@ -384,6 +392,7 @@ async def settings_page(
         {
             "request": request,
             "page_title": "Settings",
+            "version": __version__,
             "settings": settings,
             "scheduler_jobs": scheduler_service.get_all_jobs_info(),
         },
@@ -457,3 +466,137 @@ async def toggle_script_action(
         url=f"/scripts/{script_id}",
         status_code=status.HTTP_303_SEE_OTHER,
     )
+
+
+@router.get("/changelog", response_class=HTMLResponse)
+async def changelog_page(
+    request: Request,
+    username: str = Depends(verify_credentials),
+):
+    """Render the project CHANGELOG.md as a simple styled HTML page.
+
+    We don't pull in a full markdown library to avoid the dependency; instead
+    we use Python-Markdown if available, otherwise a tiny built-in renderer
+    that handles headings, lists, bold, links, and fenced code blocks.
+    """
+    from pathlib import Path
+
+    project_root = Path(__file__).resolve().parents[2]
+    changelog_path = project_root / "CHANGELOG.md"
+
+    if not changelog_path.exists():
+        return HTMLResponse(
+            "<h1>Changelog unavailable</h1><p>CHANGELOG.md not found.</p>",
+            status_code=404,
+        )
+
+    raw = changelog_path.read_text(encoding="utf-8")
+
+    try:
+        import markdown as _md  # type: ignore
+
+        body_html = _md.markdown(
+            raw,
+            extensions=["fenced_code", "tables", "toc"],
+        )
+    except ImportError:
+        body_html = _minimal_markdown(raw)
+
+    return HTMLResponse(
+        f"""<!doctype html>
+<html lang="en" data-theme="dim">
+<head>
+  <meta charset="utf-8">
+  <title>Changelog - Cronator</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/output.css">
+  <style>
+    body{{max-width:880px;margin:0 auto;padding:32px 24px;font-family:ui-sans-serif,system-ui,sans-serif;}}
+    h1,h2,h3{{color:#38bdf8;border-bottom:1px solid #1e293b;padding-bottom:8px;}}
+    h2{{margin-top:40px;}}
+    h3{{margin-top:24px;color:#94a3b8;}}
+    pre{{background:#020617;padding:14px 16px;border-radius:8px;overflow:auto;color:#e2e8f0;}}
+    code{{background:#1e293b;padding:2px 6px;border-radius:4px;font-size:0.9em;}}
+    a{{color:#60a5fa;}}
+    ul li{{margin:4px 0;}}
+    .badge{{display:inline-block;background:#0ea5e9;color:white;padding:2px 8px;border-radius:6px;font-size:12px;margin-left:8px;}}
+  </style>
+</head>
+<body>
+  <p><a href="/">&larr; Back to dashboard</a></p>
+  <h1>Cronator Changelog</h1>
+  {body_html}
+</body>
+</html>
+"""
+    )
+
+
+def _minimal_markdown(text: str) -> str:
+    """Tiny fallback renderer used when the `markdown` package is not installed.
+
+    Handles the subset we actually use in CHANGELOG.md: #/##/### headings,
+    - bullets, fenced code blocks, and links.
+    """
+    import re
+
+    lines = text.split("\n")
+    out: list[str] = []
+    in_code = False
+    in_ul = False
+    for line in lines:
+        if line.startswith("```"):
+            if in_code:
+                out.append("</pre>")
+                in_code = False
+            else:
+                out.append("<pre>")
+                in_code = True
+            continue
+        if in_code:
+            out.append(line)
+            continue
+        if line.startswith("### "):
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            out.append(f"<h3>{_inline(line[4:])}</h3>")
+        elif line.startswith("## "):
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            out.append(f"<h2>{_inline(line[3:])}</h2>")
+        elif line.startswith("# "):
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            out.append(f"<h1>{_inline(line[2:])}</h1>")
+        elif line.startswith("- "):
+            if not in_ul:
+                out.append("<ul>")
+                in_ul = True
+            out.append(f"<li>{_inline(line[2:])}</li>")
+        elif line.strip() == "":
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            out.append("")
+        else:
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            out.append(f"<p>{_inline(line)}</p>")
+    if in_ul:
+        out.append("</ul>")
+    if in_code:
+        out.append("</pre>")
+    return "\n".join(out)
+
+
+def _inline(text: str) -> str:
+    import re
+
+    text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
+    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', text)
+    return text
