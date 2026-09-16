@@ -99,7 +99,11 @@ class ScriptBase(BaseModel):
 class ScriptCreate(ScriptBase):
     """Schema for creating a new script."""
 
-    content: str = Field(default="")  # Script content for UI-created scripts
+    content: str = Field(
+        default="",
+        max_length=1 * 1024 * 1024,  # 1 MB hard limit on script size
+        description="Python script source code (max 1 MB)",
+    )
     path: str = Field(default="")  # Optional path for file-based scripts
 
     model_config = {
@@ -134,7 +138,7 @@ class ScriptUpdate(BaseModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
-    content: str | None = None
+    content: str | None = Field(default=None, max_length=1 * 1024 * 1024)
     cron_expression: str | None = None
     enabled: bool | None = None
     python_version: str | None = None
