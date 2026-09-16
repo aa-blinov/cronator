@@ -11,7 +11,7 @@ settings = get_settings()
 security = HTTPBasic()
 
 
-def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)) -> str:
+async def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)) -> str:
     """Verify HTTP Basic Auth credentials.
 
     Order of checks (F21):
@@ -27,17 +27,7 @@ def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)) ->
     try:
         from app.services.user_service import get_user, verify_password
 
-        user = None
-        try:
-            import asyncio
-
-            user = asyncio.get_event_loop().run_until_complete(get_user(username))
-        except RuntimeError:
-            # Already inside an event loop — use a sync helper instead
-            from app.services.user_service import verify_password as _vp
-
-            # We can't await from sync context here; fall back to env.
-            user = None
+        user = await get_user(username)
         if user is not None:
             if verify_password(password, user.password_hash):
                 return username
