@@ -47,6 +47,21 @@ jobs:
       - run: docker compose -f docker-compose.test.yml config --quiet
 
   # ------------------------------------------------------------------
+  # Dockerfile lint via hadolint
+  # ------------------------------------------------------------------
+  dockerfile-lint:
+    name: Dockerfile lint (hadolint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3
+        with:
+          # SC2086 (unquoted variable) and DL3008 (apt pinning) often fire on
+          # intent in our Dockerfile; we only fail on ERRORs.
+          failure-threshold: error
+          dockerfile: Dockerfile
+
+  # ------------------------------------------------------------------
   # Test suite — runs the project's Docker-based test stack
   # ------------------------------------------------------------------
   test:
@@ -57,3 +72,42 @@ jobs:
       - name: Run tests in Docker
         run: |
           docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
+
+  # ------------------------------------------------------------------
+  # PostgreSQL test suite (testcontainers) — ensures the project works
+  # against the production database, not just SQLite
+  # ------------------------------------------------------------------
+  test-postgres:
+    name: Tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: cronator_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test_user -d cronator_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/cronator_test
+      SKIP_ALEMBIC_MIGRATIONS: "1"
+      SUPPRESS_CONFIG_WARNINGS: "1"
+      ADMIN_PASSWORD: "ci-test-admin-password"
+      SECRET_KEY: "ci-test-secret-key-at-least-32-chars-long"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: pip install uv
+      - name: Run PostgreSQL tests
+        run: |
+          uv sync --all-extras
+          uv run pytest tests/pg/ -v
