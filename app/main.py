@@ -116,6 +116,11 @@ async def lifespan(app: FastAPI):
     if migrated > 0:
         logger.info(f"Migrated {migrated} settings from .env to database")
 
+    # Seed default admin user from env vars if no users exist yet (F21 RBAC)
+    from app.services.user_service import ensure_admin_seeded
+
+    await ensure_admin_seeded()
+
     # Start scheduler
     await scheduler_service.start()
     logger.info("Scheduler started")

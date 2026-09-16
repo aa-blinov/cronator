@@ -27,4 +27,4 @@ services:
       SUPPRESS_CONFIG_WARNINGS: "1"
       ADMIN_PASSWORD: "ci-test-admin-password"
       SECRET_KEY: "ci-test-secret-key-at-least-32-chars-long"
-    command: ["uv", "run", "pytest", "tests/", "-v"]
+    command: ["uv", "run", "pytest", "-v"]

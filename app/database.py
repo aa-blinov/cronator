@@ -74,4 +74,12 @@ async def close_db() -> None:
 
 # Import all models to register them with Base.metadata
 # This ensures tables are created when using Base.metadata.create_all()
-from app.models import Execution, Script, ScriptVersion, Setting  # noqa: F401, E402
+from app.models import (  # noqa: F401, E402
+    Artifact,
+    Execution,
+    Script,
+    ScriptAuditLog,
+    ScriptVersion,
+    Setting,
+    User,
+)
