@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"  # e.g. v0.2.0
+
+jobs:
+  release:
+    name: Build & publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # needed to create the GitHub release
+      packages: write  # if you later push to GHCR
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for changelog generation
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests (sanity check before publishing)
+        env:
+          SUPPRESS_CONFIG_WARNINGS: "1"
+          ADMIN_PASSWORD: ci-test-admin-password
+          SECRET_KEY: ci-test-secret-key-at-least-32-chars-long
+        run: |
+          uv sync --all-extras
+          # Lint + unit tests as a sanity check; the full docker-based test suite
+          # already runs in ci.yml on every commit.
+          uv run ruff check app/ cronator_lib/
+          uv run pytest tests/unit/ -q
+
+      - name: Build Docker image (multi-arch)
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --tag crinator:latest \
+            --tag crinator:${{ steps.version.outputs.version }} \
+            --load \
+            .
+
+      - name: Generate changelog excerpt
+        id: changelog
+        run: |
+          # Extract the section for this version from CHANGELOG.md
+          VERSION=${{ steps.version.outputs.version }}
+          awk "/^## \\[${VERSION}\\]/{flag=1; print; next} /^## \\[/&&NR>5{flag=0} flag" \
+            CHANGELOG.md > /tmp/changelog-excerpt.md || true
+          if [ ! -s /tmp/changelog-excerpt.md ]; then
+            echo "# Release v${VERSION}" > /tmp/changelog-excerpt.md
+            echo "_No CHANGELOG entry found — please add one for this version._" >> /tmp/changelog-excerpt.md
+          fi
+          echo "excerpt<<EOF" >> "$GITHUB_OUTPUT"
+          cat /tmp/changelog-excerpt.md >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Cronator v${{ steps.version.outputs.version }}"
+          body: ${{ steps.changelog.outputs.excerpt }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

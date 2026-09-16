@@ -27,8 +27,16 @@ settings = get_settings()
 log_dir = settings.logs_dir
 log_file = log_dir / "cronator.log"
 
+# Select formatter based on settings.log_format (F20)
+from app.services.json_logging import HumanFormatter, JsonFormatter
+
+if settings.log_format.lower() == "json":
+    chosen_formatter: logging.Formatter = JsonFormatter()
+else:
+    chosen_formatter = HumanFormatter()
+
 # Create handlers list - always include StreamHandler
-handlers = [logging.StreamHandler()]
+handlers: list[logging.Handler] = [logging.StreamHandler()]
 
 # Try to add file handler, but handle permission errors gracefully
 try:
@@ -40,6 +48,7 @@ try:
         maxBytes=10 * 1024 * 1024,  # 10MB
         backupCount=5,
     )
+    file_handler.setFormatter(chosen_formatter)
     handlers.append(file_handler)
 except (PermissionError, OSError) as e:
     # If we can't write to the log file, just use StreamHandler
@@ -49,9 +58,12 @@ except (PermissionError, OSError) as e:
     print(f"Warning: Could not create log file at {log_file}: {e}", file=sys.stderr)
     print("Warning: Logging to file disabled. Using console logging only.", file=sys.stderr)
 
+# Apply formatter to StreamHandler too so JSON output works everywhere
+for h in handlers:
+    h.setFormatter(chosen_formatter)
+
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
     handlers=handlers,
 )
 logger = logging.getLogger(__name__)
