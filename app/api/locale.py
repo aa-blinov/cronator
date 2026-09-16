@@ -9,6 +9,7 @@ a minimal API surface that the UI can use to switch language.
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 from app.services.settings_service import settings_service
 
@@ -25,6 +26,10 @@ SUPPORTED_LOCALES = [
 SUPPORTED_CODES = {loc["code"] for loc in SUPPORTED_LOCALES}
 
 
+class LocaleSetRequest(BaseModel):
+    locale: str = Field(..., min_length=2, max_length=8, examples=["ru"])
+
+
 @router.get("/locales")
 async def list_locales():
     """List all supported UI locales."""
@@ -38,10 +43,25 @@ async def get_locale():
     return {"locale": locale}
 
 
-@router.post("/locale")
-async def set_locale(payload: dict):
-    """Set the active locale for the current user (persisted to settings)."""
-    locale = payload.get("locale") if isinstance(payload, dict) else None
+@router.post(
+    "/locale",
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "example": {"locale": "ru"}
+                }
+            }
+        }
+    },
+)
+async def set_locale(payload: LocaleSetRequest):
+    """Set the active locale for the current user (persisted to settings).
+
+    Example request body:
+        {"locale": "ru"}
+    """
+    locale = payload.locale
     if locale not in SUPPORTED_CODES:
         raise HTTPException(
             status_code=422,

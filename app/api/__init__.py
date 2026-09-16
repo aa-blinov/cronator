@@ -9,6 +9,7 @@ from app.api.locale import router as locale_router
 from app.api.pages import router as pages_router
 from app.api.scripts import router as scripts_router
 from app.api.settings import router as settings_router
+from app.api.users import router as users_router
 
 api_router = APIRouter()
 
@@ -35,6 +36,13 @@ api_router.include_router(
     diagnostics_router,
     prefix="/api",
     tags=["diagnostics"],
+    dependencies=[Depends(verify_credentials)],
+)
+# F21: user management endpoints
+api_router.include_router(
+    users_router,
+    prefix="/api",
+    tags=["users"],
     dependencies=[Depends(verify_credentials)],
 )
 # F15: locale endpoints are public (no auth required) so the login page

@@ -480,7 +480,18 @@ async def restore_backup(file: UploadFile = File(...)):
 
 
 # F17: Webhook test endpoint
-@router.post("/test-webhook")
+@router.post(
+    "/test-webhook",
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "example": {"webhook_url": "https://example.com/webhook"}
+                }
+            }
+        }
+    },
+)
 async def test_webhook(payload: dict | None = None):
     """Send a test payload to the configured webhook URL (from body or stored setting)."""
     import httpx
