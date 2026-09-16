@@ -1,6 +1,7 @@
 """API routes for settings."""
 
 import shutil
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
@@ -37,6 +38,9 @@ class SettingsResponse(BaseModel):
     # F16: UI theme (daisyUI theme name)
     theme: str = "dim"
 
+    # F17: Webhook URL for failure notifications
+    webhook_url: str = ""
+
 
 class SchedulerStatus(BaseModel):
     """Scheduler status."""
@@ -58,6 +62,7 @@ async def get_settings_info() -> SettingsResponse:
     alert_email = await settings_service.get("alert_email", settings.alert_email)
     default_timeout = await settings_service.get("default_timeout", settings.default_timeout)
     theme = await settings_service.get("theme", "dim")
+    webhook_url = await settings_service.get("webhook_url", "")
 
     return SettingsResponse(
         app_name=settings.app_name,
@@ -71,6 +76,7 @@ async def get_settings_info() -> SettingsResponse:
         alert_email=alert_email,
         default_timeout=default_timeout,
         theme=theme,
+        webhook_url=webhook_url,
     )
 
 
@@ -153,6 +159,9 @@ class UpdateSettingsRequest(BaseModel):
     # F16: UI theme — daisyUI theme name (dim / light / cupcake / ...)
     theme: str | None = Field(default=None, pattern="^(dim|light|cupcake|dracula|business)$")
 
+    # F17: webhook URL for failure notifications
+    webhook_url: str | None = None
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -194,6 +203,8 @@ async def update_settings(request: UpdateSettingsRequest):
         updates["default_timeout"] = request.default_timeout
     if request.theme is not None:
         updates["theme"] = request.theme
+    if request.webhook_url is not None:
+        updates["webhook_url"] = request.webhook_url
 
     # Save to database
     await settings_service.bulk_set(updates)
@@ -466,3 +477,32 @@ async def restore_backup(file: UploadFile = File(...)):
             tmpdir.rmdir()
         except OSError:
             pass
+
+
+# F17: Webhook test endpoint
+@router.post("/test-webhook")
+async def test_webhook(payload: dict | None = None):
+    """Send a test payload to the configured webhook URL (from body or stored setting)."""
+    import httpx
+
+    body = payload or {}
+    target = body.get("webhook_url") or (await settings_service.get("webhook_url", ""))
+    if not target:
+        raise HTTPException(status_code=400, detail="No webhook_url configured")
+
+    payload = {
+        "type": "test",
+        "app": "Cronator",
+        "message": "This is a test webhook from Cronator",
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(target, json=payload)
+        return {
+            "success": True,
+            "status_code": r.status_code,
+            "message": f"Webhook returned {r.status_code}",
+        }
+    except Exception as e:
+        return {"success": False, "message": f"{type(e).__name__}: {e}"}
