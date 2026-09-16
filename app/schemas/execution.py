@@ -43,7 +43,29 @@ class ExecutionRead(BaseModel):
     duration_formatted: str = "-"
     script_name: str | None = None
 
-    model_config = {"from_attributes": True}
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "example": {
+                "id": 42,
+                "script_id": 1,
+                "status": "success",
+                "started_at": "2026-09-16T18:33:46.060663Z",
+                "finished_at": "2026-09-16T18:33:49.197953Z",
+                "duration_ms": 3137,
+                "exit_code": 0,
+                "stdout": "{\"timestamp\": \"...\", \"level\": \"INFO\", \"message\": \"done\"}\n",
+                "stderr": "",
+                "triggered_by": "manual",
+                "is_test": False,
+                "error_message": None,
+                "artifacts_count": 0,
+                "artifacts_size_bytes": 0,
+                "duration_formatted": "3.1s",
+                "script_name": "daily-report",
+            }
+        },
+    }
 
 
 class ExecutionList(BaseModel):
