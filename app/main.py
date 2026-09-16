@@ -103,7 +103,7 @@ async def lifespan(app: FastAPI):
     logger.info("Scheduler started")
 
     # Cleanup stale executions
-    from app.services.executor import executor_service
+    from app.services.executor import executor_service  # noqa: F811
 
     await executor_service.cleanup_stale_executions()
     logger.info("Stale executions cleaned up")
@@ -126,11 +126,52 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
-    logger.info("Shutting down Cronator...")
+    # Shutdown — registered as `app.shutdown` event by uvicorn.
+    # Order matters:
+    #   1. Stop the scheduler first so no NEW jobs are dispatched during shutdown
+    #   2. Cancel all in-flight executions so they finish with status=CANCELLED
+    #      rather than being SIGKILL'd by the OS and stuck in RUNNING forever
+    #   3. Close the database engine to release connections
+    await graceful_shutdown(scheduler_service, executor_service, close_db)
 
-    await scheduler_service.stop()
-    await close_db()
+
+async def graceful_shutdown(scheduler, executor, close_db_fn):
+    """Perform a graceful shutdown of all background services.
+
+    Public function (not nested in lifespan) so it can be unit-tested in
+    isolation. Idempotent: safe to call twice.
+    """
+    from app.services.executor import executor_service as _exec_singleton
+
+    logger.info("Shutting down Cronator gracefully...")
+
+    # 1. Stop the scheduler (no new jobs fire)
+    try:
+        await scheduler.stop()
+    except Exception as e:
+        logger.warning(f"Error stopping scheduler during shutdown: {e}")
+
+    # 2. Cancel all in-flight executions so they finish with status=CANCELLED
+    #    rather than being SIGKILL'd by the OS grace period
+    try:
+        in_flight = list(executor.running_processes.keys())
+        for execution_id in in_flight:
+            try:
+                await _exec_singleton.cancel_execution(execution_id)
+            except Exception as e:
+                logger.warning(
+                    f"Error cancelling execution {execution_id} during shutdown: {e}"
+                )
+        if in_flight:
+            logger.info(f"Cancelled {len(in_flight)} in-flight execution(s) during shutdown")
+    except Exception as e:
+        logger.warning(f"Error iterating in-flight executions during shutdown: {e}")
+
+    # 3. Close the database engine
+    try:
+        await close_db_fn()
+    except Exception as e:
+        logger.warning(f"Error closing database during shutdown: {e}")
 
     logger.info("Cronator stopped")
 
