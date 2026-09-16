@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies import verify_credentials
 from app.api.rate_limit import rate_limit
 from app.config import get_settings
 from app.database import get_db
@@ -238,6 +239,7 @@ async def update_script(
     script_id: int,
     data: ScriptUpdate,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(verify_credentials),
 ):
     """Update a script."""
     result = await db.execute(select(Script).where(Script.id == script_id))
@@ -271,6 +273,33 @@ async def update_script(
 
     # Track old name for environment service update
     old_name = script.name
+
+    # F11: Audit log — capture old/new value of each field for the audit trail.
+    audit_changes: list[tuple[str, str | None, str | None]] = []
+    AUDITABLE_FIELDS = {
+        "name",
+        "description",
+        "cron_expression",
+        "enabled",
+        "python_version",
+        "dependencies",
+        "alert_on_failure",
+        "alert_on_success",
+        "timeout",
+        "misfire_grace_time",
+        "working_directory",
+        "environment_vars",
+        "retry_count",
+        "retry_delay",
+        "max_retry_window",
+        "prevent_overlap",
+    }
+    for field in AUDITABLE_FIELDS:
+        if field in update_data:
+            old = getattr(script, field)
+            new = update_data[field]
+            if old != new:
+                audit_changes.append((field, str(old) if old is not None else None, str(new) if new is not None else None))
 
     # Update fields
     for field, value in update_data.items():
@@ -318,6 +347,21 @@ async def update_script(
     # Create version snapshot if content/deps/python changed
     if data.content is not None or deps_changed or python_changed:
         await _create_version(db, script, data.change_summary)
+
+    # F11: Write audit log entries for each changed field
+    if audit_changes:
+        from app.models.audit_log import ScriptAuditLog
+
+        for field_name, old_v, new_v in audit_changes:
+            entry = ScriptAuditLog(
+                script_id=script.id,
+                field_name=field_name,
+                old_value=old_v,
+                new_value=new_v,
+                changed_by=username,
+            )
+            db.add(entry)
+        await db.commit()
 
     # NOTE: Environment setup is now done separately via /scripts/{id}/install
     # to allow streaming of installation logs
@@ -794,6 +838,48 @@ async def _create_version(
     await db.commit()
     logging.info(
         f"Created version {version_number} for script {script.id} (hash: {current_hash[:8]}...)"
+    )
+
+
+@router.get("/{script_id}/audit")
+async def list_script_audit_log(
+    script_id: int,
+    page: int = 1,
+    per_page: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
+    """List audit-log entries for a script (F11)."""
+    from app.models.audit_log import ScriptAuditLog
+    from app.schemas.audit_log import AuditLogList
+
+    result = await db.execute(select(Script).where(Script.id == script_id))
+    script = result.scalar_one_or_none()
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+
+    # Count total
+    total = await db.scalar(
+        select(func.count()).select_from(ScriptAuditLog).where(ScriptAuditLog.script_id == script_id)
+    )
+    total = total or 0
+
+    # Page
+    offset = max(0, (page - 1) * per_page)
+    entries_result = await db.execute(
+        select(ScriptAuditLog)
+        .where(ScriptAuditLog.script_id == script_id)
+        .order_by(ScriptAuditLog.changed_at.desc(), ScriptAuditLog.id.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
+    entries = entries_result.scalars().all()
+
+    return AuditLogList(
+        items=list(entries),
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=(total + per_page - 1) // per_page if total else 0,
     )
 
 
