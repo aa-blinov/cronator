@@ -22,7 +22,7 @@ from starlette.responses import Response
 # Restrictive CSP that still lets the Tailwind CSS, fonts, and inline UI scripts work.
 # - 'self' is the same-origin source for scripts, styles, images, etc.
 # - 'unsafe-inline' for style is required by Tailwind utility classes generated dynamically.
-# - data: for images allows inline favicons; https: for fonts allows Google Fonts loaded in base.html.
+# - data: for images allows inline favicons; https: for fonts allows Google Fonts loaded in base.html.  # noqa: E501
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
     "img-src 'self' data: https:; "
