@@ -659,6 +659,11 @@ class ExecutorService:
                             )
 
                 finally:
+                    # Mark the script as no longer running immediately so that
+                    # subsequent runs (and the delete-while-running guard) see
+                    # the final committed state without waiting for the stream
+                    # cleanup delay below.
+                    self._running_scripts.discard(script_id)
                     # Cleanup
                     self.running_processes.pop(execution_id, None)
                     # Small delay helps reconnecting clients observe committed final state.
