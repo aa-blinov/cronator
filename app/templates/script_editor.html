@@ -315,10 +315,14 @@
                         <label class="label">
                             <span class="label-text">Timeout (seconds)</span>
                         </label>
-                        <input type="number" name="timeout" 
+                        <input type="number" name="timeout"
                                value="{{ script.timeout if script else 3600 }}"
                                min="1" max="86400"
                                class="input input-bordered w-full">
+                        <p class="text-xs text-base-content/50 mt-1">
+                            Maximum <strong>86400 s (24 h)</strong>. Recommended ≤ 3600 s.
+                            Use a longer timeout only for known long jobs (migrations, big exports).
+                        </p>
                     </div>
                     
                     <div class="form-control">
