@@ -1,4 +1,4 @@
-"""Security headers middleware for F1.
+"""Security headers middleware for F1 + F14.
 
 Adds the minimum headers required by the OWASP Secure Headers baseline to
 every HTTP response. Headers are deliberately conservative:
@@ -8,6 +8,7 @@ every HTTP response. Headers are deliberately conservative:
 - Referrer-Policy: strict-origin-when-cross-origin  (limit referrer leak)
 - Permissions-Policy: camera/mic/geo=()      (block unused sensitive APIs)
 - Content-Security-Policy: restrictive defaults (allow self only)
+- Strict-Transport-Security (F14, HTTPS only)  (force HTTPS for 1 year)
 
 The middleware is registered globally in app/main.py after the FastAPI app
 is created and before routers are included, so it covers error responses too.
@@ -39,6 +40,17 @@ PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=
 
 REFERRER_POLICY = "strict-origin-when-cross-origin"
 
+# 1 year is the recommended minimum for HSTS qualification in browsers' preload list.
+HSTS_VALUE = "max-age=31536000; includeSubDomains"
+
+
+def _is_https(request: Request) -> bool:
+    """Detect HTTPS — either direct scheme or via X-Forwarded-Proto (reverse proxy)."""
+    if request.url.scheme == "https":
+        return True
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
+    return forwarded_proto == "https"
+
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):  # type: ignore[override]
@@ -48,4 +60,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("Referrer-Policy", REFERRER_POLICY)
         response.headers.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
         response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+
+        # Only emit HSTS over HTTPS — emitting it over plain HTTP would lock
+        # the browser into HTTPS for max-age seconds on a host that's only HTTP.
+        if _is_https(request):
+            response.headers.setdefault("Strict-Transport-Security", HSTS_VALUE)
+
         return response
