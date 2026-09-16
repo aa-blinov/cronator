@@ -15,8 +15,10 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.database import Base
+from app.models.audit_log import ScriptAuditLog
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
+from app.models.user import User
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite+aiosqlite:///./test_app.db")
 
@@ -117,6 +119,7 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
     import app.services.executor
     import app.services.scheduler
     import app.services.settings_service
+    import app.services.user_service
 
     modules_to_patch = [
         app.database,
@@ -124,6 +127,7 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
         app.services.executor,
         app.services.scheduler,
         app.services.settings_service,
+        app.services.user_service,
         app.api.settings,
         app.api.scripts,
         app.api.executions,
@@ -137,6 +141,12 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
 
     fastapi_app.dependency_overrides[get_db] = override_get_db
     fastapi_app.dependency_overrides[verify_credentials] = override_verify_credentials
+
+    # Seed the default admin user from env so /api/users shows at least one admin.
+    # The app's lifespan doesn't run under ASGITransport, so we call it explicitly.
+    from app.services.user_service import ensure_admin_seeded
+
+    await ensure_admin_seeded()
 
     # Add Basic Auth header for any endpoints that might check it directly
     auth = base64.b64encode(b"admin:admin").decode("ascii")
