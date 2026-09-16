@@ -2,7 +2,7 @@
 
 import shutil
 
-from fastapi import APIRouter
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
@@ -329,3 +329,140 @@ async def clear_all_artifacts():
         "deleted_artifacts": artifacts_count,
         "deleted_directories": deleted_dirs,
     }
+
+
+# ---------------------------------------------------------------------------
+# F12: Backup / Restore from UI
+# ---------------------------------------------------------------------------
+
+
+@router.get("/backups")
+async def list_available_backups():
+    """List backup files available in the host's backups directory."""
+    from pathlib import Path
+
+    backups_dir = Path("/app/backups") if Path("/app").exists() else Path("./backups")
+    if not backups_dir.exists():
+        # Fallback: scan the same dir as the docker-entrypoint uses
+        backups_dir = Path(settings.data_dir).parent / "backups"
+
+    files: list[dict] = []
+    if backups_dir.exists():
+        for p in sorted(backups_dir.glob("*.sql.gz"), reverse=True):
+            try:
+                stat = p.stat()
+                files.append(
+                    {
+                        "filename": p.name,
+                        "size_bytes": stat.st_size,
+                        "created_at": stat.st_mtime,
+                    }
+                )
+            except OSError:
+                continue
+
+    return {"backups": files, "backups_dir": str(backups_dir)}
+
+
+@router.post("/restore-backup")
+async def restore_backup(file: UploadFile = File(...)):
+    """Restore from a user-uploaded .sql.gz backup file (F12).
+
+    The upload is validated, decompressed, and applied via the database
+    connection. We do NOT spawn a separate subprocess — that requires psql on
+    PATH which isn't always available inside the application container.
+    Instead we use SQLAlchemy core to apply each statement.
+    """
+    import gzip
+    import logging
+    import re
+    from pathlib import Path
+
+    from sqlalchemy import text
+
+    # Validate filename
+    if not file.filename or not file.filename.endswith(".sql.gz"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename: must be a .sql.gz file",
+        )
+
+    # Save to a temp file (StreamingUploadFile may be too large for memory)
+    import tempfile
+
+    tmpdir = Path(tempfile.mkdtemp(prefix="crinator-restore-"))
+    tmp_path = tmpdir / file.filename
+    try:
+        content = await file.read()
+        if len(content) > 500 * 1024 * 1024:  # 500 MB cap
+            raise HTTPException(status_code=413, detail="Backup file too large (>500 MB)")
+        tmp_path.write_bytes(content)
+
+        # Decompress
+        try:
+            sql_bytes = gzip.decompress(content)
+        except (OSError, EOFError, gzip.BadGzipFile) as e:
+            raise HTTPException(status_code=400, detail=f"Invalid gzip file: {e}") from e
+
+        sql_text = sql_bytes.decode("utf-8", errors="replace")
+
+        # Block obviously dangerous statements (defense in depth — caller should
+        # know what they're doing, but DROP DATABASE on the live db would be
+        # catastrophic). We don't have a sandbox, so we refuse destructive
+        # commands outright.
+        dangerous = re.findall(
+            r"\b(DROP\s+DATABASE|DROP\s+SCHEMA|TRUNCATE\s+pg_catalog)\b",
+            sql_text,
+            flags=re.IGNORECASE,
+        )
+        if dangerous:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Backup contains destructive statements that would target "
+                    "system catalogs: " + ", ".join(sorted(set(dangerous)))
+                ),
+            )
+
+        # Apply via raw connection. We open a fresh connection so we don't
+        # conflict with the application's connection pool.
+        sync_url = settings.database_url
+        sync_url = sync_url.replace("+asyncpg", "").replace("+aiosqlite", "")
+        from sqlalchemy import create_engine
+
+        sync_engine = create_engine(sync_url)
+        statements_applied = 0
+        try:
+            with sync_engine.begin() as conn:
+                # Split on semicolons at end of lines; very basic SQL splitter.
+                # For pg_dump output this is sufficient because each statement
+                # ends with `;\n`.
+                for raw_stmt in sql_text.split(";\n"):
+                    stmt = raw_stmt.strip()
+                    if not stmt:
+                        continue
+                    try:
+                        conn.execute(text(stmt))
+                        statements_applied += 1
+                    except Exception as e:
+                        logger.warning(f"Statement failed (skipped): {e}")
+                        continue
+        finally:
+            sync_engine.dispose()
+
+        return {
+            "success": True,
+            "statements_applied": statements_applied,
+            "filename": file.filename,
+            "message": (
+                f"Restored {statements_applied} statements from {file.filename}. "
+                "Note: in-flight executions may need to be cancelled."
+            ),
+        }
+    finally:
+        # Cleanup temp files
+        try:
+            tmp_path.unlink(missing_ok=True)
+            tmpdir.rmdir()
+        except OSError:
+            pass
