@@ -814,6 +814,15 @@ class ExecutorService:
         elif status == ExecutionStatus.SUCCESS:
             await self._send_success_alert(execution)
 
+        # Record metrics (counter increment by status)
+        try:
+            from app.services.metrics import record_execution_status
+
+            record_execution_status(status.value, triggered_by=execution.triggered_by)
+        except Exception:
+            # Never let metrics break an execution completion
+            pass
+
     async def _send_failure_alert(self, execution: Execution) -> None:
         """Send alert for failed execution."""
         from app.services.alerting import alerting_service
