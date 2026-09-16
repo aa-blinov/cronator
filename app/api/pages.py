@@ -21,6 +21,18 @@ from app.services.executor import executor_service
 from app.services.scheduler import scheduler_service
 
 router = APIRouter()
+DEFAULT_THEME = "dim"
+
+async def _get_user_theme() -> str:
+    """Return the persisted theme preference (default: 'dim')."""
+    from app.services.settings_service import settings_service
+
+    try:
+        return await settings_service.get("theme", "dim")
+    except Exception:
+        return "dim"
+
+
 settings = get_settings()
 security = HTTPBasic()
 
@@ -96,6 +108,7 @@ async def dashboard(
             "request": request,
             "page_title": "Dashboard",
             "version": __version__,
+            "theme": DEFAULT_THEME,
             "scripts": scripts_data,
             "stats": {
                 "total_scripts": total_scripts,
@@ -121,6 +134,7 @@ async def script_new(
             "request": request,
             "page_title": "New Script",
             "version": __version__,
+            "theme": DEFAULT_THEME,
             "script": None,
             "content": (
                 "#!/usr/bin/env python3\n"
@@ -193,6 +207,7 @@ async def script_detail(
             "request": request,
             "page_title": script.name,
             "version": __version__,
+            "theme": DEFAULT_THEME,
             "script": script,
             "executions": executions,
             "next_run": scheduler_service.get_next_run_time(script.id),
@@ -242,6 +257,7 @@ async def script_edit(
             "request": request,
             "page_title": f"Edit: {script.name}",
             "version": __version__,
+            "theme": DEFAULT_THEME,
             "script": script,
             "content": content,
             "python_versions": ["3.9", "3.10", "3.11", "3.12", "3.13"],
@@ -337,6 +353,7 @@ async def executions_list(
             "request": request,
             "page_title": "Executions",
             "version": __version__,
+            "theme": DEFAULT_THEME,
             "executions": executions,
             "scripts": scripts,
             "filters": {
@@ -376,6 +393,7 @@ async def execution_detail(
             "request": request,
             "page_title": f"Execution #{execution_id}",
             "version": __version__,
+            "theme": DEFAULT_THEME,
             "execution": execution,
         },
     )
@@ -393,6 +411,7 @@ async def settings_page(
             "request": request,
             "page_title": "Settings",
             "version": __version__,
+            "theme": DEFAULT_THEME,
             "settings": settings,
             "scheduler_jobs": scheduler_service.get_all_jobs_info(),
         },

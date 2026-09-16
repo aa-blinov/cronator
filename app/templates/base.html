@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dim">
+<html lang="en" data-theme="{{ theme|default('dim') }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -58,6 +58,20 @@
                 <div class="text-xs text-base-content/50">
                     <p>Cronator v{{ app_version or version or '0.0.0' }}</p>
                     <p class="mt-1"><a href="/changelog" class="link link-hover">Changelog</a></p>
+                </div>
+                {# F16: Theme toggle. Reads current theme from localStorage so the
+                   choice persists across reloads without a server round-trip. #}
+                <div class="mt-3">
+                    <select id="theme-select"
+                            class="select select-bordered select-xs w-full"
+                            data-current-theme="{{ theme|default('dim') }}"
+                            aria-label="UI theme">
+                        <option value="dim">Dim (dark)</option>
+                        <option value="light">Light</option>
+                        <option value="cupcake">Cupcake</option>
+                        <option value="dracula">Dracula</option>
+                        <option value="business">Business</option>
+                    </select>
                 </div>
             </div>
         </aside>
@@ -224,6 +238,30 @@
         }
 
         consumeQueuedToast();
+
+        // F16: Theme toggle — persist to localStorage and POST to server
+        const themeSelect = document.getElementById('theme-select');
+        if (themeSelect) {
+            const savedTheme = localStorage.getItem('crinator-theme');
+            if (savedTheme && savedTheme !== themeSelect.value) {
+                themeSelect.value = savedTheme;
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            }
+            themeSelect.addEventListener('change', async () => {
+                const newTheme = themeSelect.value;
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('crinator-theme', newTheme);
+                try {
+                    await fetch('/api/settings/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ theme: newTheme }),
+                    });
+                } catch (e) {
+                    console.warn('Failed to persist theme preference', e);
+                }
+            });
+        }
 
         // Confirm dangerous actions
         document.querySelectorAll('[data-confirm]').forEach(el => {

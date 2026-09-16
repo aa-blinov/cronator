@@ -3,7 +3,7 @@
 import shutil
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from app.config import get_settings
@@ -34,6 +34,9 @@ class SettingsResponse(BaseModel):
 
     default_timeout: int
 
+    # F16: UI theme (daisyUI theme name)
+    theme: str = "dim"
+
 
 class SchedulerStatus(BaseModel):
     """Scheduler status."""
@@ -54,6 +57,7 @@ async def get_settings_info() -> SettingsResponse:
     smtp_from = await settings_service.get("smtp_from", settings.smtp_from)
     alert_email = await settings_service.get("alert_email", settings.alert_email)
     default_timeout = await settings_service.get("default_timeout", settings.default_timeout)
+    theme = await settings_service.get("theme", "dim")
 
     return SettingsResponse(
         app_name=settings.app_name,
@@ -66,6 +70,7 @@ async def get_settings_info() -> SettingsResponse:
         smtp_from=smtp_from,
         alert_email=alert_email,
         default_timeout=default_timeout,
+        theme=theme,
     )
 
 
@@ -145,6 +150,9 @@ class UpdateSettingsRequest(BaseModel):
 
     default_timeout: int | None = None
 
+    # F16: UI theme — daisyUI theme name (dim / light / cupcake / ...)
+    theme: str | None = Field(default=None, pattern="^(dim|light|cupcake|dracula|business)$")
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -156,6 +164,7 @@ class UpdateSettingsRequest(BaseModel):
                 "smtp_from": "cronator@example.com",
                 "alert_email": "oncall@example.com",
                 "default_timeout": 3600,
+                "theme": "dim",
             }
         }
     }
@@ -183,6 +192,8 @@ async def update_settings(request: UpdateSettingsRequest):
         updates["alert_email"] = request.alert_email
     if request.default_timeout is not None:
         updates["default_timeout"] = request.default_timeout
+    if request.theme is not None:
+        updates["theme"] = request.theme
 
     # Save to database
     await settings_service.bulk_set(updates)
