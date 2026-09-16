@@ -110,6 +110,8 @@ COPY --from=builder /app/cronator_lib /app/cronator_lib
 COPY --from=builder /app/pyproject.toml /app/
 COPY --from=builder /app/alembic /app/alembic
 COPY --from=builder /app/alembic.ini /app/
+COPY --from=builder /app/CHANGELOG.md /app/CHANGELOG.md
+COPY --from=builder /app/LICENSE /app/LICENSE
 
 # Copy built CSS from css-builder stage — only the compiled output is needed at runtime
 COPY --from=css-builder /app/app/static/output.css /app/app/static/output.css

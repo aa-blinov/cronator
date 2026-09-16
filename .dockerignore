@@ -43,6 +43,8 @@ scripts/
 # Documentation
 *.md
 !README.md
+!CHANGELOG.md
+!LICENSE
 docs/
 
 # Testing
