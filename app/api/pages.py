@@ -528,7 +528,7 @@ async def changelog_page(
   {body_html}
 </body>
 </html>
-"""
+"""  # noqa: E501
     )
 
 
@@ -538,7 +538,6 @@ def _minimal_markdown(text: str) -> str:
     Handles the subset we actually use in CHANGELOG.md: #/##/### headings,
     - bullets, fenced code blocks, and links.
     """
-    import re
 
     lines = text.split("\n")
     out: list[str] = []
