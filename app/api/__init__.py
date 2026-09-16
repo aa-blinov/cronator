@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies import verify_credentials
+from app.api.diagnostics import router as diagnostics_router
 from app.api.executions import router as executions_router
 from app.api.pages import router as pages_router
 from app.api.scripts import router as scripts_router
@@ -27,6 +28,12 @@ api_router.include_router(
     settings_router,
     prefix="/api/settings",
     tags=["settings"],
+    dependencies=[Depends(verify_credentials)],
+)
+api_router.include_router(
+    diagnostics_router,
+    prefix="/api",
+    tags=["diagnostics"],
     dependencies=[Depends(verify_credentials)],
 )
 
