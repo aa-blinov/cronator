@@ -226,17 +226,29 @@ app.include_router(api_router)
 
 @app.get("/health")
 async def health_check():
-    """Enhanced health check endpoint with detailed status."""
+    """Enhanced health check endpoint with detailed status.
+
+    Includes:
+    - app metadata: name, version, timestamp
+    - components.database: ping result
+    - components.scheduler: running flag + job_count
+    - components.disk: free/total bytes and percent used on the data directory
+    - components.migrations: current/head alembic revisions and pending flag
+      (or "skipped" status when SKIP_ALEMBIC_MIGRATIONS=1, e.g. in tests)
+    """
+    from app import __version__
     from app.database import async_session_maker
 
-    checks = {
+    checks: dict = {
         "status": "healthy",
         "app": settings.app_name,
-        "version": "0.1.0",
+        "version": __version__,
         "timestamp": datetime.now(UTC).isoformat(),
         "components": {
             "database": "unknown",
-            "scheduler": "unknown",
+            "scheduler": {"status": "unknown"},
+            "disk": {},
+            "migrations": {},
         },
     }
 
@@ -250,18 +262,115 @@ async def health_check():
         checks["status"] = "degraded"
         logger.error(f"Database health check failed: {e}")
 
-    # Scheduler check
+    # Scheduler check (status + job_count for operator visibility)
     try:
         is_running = scheduler_service.scheduler.running
-        checks["components"]["scheduler"] = "running" if is_running else "stopped"
+        try:
+            job_count = len(scheduler_service.scheduler.get_jobs())
+        except Exception:
+            job_count = 0
+        checks["components"]["scheduler"] = {
+            "status": "running" if is_running else "stopped",
+            "job_count": job_count,
+        }
         if not is_running:
             checks["status"] = "degraded"
     except Exception as e:
-        checks["components"]["scheduler"] = f"error: {type(e).__name__}"
+        checks["components"]["scheduler"] = {
+            "status": f"error: {type(e).__name__}",
+            "job_count": 0,
+        }
         checks["status"] = "degraded"
         logger.error(f"Scheduler health check failed: {e}")
 
-    # Return 503 if unhealthy
+    # Disk usage on the data directory (where artifacts/logs/backups accumulate)
+    try:
+        import shutil
+
+        # Fall back to a directory that always exists if data_dir doesn't exist yet
+        # (e.g. in fresh test fixtures). The point is to report useful disk info,
+        # not to fail health checks.
+        target = settings.data_dir if settings.data_dir.exists() else Path("/")
+        usage = shutil.disk_usage(target)
+        total = usage.total
+        free = usage.free
+        used = usage.used
+        used_percent = round((used / total) * 100, 1) if total else 0.0
+        checks["components"]["disk"] = {
+            "path": str(target),
+            "total_bytes": total,
+            "total_mb": round(total / (1024 * 1024), 2),
+            "free_bytes": free,
+            "free_mb": round(free / (1024 * 1024), 2),
+            "used_bytes": used,
+            "used_percent": used_percent,
+        }
+        # Warn (but don't mark degraded) at 95% full — operators should still see
+        # the app as functional, but it's actionable info.
+        if used_percent >= 95:
+            checks["components"]["disk"]["warning"] = (
+                f"disk is {used_percent}% full — clean up artifacts or extend storage"
+            )
+    except Exception as e:
+        # Disk info is informational only — never degrades app health.
+        checks["components"]["disk"] = {"error": f"{type(e).__name__}: {e}"}
+
+    # Migrations status (best-effort; tests skip alembic and don't have the table)
+    try:
+        import os
+
+        if os.getenv("SKIP_ALEMBIC_MIGRATIONS"):
+            checks["components"]["migrations"] = {
+                "status": "skipped",
+                "reason": "SKIP_ALEMBIC_MIGRATIONS=1",
+            }
+        else:
+            from alembic.runtime.migration import MigrationContext
+            from alembic.script import ScriptDirectory
+            from alembic.config import Config
+            from sqlalchemy import create_engine
+
+            cfg = Config("alembic.ini")
+            script_dir = ScriptDirectory.from_config(cfg)
+            head_rev = script_dir.get_current_head()
+
+            # Alembic's MigrationContext needs a sync Connection.
+            # Use a sync engine derived from the async one to inspect migrations.
+            from app.database import engine as _async_engine
+
+            sync_url = _async_engine.url.render_as_string(hide_password=False)
+            # Strip async driver suffix to get sync URL
+            sync_url = sync_url.replace("+asyncpg", "").replace("+aiosqlite", "")
+            try:
+                sync_engine = create_engine(sync_url)
+            except ModuleNotFoundError as exc:
+                # e.g. psycopg2 not installed for PostgreSQL sync URL — skip silently
+                checks["components"]["migrations"] = {
+                    "status": "unavailable",
+                    "reason": f"sync driver not installed ({exc.name})",
+                    "head": head_rev,
+                }
+            else:
+                try:
+                    with sync_engine.connect() as conn:
+                        ctx = MigrationContext.configure(conn)
+                        current_rev = ctx.get_current_revision()
+                finally:
+                    sync_engine.dispose()
+
+                pending = current_rev != head_rev
+                checks["components"]["migrations"] = {
+                    "status": "ok" if not pending else "pending",
+                    "current": current_rev,
+                    "head": head_rev,
+                    "pending": pending,
+                }
+                if pending:
+                    checks["status"] = "degraded"
+    except Exception as e:
+        checks["components"]["migrations"] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
+
+    # Return 503 if any component is degraded
     status_code = 200 if checks["status"] == "healthy" else 503
     return JSONResponse(content=checks, status_code=status_code)
 
