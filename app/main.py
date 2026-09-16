@@ -16,6 +16,7 @@ from sqlalchemy import text
 from app.api import api_router
 from app.config import get_settings
 from app.database import close_db
+from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.services.scheduler import scheduler_service
 
 settings = get_settings()
@@ -141,6 +142,10 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Register security headers middleware (must run before exception handlers
+# so error responses also carry the headers).
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # Exception handlers for centralized error handling
