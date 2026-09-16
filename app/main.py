@@ -8,15 +8,17 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
 
+from app import __version__
 from app.api import api_router
 from app.config import get_settings
 from app.database import close_db
 from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.services.metrics import init_app_info
 from app.services.scheduler import scheduler_service
 
 settings = get_settings()
@@ -55,6 +57,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
+
+
+# Initialize the metrics registry at import time
+init_app_info()
 
 
 @asynccontextmanager
@@ -180,13 +186,64 @@ async def graceful_shutdown(scheduler, executor, close_db_fn):
 app = FastAPI(
     title=settings.app_name,
     description="Python Script Scheduler with Web UI",
-    version="0.1.0",
+    version=__version__,
     lifespan=lifespan,
 )
 
 # Register security headers middleware (must run before exception handlers
 # so error responses also carry the headers).
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics_endpoint():
+    """Prometheus text exposition format.
+
+    Updates transient gauges (running executions, scheduler job count,
+    script totals) on each scrape so the values reflect the current state.
+    """
+    from app.services.metrics import (
+        get_uptime_seconds,
+        metrics_registry,
+    )
+    from sqlalchemy import func, select
+
+    from app.database import async_session_maker
+    from app.models.artifact import Artifact
+    from app.models.execution import Execution, ExecutionStatus
+    from app.models.script import Script
+
+    # Refresh dynamic gauges
+    try:
+        async with async_session_maker() as db:
+            script_total = await db.scalar(select(func.count()).select_from(Script)) or 0
+            running = await db.scalar(
+                select(func.count())
+                .select_from(Execution)
+                .where(Execution.status == ExecutionStatus.RUNNING.value)
+            ) or 0
+            artifacts_total = await db.scalar(select(func.count()).select_from(Artifact)) or 0
+        metrics_registry.gauge_set("crinator_scripts_total", float(script_total))
+        metrics_registry.gauge_set("crinator_executions_running", float(running))
+        metrics_registry.gauge_set("crinator_artifacts_total", float(artifacts_total))
+    except Exception:
+        # Don't fail metrics scrape because of a DB hiccup
+        pass
+
+    # Scheduler jobs (in-process, always reachable)
+    try:
+        from app.services.scheduler import scheduler_service
+
+        job_count = len(scheduler_service.scheduler.get_jobs())
+        metrics_registry.gauge_set("crinator_scheduler_jobs", float(job_count))
+    except Exception:
+        pass
+
+    metrics_registry.gauge_set("crinator_uptime_seconds", get_uptime_seconds())
+    init_app_info()
+
+    body = metrics_registry.render()
+    return PlainTextResponse(body, media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
 # Exception handlers for centralized error handling
