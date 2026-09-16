@@ -6,7 +6,7 @@ import json
 import logging
 
 import aiofiles
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -586,7 +586,19 @@ async def get_script_packages(
     return {"packages": packages}
 
 
-@router.post("/validate-dependencies")
+@router.post(
+    "/validate-dependencies",
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "schema": {"type": "object"},
+                    "example": {"dependencies": "requests>=2.31\npandas>=2.0\n"},
+                }
+            }
+        }
+    },
+)
 async def validate_dependencies(
     dependencies: dict,
 ):
@@ -609,7 +621,19 @@ async def validate_dependencies(
     }
 
 
-@router.post("/validate-script")
+@router.post(
+    "/validate-script",
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "schema": {"type": "object"},
+                    "example": {"code": "def main():\n    print('hello')\n    return 0\n"},
+                }
+            }
+        }
+    },
+)
 async def validate_script(
     data: dict,
 ):

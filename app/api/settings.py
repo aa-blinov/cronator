@@ -145,6 +145,21 @@ class UpdateSettingsRequest(BaseModel):
 
     default_timeout: int | None = None
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "smtp_enabled": True,
+                "smtp_host": "smtp.gmail.com",
+                "smtp_port": 587,
+                "smtp_user": "alerts@example.com",
+                "smtp_password": "app-specific-password",
+                "smtp_from": "cronator@example.com",
+                "alert_email": "oncall@example.com",
+                "default_timeout": 3600,
+            }
+        }
+    }
+
 
 @router.post("/update")
 async def update_settings(request: UpdateSettingsRequest):
