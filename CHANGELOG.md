@@ -106,6 +106,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   event loop, so DB-backed auth silently fell through to the env-defined
   admin and rejected real User-table logins. Switched to an `async`
   dependency so the DB lookup awaits correctly.
+- **`restore-backup` async fix (F12)** — `app/api/settings.py:
+  restore_backup` previously called `sqlalchemy.create_engine(sync_url)`
+  which requires `psycopg2` for PostgreSQL — that driver is not installed
+  in the runtime image, so every restore against the live PostgreSQL stack
+  returned 500 with `ModuleNotFoundError: No module named 'psycopg2'`.
+  Switched to the application's existing `async_session_maker` (asyncpg
+  for PostgreSQL, aiosqlite for SQLite); each statement runs in its own
+  transaction so per-statement failures are still isolated.
 
 ## [0.1.0] — 2026-09-06
 
