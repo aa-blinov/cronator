@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -311,6 +311,7 @@ async def executions_list(
     page: int = 1,
     script_id: str | None = Query(None),
     status: str | None = Query(None),
+    search: str | None = Query(None),
     username: str = Depends(verify_credentials),
     db: AsyncSession = Depends(get_db),
 ):
@@ -331,6 +332,18 @@ async def executions_list(
         query = query.where(Execution.script_id == parsed_script_id)
     if status and status.strip():
         query = query.where(Execution.status == status)
+    # Q2: server-side search across stdout/stderr/script name
+    if search and search.strip():
+        from sqlalchemy import or_
+
+        like = f"%{search.strip()}%"
+        query = query.join(Script, Execution.script_id == Script.id).where(
+            or_(
+                Execution.stdout.ilike(like),
+                Execution.stderr.ilike(like),
+                Script.name.ilike(like),
+            )
+        )
 
     # Count
     count_query = select(func.count()).select_from(query.subquery())
@@ -359,6 +372,7 @@ async def executions_list(
             "filters": {
                 "script_id": parsed_script_id,
                 "status": status if status and status.strip() else None,
+                "search": search if search and search.strip() else None,
             },
             "pagination": {
                 "page": page,
