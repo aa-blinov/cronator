@@ -8,7 +8,7 @@ import logging
 import aiofiles
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import verify_credentials
@@ -59,7 +59,16 @@ async def list_scripts(
         query = query.where(Script.enabled == enabled)
 
     if search:
-        query = query.where(Script.name.ilike(f"%{search}%"))
+        # Q2: search across name + description + cron_expression + content
+        like = f"%{search}%"
+        query = query.where(
+            or_(
+                Script.name.ilike(like),
+                Script.description.ilike(like),
+                Script.cron_expression.ilike(like),
+                Script.content.ilike(like),
+            )
+        )
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())
