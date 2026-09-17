@@ -391,6 +391,8 @@ async def restore_backup(file: UploadFile = File(...)):
 
     from sqlalchemy import text
 
+    logger = logging.getLogger(__name__)
+
     # Validate filename
     if not file.filename or not file.filename.endswith(".sql.gz"):
         raise HTTPException(
@@ -435,31 +437,29 @@ async def restore_backup(file: UploadFile = File(...)):
                 ),
             )
 
-        # Apply via raw connection. We open a fresh connection so we don't
-        # conflict with the application's connection pool.
-        sync_url = settings.database_url
-        sync_url = sync_url.replace("+asyncpg", "").replace("+aiosqlite", "")
-        from sqlalchemy import create_engine
+        # Apply via the application's existing async engine — no extra
+        # dependency on psycopg2 (which isn't installed in the runtime image)
+        # and we don't conflict with the application's connection pool
+        # because each statement commits independently in its own transaction.
+        from app.database import async_session_maker
 
-        sync_engine = create_engine(sync_url)
         statements_applied = 0
-        try:
-            with sync_engine.begin() as conn:
-                # Split on semicolons at end of lines; very basic SQL splitter.
-                # For pg_dump output this is sufficient because each statement
-                # ends with `;\n`.
-                for raw_stmt in sql_text.split(";\n"):
-                    stmt = raw_stmt.strip()
-                    if not stmt:
-                        continue
-                    try:
-                        conn.execute(text(stmt))
-                        statements_applied += 1
-                    except Exception as e:
-                        logger.warning(f"Statement failed (skipped): {e}")
-                        continue
-        finally:
-            sync_engine.dispose()
+        async with async_session_maker() as db:
+            # Split on semicolons at end of lines; very basic SQL splitter.
+            # For pg_dump output this is sufficient because each statement
+            # ends with `;\n`.
+            for raw_stmt in sql_text.split(";\n"):
+                stmt = raw_stmt.strip()
+                if not stmt:
+                    continue
+                try:
+                    await db.execute(text(stmt))
+                    await db.commit()
+                    statements_applied += 1
+                except Exception as e:
+                    logger.warning(f"Statement failed (skipped): {e}")
+                    await db.rollback()
+                    continue
 
         return {
             "success": True,
