@@ -15,7 +15,7 @@
                 {% endfor %}
             </select>
         </div>
-        
+
         <div class="form-control">
             <select name="status" class="select select-bordered select-sm">
                 <option value="">All Statuses</option>
@@ -26,7 +26,19 @@
                 {% endfor %}
             </select>
         </div>
-        
+
+        <div class="form-control flex-1 min-w-[200px]">
+            <input
+                type="search"
+                name="search"
+                value="{{ filters.search or '' }}"
+                placeholder="Search stdout / stderr / script name…"
+                class="input input-bordered input-sm w-full"
+                autocomplete="off"
+                data-testid="executions-search-input"
+            />
+        </div>
+
         <button type="submit" class="btn btn-primary btn-sm">Filter</button>
         <a href="/executions" class="btn btn-ghost btn-sm">Reset</a>
     </form>
@@ -127,6 +139,7 @@ function removeEmptyParams(event) {
                 {% set filter_params = [] %}
                 {% if filters.script_id %}{% set _ = filter_params.append('script_id=' ~ filters.script_id) %}{% endif %}
                 {% if filters.status %}{% set _ = filter_params.append('status=' ~ filters.status) %}{% endif %}
+                {% if filters.search %}{% set _ = filter_params.append('search=' ~ filters.search|urlencode) %}{% endif %}
                 {% set filter_query = '&' ~ filter_params|join('&') if filter_params else '' %}
                 
                 {% if pagination.page > 1 %}

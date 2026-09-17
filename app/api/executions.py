@@ -8,7 +8,7 @@ from datetime import UTC
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -76,6 +76,7 @@ async def list_executions(
     per_page: int = 50,
     script_id: str | None = Query(None),
     status: str | None = Query(None),
+    search: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """List executions with pagination and filtering."""
@@ -94,6 +95,19 @@ async def list_executions(
 
     if status:
         query = query.where(Execution.status == status)
+
+    # Q2: server-side search across stdout, stderr, and script name
+    if search:
+        from app.models.script import Script
+
+        like = f"%{search}%"
+        query = query.join(Script, Execution.script_id == Script.id).where(
+            or_(
+                Execution.stdout.ilike(like),
+                Execution.stderr.ilike(like),
+                Script.name.ilike(like),
+            )
+        )
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())
