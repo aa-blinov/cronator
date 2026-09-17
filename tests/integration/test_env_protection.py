@@ -5,14 +5,33 @@ import asyncio
 import pytest
 
 
-async def wait_for_script_finish(test_client, script_id, timeout=30):
-    """Wait for a script execution to finish by polling its status."""
+async def _poll_script_status(test_client, script_id, want_status, timeout=15):
+    """Poll a script's last_run_status until it equals want_status (or timeout)."""
     for _ in range(timeout):
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.5)
         response = await test_client.get(f"/api/scripts/{script_id}")
         if response.status_code == 200:
             status = response.json().get("last_run_status")
-            if status != "running":
+            if status == want_status:
+                return True
+    return False
+
+
+async def wait_for_script_finish(test_client, script_id, timeout=30):
+    """Wait for a script execution to finish by polling its status."""
+    return await _poll_script_status(test_client, script_id, want_status=None, timeout=timeout) \
+        or await _poll_script_status(test_client, script_id, want_status="failed", timeout=timeout) \
+        or await _poll_script_status(test_client, script_id, want_status="succeeded", timeout=timeout)
+
+
+async def _wait_until_running(test_client, script_id, timeout=15):
+    """Poll until last_run_status == 'running'. Returns True if seen."""
+    for _ in range(timeout):
+        await asyncio.sleep(0.5)
+        response = await test_client.get(f"/api/scripts/{script_id}")
+        if response.status_code == 200:
+            status = response.json().get("last_run_status")
+            if status == "running":
                 return True
     return False
 
@@ -41,12 +60,17 @@ async def test_cannot_delete_script_while_running(test_client):
         response = await test_client.post(f"/api/scripts/{script_id}/run")
         assert response.status_code == 200
 
-        # Wait a bit to ensure script is running
-        await asyncio.sleep(1)
+        # Wait until the script is *actually* in running state before trying to
+        # delete — earlier versions slept 1s which was too tight on slow CI and
+        # let the script finish before we hit DELETE, then DELETE returned 204
+        # and the test's 409 assertion failed.
+        assert await _wait_until_running(test_client, script_id, timeout=15), (
+            f"Script {script_id} never reached 'running' state"
+        )
 
         # Try to delete (should fail with 409)
         response = await test_client.delete(f"/api/scripts/{script_id}")
-        assert response.status_code == 409
+        assert response.status_code == 409, f"expected 409, got {response.status_code}: {response.text}"
         assert "running" in response.json()["detail"].lower()
 
         # Wait for script to finish
@@ -88,12 +112,12 @@ async def test_cannot_install_dependencies_while_running(test_client):
         response = await test_client.post(f"/api/scripts/{script_id}/run")
         assert response.status_code == 200
 
-        # Wait a bit to ensure script is running
-        await asyncio.sleep(1)
+        # Wait until script is actually running (don't trust a flat 1s sleep)
+        assert await _wait_until_running(test_client, script_id, timeout=15)
 
         # Try to install dependencies (should fail with 409)
         response = await test_client.post(f"/api/scripts/{script_id}/install")
-        assert response.status_code == 409
+        assert response.status_code == 409, f"expected 409, got {response.status_code}: {response.text}"
         assert "running" in response.json()["detail"].lower()
 
         # Wait for script to finish
@@ -128,12 +152,12 @@ async def test_cannot_rebuild_env_while_running(test_client):
         response = await test_client.post(f"/api/scripts/{script_id}/run")
         assert response.status_code == 200
 
-        # Wait a bit to ensure script is running
-        await asyncio.sleep(1)
+        # Wait until script is actually running
+        assert await _wait_until_running(test_client, script_id, timeout=15)
 
         # Try to rebuild environment (should fail with 409)
         response = await test_client.post(f"/api/scripts/{script_id}/rebuild-env")
-        assert response.status_code == 409
+        assert response.status_code == 409, f"expected 409, got {response.status_code}: {response.text}"
         assert "running" in response.json()["detail"].lower()
 
         # Wait for script to finish
