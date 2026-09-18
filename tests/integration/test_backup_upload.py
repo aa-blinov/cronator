@@ -5,8 +5,8 @@ flow: POST /api/settings/restore-backup with a .sql.gz file, which is
 forwarded to psql inside the cronator container.
 """
 
-import io
 import gzip
+import io
 
 import pytest
 

@@ -96,7 +96,6 @@ async def test_health_status_is_healthy_when_database_ok(test_client):
 @pytest.mark.asyncio
 async def test_health_response_no_secrets(test_client):
     response = await test_client.get("/health")
-    body = response.json()
     # Make sure SECRET_KEY / passwords don't leak anywhere in the response
     raw = response.text.lower()
     for secret_token in ("secret_key", "admin_password", "postgresql://", "smtp_password"):

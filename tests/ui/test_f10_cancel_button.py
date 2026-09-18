@@ -9,7 +9,6 @@ from __future__ import annotations
 import time
 
 import httpx
-import pytest
 from playwright.sync_api import Page
 
 from tests.ui.conftest import screenshot
@@ -52,7 +51,7 @@ def test_f10_cancel_button_visible_for_running(page: Page, base_url: str) -> Non
         page.reload(wait_until="networkidle")
         # The running row should contain a Cancel button
         cancel_buttons = page.locator('button:has-text("Cancel")')
-        assert cancel_buttons.count() >= 1, f"no Cancel buttons rendered; expected at least 1"
+        assert cancel_buttons.count() >= 1, "no Cancel buttons rendered; expected at least 1"
         screenshot(page, "f10_02_running_execution_with_cancel_button")
 
         # Cancel the specific execution via API (don't actually click to avoid JS confirm dialog)
