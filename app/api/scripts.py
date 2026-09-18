@@ -4,10 +4,12 @@ import asyncio
 import hashlib
 import json
 import logging
+from pathlib import Path
 
 import aiofiles
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -240,6 +242,74 @@ async def create_script(
     return ScriptReadWithInstallStatus(
         **ScriptRead.model_validate(script).model_dump(),
         needs_install=bool(data.dependencies),
+    )
+
+
+# Q5: Duplicate script — creates a new Script row copying all editable
+# fields from the original. The new script is always disabled so it doesn't
+# start running on the same schedule. If "<name>-copy" already exists we
+# fall through to "<name>-copy-2", "-copy-3", etc.
+@router.post(
+    "/{script_id}/duplicate",
+    response_model=ScriptReadWithInstallStatus,
+    status_code=status.HTTP_201_CREATED,
+)
+async def duplicate_script(
+    script_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Duplicate a script. Returns 201 with the new script body."""
+    from sqlalchemy import select
+
+    original = await db.get(Script, script_id)
+    if not original:
+        raise HTTPException(status_code=404, detail="Script not found")
+
+    # Find a free name like "orig-copy", "orig-copy-2", "orig-copy-3"...
+    base = f"{original.name}-copy"
+    candidate = base
+    suffix = 2
+    while True:
+        existing = await db.execute(
+            select(Script.id).where(Script.name == candidate)
+        )
+        if existing.scalar_one_or_none() is None:
+            break
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+
+    # Generate a unique path so the script can be written to disk
+    script_dir = Path(f"/scripts/{candidate}")
+    dup = Script(
+        name=candidate,
+        description=original.description,
+        content=original.content,
+        cron_expression=original.cron_expression,
+        enabled=False,  # never auto-enable the duplicate
+        python_version=original.python_version,
+        timeout=original.timeout,
+        dependencies=original.dependencies,
+        environment_vars=original.environment_vars,
+        path=str(script_dir / "main.py"),
+        retry_count=original.retry_count,
+        retry_delay=original.retry_delay,
+        max_retry_window=original.max_retry_window,
+        prevent_overlap=original.prevent_overlap,
+        misfire_grace_time=original.misfire_grace_time,
+        working_directory=original.working_directory,
+        alert_on_failure=original.alert_on_failure,
+        alert_on_success=original.alert_on_success,
+    )
+    db.add(dup)
+    await db.commit()
+    await db.refresh(dup)
+
+    # Create initial ScriptVersion so the new script appears in history
+    await _create_version(db, dup, change_summary=f"Duplicated from {original.name}")
+
+    return ScriptReadWithInstallStatus(
+        **ScriptRead.model_validate(dup).model_dump(),
+        needs_install=bool(dup.dependencies),
     )
 
 
@@ -1048,3 +1118,92 @@ async def rerun_script(
         raise HTTPException(status_code=404, detail="Script not found")
     execution_id = await executor_service.execute_script(script_id, triggered_by="manual")
     return {"execution_id": execution_id}
+
+
+# ----------------------------------------------------------------------------
+# Q1: Bulk script actions (enable / disable / delete)
+# ----------------------------------------------------------------------------
+
+
+class BulkScriptIds(BaseModel):
+    """Body for bulk operations. `ids` must be non-empty."""
+    ids: list[int] = Field(..., min_length=1)
+
+
+class BulkFailure(BaseModel):
+    id: int
+    error: str
+
+
+class BulkResult(BaseModel):
+    succeeded: list[int]
+    failed: list[BulkFailure]
+
+
+async def _bulk_dispatch(action: str, payload: BulkScriptIds, db: AsyncSession) -> BulkResult:
+    """Shared body for enable/disable/delete. Never all-or-nothing — a single
+    failure (e.g. can't delete a running script) is reported in `failed`
+    while the rest succeed.
+    """
+    succeeded: list[int] = []
+    failed: list[BulkFailure] = []
+
+    for sid in payload.ids:
+        script = await db.get(Script, sid)
+        if not script:
+            failed.append(BulkFailure(id=sid, error=f"Script {sid} not found"))
+            continue
+        try:
+            if action == "enable":
+                script.enabled = True
+                await scheduler_service.add_job(script)
+            elif action == "disable":
+                script.enabled = False
+                await scheduler_service.remove_job(script)
+            elif action == "delete":
+                if executor_service.is_script_running(sid):
+                    raise RuntimeError(
+                        f"Cannot delete script {sid} while it is running"
+                    )
+                await scheduler_service.remove_job(script)
+                await db.delete(script)
+            else:  # pragma: no cover — FastAPI path validation prevents this
+                raise RuntimeError(f"Unknown bulk action {action!r}")
+            succeeded.append(sid)
+        except Exception as exc:
+            failed.append(BulkFailure(id=sid, error=str(exc) or exc.__class__.__name__))
+
+    await db.commit()
+    return BulkResult(succeeded=succeeded, failed=failed)
+
+
+@router.post(
+    "/bulk/{action}",
+    response_model=BulkResult,
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "example": {"ids": [1, 2, 3]},
+                    "examples": {
+                        "disable": {"summary": "Disable", "value": {"ids": [1, 2, 3]}},
+                        "enable": {"summary": "Enable", "value": {"ids": [1, 2, 3]}},
+                        "delete": {"summary": "Delete", "value": {"ids": [1, 2, 3]}},
+                    },
+                }
+            }
+        }
+    },
+)
+async def bulk_action(
+    action: str,
+    payload: BulkScriptIds,
+    db: AsyncSession = Depends(get_db),
+):
+    """Bulk enable / disable / delete scripts. `action` is one of
+    `enable`, `disable`, `delete`. Returns the per-id result so the UI
+    can surface partial failures (e.g. a running script blocking a
+    delete)."""
+    if action not in {"enable", "disable", "delete"}:
+        raise HTTPException(status_code=400, detail=f"Unknown bulk action: {action!r}")
+    return await _bulk_dispatch(action, payload, db)
