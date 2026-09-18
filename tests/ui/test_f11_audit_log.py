@@ -6,11 +6,9 @@ page renders the change history inline.
 
 from __future__ import annotations
 
-import json
 import time
 
 import httpx
-import pytest
 from playwright.sync_api import Page
 
 from tests.ui.conftest import screenshot

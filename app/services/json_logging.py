@@ -16,7 +16,6 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-
 # Fields that the stdlib LogRecord always has; we strip them to keep
 # the JSON output focused on what's interesting.
 _STD_LOGRECORD_ATTRS = {

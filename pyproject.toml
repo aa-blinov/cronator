@@ -50,6 +50,9 @@ select = ["E", "F", "I", "UP"]
 "app/script_templates.py" = ["E501"]
 # Test comments and docstrings in Russian may exceed the line limit
 "tests/**" = ["E501"]
+# E402 module-level imports after non-import statements — intentional
+# (TYPE_CHECKING + runtime conditional imports)
+"app/main.py" = ["E402"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

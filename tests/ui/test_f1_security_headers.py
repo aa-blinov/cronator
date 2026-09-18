@@ -10,10 +10,7 @@ Captures three screenshots:
 
 from __future__ import annotations
 
-import json
-
-import pytest
-from playwright.sync_api import Page, Request, Response
+from playwright.sync_api import Page, Response
 
 from tests.ui.conftest import screenshot
 

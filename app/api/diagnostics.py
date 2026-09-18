@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import os
 import platform
-import sys
 import time
 from pathlib import Path
 
@@ -107,7 +106,11 @@ async def get_diagnostics(username: str = Depends(verify_credentials)):
         sched_info["running"] = bool(scheduler_service.scheduler.running)
         sched_info["job_count"] = len(scheduler_service.scheduler.get_jobs())
         sched_info["jobs"] = [
-            {"id": j.id, "name": j.name, "next_run": str(j.next_run_time) if j.next_run_time else None}
+            {
+                "id": j.id,
+                "name": j.name,
+                "next_run": str(j.next_run_time) if j.next_run_time else None,
+            }
             for j in scheduler_service.scheduler.get_jobs()
         ]
     except Exception as e:
@@ -158,7 +161,11 @@ async def get_diagnostics(username: str = Depends(verify_credentials)):
         "log_file": str(log_file),
         "exists": log_file.exists(),
         "size_bytes": log_file.stat().st_size if log_file.exists() else 0,
-        "rotated_files": sorted(log_file.parent.glob("cronator.log.*")) if log_file.parent.exists() else [],
+        "rotated_files": (
+            sorted(log_file.parent.glob("cronator.log.*"))
+            if log_file.parent.exists()
+            else []
+        ),
     }
 
     return {

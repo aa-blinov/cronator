@@ -27,7 +27,6 @@ def _render_health_json_in_browser(page: Page, base_url: str) -> dict:
         }"""
     )
     body = json.loads(json_str)
-    pretty = json.dumps(body, indent=2)
     html = (
         "<!doctype html><html><head><meta charset='utf-8'>"
         "<title>Health response</title>"

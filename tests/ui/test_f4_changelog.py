@@ -6,7 +6,6 @@ what's changed in each release without leaving the app.
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page
 
 from tests.ui.conftest import screenshot

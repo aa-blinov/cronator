@@ -219,16 +219,16 @@ async def metrics_endpoint():
     Updates transient gauges (running executions, scheduler job count,
     script totals) on each scrape so the values reflect the current state.
     """
-    from app.services.metrics import (
-        get_uptime_seconds,
-        metrics_registry,
-    )
     from sqlalchemy import func, select
 
     from app.database import async_session_maker
     from app.models.artifact import Artifact
     from app.models.execution import Execution, ExecutionStatus
     from app.models.script import Script
+    from app.services.metrics import (
+        get_uptime_seconds,
+        metrics_registry,
+    )
 
     # Refresh dynamic gauges
     try:
