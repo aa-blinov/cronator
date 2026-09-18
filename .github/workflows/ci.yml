@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: hadolint/hadolint-action@08b13a8fc994e434ccaaff93a72f1842dc4c4d11
+      - uses: hadolint/hadolint-action@v3.1.0
         with:
           # SC2086 (unquoted variable) and DL3008 (apt pinning) often fire on
           # intent in our Dockerfile; we only fail on ERRORs.
