@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% import "icons.html" as icons %}
+
+{% block header_actions %}
+<div class="flex items-center gap-2">
+    <a href="/scripts/new" class="btn btn-primary btn-sm gap-2">
+        {{ icons.sparkles("w-4 h-4") }} New Script
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Q1: Search + status filter + bulk-action toolbar -->
+<div class="glass-card rounded-xl p-4 mb-6">
+    <form method="GET" action="/scripts" class="flex flex-wrap items-center gap-4" onsubmit="removeEmptyParams(event)">
+        <div class="form-control flex-1 min-w-[220px]">
+            <input
+                type="search"
+                name="search"
+                value="{{ filters.search or '' }}"
+                placeholder="Search name / description / cron / content…"
+                class="input input-bordered input-sm w-full"
+                autocomplete="off"
+                data-testid="scripts-search-input"
+            />
+        </div>
+
+        <div class="form-control">
+            <select name="status" class="select select-bordered select-sm">
+                <option value="">All Statuses</option>
+                <option value="enabled" {% if filters.status == 'enabled' %}selected{% endif %}>Enabled</option>
+                <option value="disabled" {% if filters.status == 'disabled' %}selected{% endif %}>Disabled</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+        <a href="/scripts" class="btn btn-ghost btn-sm">Reset</a>
+    </form>
+</div>
+
+<!-- Bulk-action toolbar (visible only when ≥1 row is selected) -->
+<div id="bulk-toolbar"
+     data-testid="bulk-toolbar"
+     class="hidden glass-card rounded-xl p-3 mb-4 flex items-center gap-3 border border-primary/40">
+    <span class="text-sm font-semibold">
+        <span data-testid="bulk-selected-count">0</span> selected
+    </span>
+    <button class="btn btn-sm btn-primary" data-testid="bulk-enable"
+            onclick="bulkAction('enable')">Enable</button>
+    <button class="btn btn-sm btn-warning" data-testid="bulk-disable"
+            onclick="bulkAction('disable')">Disable</button>
+    <button class="btn btn-sm btn-error" data-testid="bulk-delete"
+            onclick="bulkAction('delete')">Delete</button>
+    <button class="btn btn-sm btn-ghost ml-auto" onclick="clearSelection()">Clear</button>
+</div>
+
+<!-- Scripts table -->
+<div class="glass-card rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-700/50 flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Scripts</h3>
+        <p class="text-sm text-base-content/60">
+            {{ pagination.total }} script(s) total
+        </p>
+    </div>
+
+    {% if scripts %}
+    <div class="overflow-x-auto">
+        <table class="table w-full" data-testid="scripts-table">
+            <thead>
+                <tr class="border-b border-gray-700/50">
+                    <th class="bg-transparent w-10">
+                        <input
+                            type="checkbox"
+                            class="checkbox checkbox-sm"
+                            data-testid="select-all"
+                            onchange="toggleAll(this)"
+                            aria-label="Select all scripts"
+                        />
+                    </th>
+                    <th class="bg-transparent">Name</th>
+                    <th class="bg-transparent">Schedule</th>
+                    <th class="bg-transparent">Status</th>
+                    <th class="bg-transparent">Last Run</th>
+                    <th class="bg-transparent">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for script in scripts %}
+                <tr data-script-id="{{ script.id }}"
+                    data-script-name="{{ script.name }}"
+                    data-search="{{ (script.name ~ ' ' ~ (script.description or '') ~ ' ' ~ script.cron_expression)|lower }}">
+                    <td>
+                        <input
+                            type="checkbox"
+                            class="checkbox checkbox-sm row-checkbox"
+                            data-testid="row-checkbox"
+                            value="{{ script.id }}"
+                            onchange="onRowChange()"
+                        />
+                    </td>
+                    <td class="font-medium">
+                        <a href="/scripts/{{ script.id }}" class="link link-hover">{{ script.name }}</a>
+                        {% if script.description %}
+                        <p class="text-xs text-base-content/50 truncate max-w-md">{{ script.description }}</p>
+                        {% endif %}
+                    </td>
+                    <td><code class="text-xs">{{ script.cron_expression }}</code></td>
+                    <td>
+                        {% if script.enabled %}
+                        <span class="badge badge-success badge-sm">enabled</span>
+                        {% else %}
+                        <span class="badge badge-ghost badge-sm">disabled</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if script.last_success_at %}
+                        <span class="text-xs">{{ script.last_success_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        {% else %}
+                        <span class="text-xs text-base-content/40">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="/scripts/{{ script.id }}" class="btn btn-xs btn-ghost">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="px-6 py-4 border-t border-gray-700/50 flex items-center justify-between">
+        <p class="text-sm text-base-content/60">
+            Showing {{ (pagination.page - 1) * pagination.per_page + 1 }} -
+            {{ [pagination.page * pagination.per_page, pagination.total] | min }} of {{ pagination.total }}
+        </p>
+        <div class="join">
+            {% set filter_params = [] %}
+            {% if filters.search %}{% set _ = filter_params.append('search=' ~ filters.search|urlencode) %}{% endif %}
+            {% if filters.status %}{% set _ = filter_params.append('status=' ~ filters.status) %}{% endif %}
+            {% set filter_query = '&' ~ filter_params|join('&') if filter_params else '' %}
+            {% if pagination.page > 1 %}
+            <a href="?page={{ pagination.page - 1 }}{{ filter_query }}" class="join-item btn btn-sm">«</a>
+            {% endif %}
+            {% for p in range(1, pagination.pages + 1) %}
+                {% if p == pagination.page %}
+                <button class="join-item btn btn-sm btn-active">{{ p }}</button>
+                {% elif p <= 3 or p > pagination.pages - 2 or (p >= pagination.page - 1 and p <= pagination.page + 1) %}
+                <a href="?page={{ p }}{{ filter_query }}" class="join-item btn btn-sm">{{ p }}</a>
+                {% elif p == 4 or p == pagination.pages - 2 %}
+                <button class="join-item btn btn-sm btn-disabled">...</button>
+                {% endif %}
+            {% endfor %}
+            {% if pagination.page < pagination.pages %}
+            <a href="?page={{ pagination.page + 1 }}{{ filter_query }}" class="join-item btn btn-sm">»</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="p-12 text-center">
+        <p class="text-base-content/60 mb-2">
+            {% if filters.search or filters.status %}No scripts match your filters{% else %}No scripts yet{% endif %}
+        </p>
+        <a href="/scripts/new" class="btn btn-primary btn-sm mt-3">Create your first script</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function selectedIds() {
+    return Array.from(document.querySelectorAll('.row-checkbox:checked'))
+        .map(cb => Number(cb.value));
+}
+
+function onRowChange() {
+    const ids = selectedIds();
+    const toolbar = document.getElementById('bulk-toolbar');
+    const count = document.querySelector('[data-testid="bulk-selected-count"]');
+    if (count) count.textContent = ids.length;
+    if (toolbar) {
+        if (ids.length > 0) toolbar.classList.remove('hidden');
+        else toolbar.classList.add('hidden');
+    }
+}
+
+function toggleAll(master) {
+    document.querySelectorAll('.row-checkbox').forEach(cb => {
+        cb.checked = master.checked;
+    });
+    onRowChange();
+}
+
+function clearSelection() {
+    document.querySelectorAll('.row-checkbox, [data-testid="select-all"]')
+        .forEach(cb => { cb.checked = false; });
+    onRowChange();
+}
+
+async function bulkAction(action) {
+    const ids = selectedIds();
+    if (ids.length === 0) {
+        window.showToast?.('Select at least one script first', 'warning');
+        return;
+    }
+    if (action === 'delete' && !confirm(
+        `Delete ${ids.length} script(s)? This will remove the script, its environment, scheduled jobs, and execution history. This cannot be undone.`
+    )) {
+        return;
+    }
+    try {
+        const r = await fetch(`/api/scripts/bulk/${action}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+        });
+        if (!r.ok) {
+            const data = await r.json().catch(() => ({}));
+            window.showToast?.(data.detail || `Bulk ${action} failed (HTTP ${r.status})`, 'error');
+            return;
+        }
+        const body = await r.json();
+        const okCount = body.succeeded.length;
+        const failCount = body.failed.length;
+        const label = action.charAt(0).toUpperCase() + action.slice(1);
+        if (failCount === 0) {
+            window.showToast?.(`${label}: ${okCount} succeeded`, 'success');
+        } else {
+            window.showToast?.(
+                `${label}: ${okCount} ok, ${failCount} failed (${body.failed.map(f => f.error).join('; ')})`,
+                'warning',
+            );
+        }
+        // Reload the page to reflect the new state
+        window.location.reload();
+    } catch (err) {
+        window.showToast?.(`Error: ${err.message}`, 'error');
+    }
+}
+</script>
+{% endblock %}

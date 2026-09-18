@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -116,6 +116,64 @@ async def dashboard(
                 "today_executions": today_execs,
                 "failed_today": failed_today,
                 "running_now": running_now,
+            },
+            "now": datetime.now(UTC),
+        },
+    )
+
+
+@router.get("/scripts", response_class=HTMLResponse)
+async def scripts_list(
+    request: Request,
+    page: int = 1,
+    per_page: int = 50,
+    search: str | None = None,
+    status: str | None = Query(None),
+    username: str = Depends(verify_credentials),
+    db: AsyncSession = Depends(get_db),
+):
+    """Q1: dedicated /scripts page — sortable list with search, status filter,
+    pagination, and a bulk-action toolbar (enable / disable / delete)."""
+    like = f"%{search.strip()}%" if search and search.strip() else None
+    base_query = select(Script)
+    if like:
+        base_query = base_query.where(
+            or_(
+                Script.name.ilike(like),
+                Script.description.ilike(like),
+                Script.cron_expression.ilike(like),
+                Script.content.ilike(like),
+            )
+        )
+    if status == "enabled":
+        base_query = base_query.where(Script.enabled.is_(True))
+    elif status == "disabled":
+        base_query = base_query.where(Script.enabled.is_(False))
+
+    count_query = select(func.count()).select_from(base_query.subquery())
+    total = await db.scalar(count_query) or 0
+
+    query = base_query.order_by(Script.name)
+    query = query.offset((page - 1) * per_page).limit(per_page)
+    result = await db.execute(query)
+    scripts = result.scalars().all()
+
+    return request.app.state.templates.TemplateResponse(
+        "scripts.html",
+        {
+            "request": request,
+            "page_title": "Scripts",
+            "theme": DEFAULT_THEME,
+            "scripts": scripts,
+            "filters": {
+                "search": search if search and search.strip() else None,
+                "status": status if status and status.strip() else None,
+            },
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "pages": (total + per_page - 1) // per_page,
             },
             "now": datetime.now(UTC),
         },
@@ -334,8 +392,6 @@ async def executions_list(
         query = query.where(Execution.status == status)
     # Q2: server-side search across stdout/stderr/script name
     if search and search.strip():
-        from sqlalchemy import or_
-
         like = f"%{search.strip()}%"
         query = query.join(Script, Execution.script_id == Script.id).where(
             or_(
