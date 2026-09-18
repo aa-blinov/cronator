@@ -9,6 +9,11 @@
     <a href="/scripts/{{ script.id }}/edit" class="btn btn-ghost btn-sm gap-2">
         {{ icons.pencil("w-4 h-4") }} Edit
     </a>
+    <button id="duplicate-btn" class="btn btn-ghost btn-sm gap-2"
+            data-testid="duplicate-btn"
+            onclick="duplicateScript({{ script.id }})">
+        {{ icons.copy("w-4 h-4") }} Duplicate
+    </button>
     <button id="toggle-btn" class="btn btn-ghost btn-sm gap-2">
         {% if script.enabled %}{{ icons.pause("w-4 h-4") }} Disable{% else %}{{ icons.play("w-4 h-4") }} Enable{% endif %}
     </button>
@@ -22,7 +27,7 @@ function deleteScript(scriptId) {
     if (!confirm('Delete this script? This will remove the script, its environment, scheduled jobs, and all execution history. This action cannot be undone.')) {
         return;
     }
-    
+
     fetch(`/api/scripts/${scriptId}`, {
         method: 'DELETE',
         headers: {
@@ -45,6 +50,35 @@ function deleteScript(scriptId) {
     .catch(error => {
         window.showToast?.(`Error deleting script: ${error.message}`, 'error');
     });
+}
+
+async function duplicateScript(scriptId) {
+    // Q5: POST /api/scripts/{id}/duplicate — creates a disabled copy.
+    // On success we redirect to the new script's detail page so the user
+    // can edit/enable it; on error we surface the message via showToast.
+    const btn = document.getElementById('duplicate-btn');
+    if (btn) btn.disabled = true;
+    try {
+        const response = await fetch(`/api/scripts/${scriptId}/duplicate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (response.status === 201) {
+            const dup = await response.json();
+            window.showToast?.(`Duplicated as "${dup.name}" (disabled)`, 'success');
+            window.location.href = `/scripts/${dup.id}`;
+        } else {
+            const data = await response.json().catch(() => ({}));
+            window.showToast?.(
+                `Failed to duplicate: ${data.detail || response.statusText}`,
+                'error',
+            );
+        }
+    } catch (error) {
+        window.showToast?.(`Error duplicating script: ${error.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 }
 </script>
 {% endblock %}
