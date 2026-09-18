@@ -18,9 +18,7 @@ Metrics exposed:
 from __future__ import annotations
 
 import time
-from collections import Counter
 from threading import Lock
-from typing import Iterable
 
 from app import __version__
 

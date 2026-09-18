@@ -7,8 +7,6 @@ CI job that spins up PostgreSQL testcontainers and runs the pg/ suite.
 
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 

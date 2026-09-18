@@ -12,7 +12,6 @@ them the app fails the OWASP Secure Headers Project baseline.
 """
 
 import pytest
-from httpx import AsyncClient
 
 REQUIRED_HEADERS = {
     "x-content-type-options": "nosniff",

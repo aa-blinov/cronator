@@ -15,10 +15,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.database import Base
-from app.models.audit_log import ScriptAuditLog
 from app.models.execution import Execution, ExecutionStatus
 from app.models.script import Script
-from app.models.user import User
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite+aiosqlite:///./test_app.db")
 

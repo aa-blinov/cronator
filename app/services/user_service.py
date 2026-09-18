@@ -4,17 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 import secrets
 from datetime import UTC, datetime
-from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session_maker
 from app.models.user import User
-
 
 # PBKDF2-HMAC-SHA256 with 200_000 iterations and a 32-byte salt.
 ITERATIONS = 200_000

@@ -8,8 +8,6 @@ The default remains human-readable.
 import json
 import logging
 
-import pytest
-
 
 def test_logging_format_default_is_human():
     """Without configuration, logs are human-readable (not JSON)."""

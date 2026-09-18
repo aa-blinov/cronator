@@ -43,6 +43,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # docker-compose.yml references `env_file: .env` and `${BACKUP_RETENTION_DAYS}`.
+      # In CI we don't have a real `.env` (it would leak secrets), so copy the
+      # checked-in `.env.example` to a stub `.env` so `docker compose config --quiet`
+      # can resolve every interpolation. The runtime tests use their own env vars.
+      - name: Stub .env for compose validation
+        run: |
+          if [ ! -f .env ]; then
+            cp .env.example .env
+            echo "BACKUP_RETENTION_DAYS=7" >> .env
+          fi
       - run: docker compose -f docker-compose.yml config --quiet
       - run: docker compose -f docker-compose.test.yml config --quiet
 
@@ -54,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: hadolint/hadolint-action@v3
+      - uses: hadolint/hadolint-action@08b13a8fc994e434ccaaff93a72f1842dc4c4d11
         with:
           # SC2086 (unquoted variable) and DL3008 (apt pinning) often fire on
           # intent in our Dockerfile; we only fail on ERRORs.

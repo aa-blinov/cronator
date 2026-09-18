@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.api.dependencies import verify_credentials
 from app.services import user_service
 from app.services.user_service import create_user, delete_user, get_user, list_users
 
@@ -53,7 +54,7 @@ def _to_read(user) -> UserRead:
 
 
 @router.get("/users", response_model=UserList)
-async def list_users_endpoint(username: str = Depends(__import__("app.api.dependencies", fromlist=["verify_credentials"]).verify_credentials)):
+async def list_users_endpoint(username: str = Depends(verify_credentials)):
     """List all users. Admin-only in production; here we accept any authenticated user."""
     users = await list_users()
     return UserList(
@@ -65,7 +66,7 @@ async def list_users_endpoint(username: str = Depends(__import__("app.api.depend
 @router.post("/users", response_model=UserRead, status_code=201)
 async def create_user_endpoint(
     payload: UserCreate,
-    username: str = Depends(__import__("app.api.dependencies", fromlist=["verify_credentials"]).verify_credentials),
+    username: str = Depends(verify_credentials),
 ):
     """Create a new user. Admin-only in production."""
     existing = await get_user(payload.username)
@@ -78,7 +79,7 @@ async def create_user_endpoint(
 @router.delete("/users/{user_id}", status_code=204)
 async def delete_user_endpoint(
     user_id: int,
-    username: str = Depends(__import__("app.api.dependencies", fromlist=["verify_credentials"]).verify_credentials),
+    username: str = Depends(verify_credentials),
 ):
     """Delete a user. Admin-only in production; blocks deleting the last admin."""
     if await user_service.count_admins() <= 1:

@@ -6,7 +6,7 @@ import json
 import logging
 
 import aiofiles
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -308,7 +308,13 @@ async def update_script(
             old = getattr(script, field)
             new = update_data[field]
             if old != new:
-                audit_changes.append((field, str(old) if old is not None else None, str(new) if new is not None else None))
+                audit_changes.append(
+            (
+                field,
+                str(old) if old is not None else None,
+                str(new) if new is not None else None,
+            )
+        )
 
     # Update fields
     for field, value in update_data.items():
@@ -868,7 +874,9 @@ async def list_script_audit_log(
 
     # Count total
     total = await db.scalar(
-        select(func.count()).select_from(ScriptAuditLog).where(ScriptAuditLog.script_id == script_id)
+        select(func.count())
+        .select_from(ScriptAuditLog)
+        .where(ScriptAuditLog.script_id == script_id)
     )
     total = total or 0
 
