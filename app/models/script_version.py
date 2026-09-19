@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Index, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -41,8 +41,14 @@ class ScriptVersion(Base):
     timeout: Mapped[int] = mapped_column(nullable=False, default=3600)
     environment_vars: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
-    # Version metadata
-    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
+    # Version metadata — DateTime(timezone=True) to match the actual DB
+    # column (TIMESTAMPTZ, per the initial migration) and every other
+    # datetime column in the app; without it, `alembic check` reports
+    # a spurious drift and autogenerate would propose downgrading the
+    # real column to a naive TIMESTAMP.
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     created_by: Mapped[str] = mapped_column(String(50), nullable=False, default="manual")
     change_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
