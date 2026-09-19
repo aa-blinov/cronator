@@ -3,14 +3,17 @@
 @tailwind utilities;
 
 body {
-    background: oklch(30.857% 0.023 264.149);
+    /* Theme-aware (daisyUI's base-100 CSS variable), not a hardcoded dim-theme
+       color — otherwise switching themes leaves the page background stuck
+       on dim's value no matter which theme is selected. */
+    background: oklch(var(--b1));
     min-height: 100vh;
 }
 
 .glass-card {
-    background: oklch(25% 0.019 264.182 / 0.7);
+    background: oklch(var(--b2) / 0.7);
     backdrop-filter: blur(10px);
-    border: 1px solid oklch(82.901% 0.031 222.959 / 0.1);
+    border: 1px solid oklch(var(--bc) / 0.1);
 }
 
 .status-success { color: oklch(86.171% 0.142 166.534); }

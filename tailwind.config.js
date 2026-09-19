@@ -27,6 +27,9 @@ module.exports = {
   },
   plugins: [require("daisyui")],
   daisyui: {
+    // The theme <select> in base.html offers dim/light/cupcake/dracula/business,
+    // but daisyui only generates CSS for themes listed here — light/cupcake/
+    // dracula/business were never actually built, so picking them did nothing.
     themes: [
       {
         dim: {
@@ -62,6 +65,10 @@ module.exports = {
           "--tab-radius": "0.5rem",
         },
       },
+      "light",
+      "cupcake",
+      "dracula",
+      "business",
     ],
   },
 }
