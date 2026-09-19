@@ -154,6 +154,45 @@ class TestExecutorService:
         ]
 
     @pytest.mark.asyncio
+    async def test_cancel_execution_with_no_process_yet_still_marks_cancelled(self):
+        """A user can cancel while the execution is still in setup_environment
+        (venv creation / pip install), before any OS process exists. Previously
+        this path returned False without touching the DB at all — the
+        execution stayed RUNNING forever and the script ran anyway once setup
+        finished."""
+        service = ExecutorService()
+
+        execution_id = 1
+        mock_execution = MagicMock()
+        mock_execution.status = ExecutionStatus.RUNNING.value
+        mock_execution.script_id = 7
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=mock_execution)
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=mock_result)
+        mock_db.commit = AsyncMock()
+
+        mock_session_ctx = AsyncMock()
+        mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_session_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        # No entry in service.running_processes for this execution_id —
+        # simulates "still setting up, process not started yet".
+        service._running_scripts.add(7)
+
+        with patch("app.services.executor.async_session_maker", return_value=mock_session_ctx):
+            result = await service.cancel_execution(execution_id)
+
+        assert result is True
+        assert mock_execution.status == ExecutionStatus.CANCELLED.value
+        mock_db.commit.assert_awaited_once()
+        # Deliberately still marked running — the background setup task is
+        # still actually executing and will discard this itself when done.
+        assert 7 in service._running_scripts
+
+    @pytest.mark.asyncio
     async def test_finish_execution_keeps_cancelled_status_and_sets_duration(self):
         """Cancelled executions keep their status while still capturing final metadata."""
         service = ExecutorService()
@@ -559,3 +598,88 @@ class TestTimeoutOnHungProcess:
         assert len(finish_calls) == 1
         status, kwargs = finish_calls[0]
         assert status == ExecutionStatus.TIMEOUT
+
+
+class TestCancelDuringEnvironmentSetup:
+    """setup_environment() can run for minutes (venv creation, pip install)
+    and happens *before* the script's own subprocess starts. A user who
+    cancels during that window used to have the cancellation silently
+    dropped — the DB status stayed RUNNING and the script started anyway
+    once setup finished. These tests confirm _run_script re-checks the
+    status right after setup_environment returns and aborts instead.
+    """
+
+    def _make_script(self) -> MagicMock:
+        script = MagicMock()
+        script.id = 1
+        script.name = "cancel_me"
+        script.path = None
+        script.python_version = "3.12"
+        script.dependencies = "requests"
+        script.timeout = 60
+        script.environment_vars = None
+        script.working_directory = None
+        return script
+
+    def _make_execution(self) -> MagicMock:
+        execution = MagicMock()
+        execution.id = 42
+        execution.status = ExecutionStatus.RUNNING.value
+        execution.exit_code = None
+        execution.stdout = ""
+        execution.stderr = ""
+        execution.finished_at = None
+        return execution
+
+    @pytest.mark.asyncio
+    async def test_script_does_not_start_if_cancelled_during_setup(self):
+        script = self._make_script()
+        execution = self._make_execution()
+
+        res_script = MagicMock()
+        res_script.scalar_one_or_none.return_value = script
+        res_exec = MagicMock()
+        res_exec.scalar_one_or_none.return_value = execution
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(side_effect=[res_script, res_exec])
+        mock_db.commit = AsyncMock()
+
+        async def fake_refresh(exec_obj):
+            # Simulates a concurrent cancel_execution() call having
+            # committed CANCELLED to the DB while setup_environment ran.
+            exec_obj.status = ExecutionStatus.CANCELLED.value
+
+        mock_db.refresh = AsyncMock(side_effect=fake_refresh)
+
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=mock_db)
+        ctx.__aexit__ = AsyncMock(return_value=None)
+
+        script_path = MagicMock(spec=Path)
+        script_path.exists.return_value = True
+
+        service = ExecutorService()
+        service._running_scripts.add(1)
+        subprocess_calls = []
+
+        async def tracked_subprocess(*args, **kwargs):
+            subprocess_calls.append(args)
+            raise AssertionError("the script must not start once cancelled")
+
+        with (
+            patch(
+                "app.services.executor.async_session_maker",
+                return_value=ctx,
+            ),
+            patch("app.services.executor.environment_service") as mock_env_svc,
+            patch.object(ExecutorService, "_get_script_path", return_value=script_path),
+            patch("asyncio.create_subprocess_exec", new=AsyncMock(side_effect=tracked_subprocess)),
+        ):
+            mock_env_svc.env_exists = AsyncMock(return_value=False)
+            mock_env_svc.setup_environment = AsyncMock(return_value=(True, "ok"))
+
+            await service._run_script(script_id=1, execution_id=42)
+
+        assert subprocess_calls == []
+        assert 1 not in service._running_scripts

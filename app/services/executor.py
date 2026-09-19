@@ -355,6 +355,18 @@ class ExecutorService:
                         await self.close_stream(execution_id)
                         return
 
+                    # setup_environment can take minutes (venv creation, pip
+                    # install); the user may have cancelled while it ran.
+                    await db.refresh(execution)
+                    if execution.status == ExecutionStatus.CANCELLED.value:
+                        logger.info(
+                            f"Execution {execution_id} was cancelled during "
+                            "environment setup; not starting the script"
+                        )
+                        self._running_scripts.discard(script_id)
+                        await self.close_stream(execution_id)
+                        return
+
                 # Get Python path
                 python_path = environment_service.get_python_path(script.name)
                 if not python_path.exists():
@@ -939,21 +951,28 @@ class ExecutorService:
                     self._running_scripts.discard(execution.script_id)
                 return False
 
-            if not process:
-                logger.warning(
-                    f"Process for execution {execution_id} not found in running_processes, "
-                    "but execution exists. Cleaning up."
-                )
-                if execution.script_id:
-                    self._running_scripts.discard(execution.script_id)
-                return False
-
             # Persist cancellation intent before killing the process so the
             # process reaper doesn't race and overwrite the final status with `failed`.
             execution.status = ExecutionStatus.CANCELLED.value
             execution.finished_at = datetime.now(UTC)
             execution.error_message = "Cancelled by user"
             await db.commit()
+
+            if not process:
+                # No OS process yet — the execution is still in
+                # setup_environment (venv creation / pip install), which can
+                # run for several minutes. There's nothing to kill, but the
+                # DB status above is enough: _run_script re-checks it right
+                # after setup_environment returns and aborts before ever
+                # starting the script's own process. Deliberately not
+                # discarding _running_scripts here — that background work is
+                # still actually running and shouldn't be raced by a
+                # concurrent re-run of the same script.
+                logger.info(
+                    f"Execution {execution_id} cancelled while still setting up "
+                    "its environment; marked cancelled, will abort once setup finishes"
+                )
+                return True
 
         try:
             process.kill()
