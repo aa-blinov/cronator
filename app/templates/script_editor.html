@@ -6,17 +6,14 @@
 {% endblock %}
 
 {% block extra_head %}
-<!-- CodeMirror (self-hosted under /static/vendor — the CSP only allows
-     'self' for script-src/style-src, so the cdnjs.cloudflare.com CDN
-     version was silently blocked by the browser and never loaded) -->
+<!-- CodeMirror CSS only — kept in <head> to avoid a flash of the raw
+     <textarea> before it upgrades to the editor. The ~190KB of JS moved
+     to the end of <body> (extra_scripts) so it stops blocking HTML
+     parsing/first paint; execution order is preserved since these are
+     plain synchronous <script src> tags, not deferred. -->
 <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.min.css">
 <link rel="stylesheet" href="/static/vendor/codemirror/theme/material-ocean.min.css">
 <link rel="stylesheet" href="/static/vendor/codemirror/addon/hint/show-hint.min.css">
-<script src="/static/vendor/codemirror/codemirror.min.js"></script>
-<script src="/static/vendor/codemirror/mode/python/python.min.js"></script>
-<script src="/static/vendor/codemirror/addon/edit/matchbrackets.min.js"></script>
-<script src="/static/vendor/codemirror/addon/edit/closebrackets.min.js"></script>
-<script src="/static/vendor/codemirror/addon/hint/show-hint.min.js"></script>
 <style>
     .CodeMirror {
         height: 500px;
@@ -571,6 +568,11 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="/static/vendor/codemirror/codemirror.min.js"></script>
+<script src="/static/vendor/codemirror/mode/python/python.min.js"></script>
+<script src="/static/vendor/codemirror/addon/edit/matchbrackets.min.js"></script>
+<script src="/static/vendor/codemirror/addon/edit/closebrackets.min.js"></script>
+<script src="/static/vendor/codemirror/addon/hint/show-hint.min.js"></script>
 <script>
     // Show/hide retry options based on retry_count
     (function() {
