@@ -14,6 +14,22 @@ from __future__ import annotations
 
 import pytest
 
+from app.services.scheduler import scheduler_service
+
+
+@pytest.mark.asyncio
+async def test_bulk_disable_actually_removes_the_scheduler_job(test_client, script_factory):
+    """Bulk-disable must unschedule the job, not just flip `enabled` in the DB
+    (remove_job takes a script_id, not a Script object)."""
+    s = await script_factory(name="bulk_sched", content="print(1)", enabled=True, cron_expression="* * * * *")
+    await scheduler_service.add_job(s)
+    assert scheduler_service.scheduler.get_job(f"script_{s.id}") is not None
+
+    r = await test_client.post("/api/scripts/bulk/disable", json={"ids": [s.id]})
+    assert r.status_code == 200, r.text
+
+    assert scheduler_service.scheduler.get_job(f"script_{s.id}") is None
+
 
 @pytest.mark.asyncio
 async def test_bulk_disable_marks_all_targeted_scripts_disabled(test_client, script_factory):
