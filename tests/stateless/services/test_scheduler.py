@@ -51,7 +51,7 @@ class TestSchedulerService:
         assert str(service.scheduler.timezone) == "UTC"
 
     @pytest.mark.asyncio
-    async def test_add_job_disabled_script(self, db_session):
+    async def test_add_job_disabled_script(self):
         """Test that disabled scripts are not added."""
         service = SchedulerService()
 

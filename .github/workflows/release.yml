@@ -35,10 +35,10 @@ jobs:
           SECRET_KEY: ci-test-secret-key-at-least-32-chars-long
         run: |
           uv sync --all-extras
-          # Lint + unit tests as a sanity check; the full docker-based test suite
-          # already runs in ci.yml on every commit.
+          # Lint + stateless tests as a sanity check; the full docker-based
+          # test suite already runs in ci.yml on every commit.
           uv run ruff check app/ cronator_lib/
-          uv run pytest tests/unit/ -q
+          uv run pytest tests/stateless/ -q
 
       - name: Build Docker image (multi-arch)
         run: |

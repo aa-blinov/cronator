@@ -60,11 +60,11 @@ asyncio_mode = "auto"
 # Docker-based `npm run test:docker` flow. They run on the host with
 # `pytest tests/ui/ -v` against an already-running app.
 #
-# Some integration tests rely on host paths and the host's ruff binary
+# Some stateless tests rely on host paths and the host's ruff binary
 # (test_ci_workflow, test_dockerfile_lint). Those are skipped automatically
 # when run inside the Docker test container — they should run on the host
-# only (see `pytest tests/integration/ -v`).
-testpaths = ["tests/unit", "tests/integration", "tests/pg"]
+# only (see `pytest tests/stateless/ -v`).
+testpaths = ["tests/stateless", "tests/stateful", "tests/pg"]
 filterwarnings = [
     "ignore:SECRET_KEY is using default value:UserWarning",
     "ignore:ADMIN_PASSWORD is using default value:UserWarning",
