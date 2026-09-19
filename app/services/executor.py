@@ -175,6 +175,20 @@ class ExecutorService:
             self._script_locks[script_id] = asyncio.Lock()
         return self._script_locks[script_id]
 
+    def _get_free_space_mb(self) -> int | None:
+        """Free space (MB) on the volume that holds artifacts, or None if
+        it can't be determined (missing dir, permission error, ...) —
+        callers should treat None as "can't tell, don't block"."""
+        import shutil
+
+        check_path = (
+            settings.artifacts_dir if settings.artifacts_dir.exists() else settings.data_dir
+        )
+        try:
+            return shutil.disk_usage(check_path).free // (1024 * 1024)
+        except OSError:
+            return None
+
     async def execute_script(
         self,
         script_id: int,
@@ -196,6 +210,37 @@ class ExecutorService:
         Returns:
             Execution ID
         """
+        # min_free_space_mb exists in settings and is shown in
+        # /api/diagnostics, but until now nothing ever checked it — a
+        # script filling the disk (or artifacts/venvs piling up) had no
+        # backstop, it would just start failing unpredictably wherever the
+        # write happened to land. Refuse new runs early and leave a visible
+        # FAILED record instead.
+        free_mb = self._get_free_space_mb()
+        if free_mb is not None and free_mb < settings.min_free_space_mb:
+            logger.error(
+                f"Refusing to start script {script_id}: "
+                f"only {free_mb}MB free (minimum {settings.min_free_space_mb}MB)"
+            )
+            async with async_session_maker() as low_space_db:
+                failed = Execution(
+                    script_id=script_id,
+                    status=ExecutionStatus.FAILED.value,
+                    triggered_by=triggered_by,
+                    started_at=datetime.now(UTC),
+                    finished_at=datetime.now(UTC),
+                    duration_ms=0,
+                    error_message=(
+                        f"Not enough free disk space to start execution: "
+                        f"{free_mb}MB free, {settings.min_free_space_mb}MB required"
+                    ),
+                    attempt=attempt,
+                )
+                low_space_db.add(failed)
+                await low_space_db.commit()
+                await low_space_db.refresh(failed)
+                return failed.id
+
         # Acquire lock to prevent race condition
         lock = self._get_script_lock(script_id)
         async with lock:
