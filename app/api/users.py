@@ -1,7 +1,8 @@
-"""User management API for F21 multi-user RBAC (compressed).
+"""User management API for F21 multi-user RBAC.
 
-Only admins can list/create/delete users. We're not (yet) gating the
-other endpoints on role — that's an incremental rollout.
+Only admins can list/create/delete users, and — via require_admin in
+scripts.py/executions.py/settings.py/pages.py — perform any mutating
+action anywhere in the app. Viewers get read-only access everywhere.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.api.dependencies import verify_credentials
+from app.api.dependencies import require_admin
 from app.services import user_service
 from app.services.user_service import create_user, delete_user, get_user, list_users
 
@@ -54,8 +55,8 @@ def _to_read(user) -> UserRead:
 
 
 @router.get("/users", response_model=UserList)
-async def list_users_endpoint(username: str = Depends(verify_credentials)):
-    """List all users. Admin-only in production; here we accept any authenticated user."""
+async def list_users_endpoint(username: str = Depends(require_admin)):
+    """List all users. Admin-only."""
     users = await list_users()
     return UserList(
         items=[_to_read(u) for u in users],
@@ -66,9 +67,9 @@ async def list_users_endpoint(username: str = Depends(verify_credentials)):
 @router.post("/users", response_model=UserRead, status_code=201)
 async def create_user_endpoint(
     payload: UserCreate,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(require_admin),
 ):
-    """Create a new user. Admin-only in production."""
+    """Create a new user. Admin-only."""
     existing = await get_user(payload.username)
     if existing:
         raise HTTPException(status_code=409, detail=f"User {payload.username!r} already exists")
@@ -79,9 +80,9 @@ async def create_user_endpoint(
 @router.delete("/users/{user_id}", status_code=204)
 async def delete_user_endpoint(
     user_id: int,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(require_admin),
 ):
-    """Delete a user. Admin-only in production; blocks deleting the last admin."""
+    """Delete a user. Admin-only; blocks deleting the last admin."""
     if await user_service.count_admins() <= 1:
         # Look up if the one we're deleting is the last admin
         users = await list_users()

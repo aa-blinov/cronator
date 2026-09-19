@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import verify_credentials
+from app.api.dependencies import require_admin
 from app.api.rate_limit import rate_limit
 from app.config import get_settings
 from app.database import get_db
@@ -152,6 +152,7 @@ async def get_script(
 async def create_script(
     data: ScriptCreate,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Create a new script."""
     # Check if name already exists
@@ -257,6 +258,7 @@ async def create_script(
 async def duplicate_script(
     script_id: int,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Duplicate a script. Returns 201 with the new script body."""
     original = await db.get(Script, script_id)
@@ -326,7 +328,7 @@ async def update_script(
     script_id: int,
     data: ScriptUpdate,
     db: AsyncSession = Depends(get_db),
-    username: str = Depends(verify_credentials),
+    username: str = Depends(require_admin),
 ):
     """Update a script."""
     result = await db.execute(select(Script).where(Script.id == script_id))
@@ -474,6 +476,7 @@ async def update_script(
 async def delete_script(
     script_id: int,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Delete a script."""
     result = await db.execute(select(Script).where(Script.id == script_id))
@@ -509,6 +512,7 @@ async def run_script(
     script_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Manually trigger a script execution."""
     result = await db.execute(select(Script).where(Script.id == script_id))
@@ -528,6 +532,7 @@ async def test_script(
     script_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Run a test execution (marked as test in database)."""
     result = await db.execute(select(Script).where(Script.id == script_id))
@@ -552,6 +557,7 @@ async def test_script(
 async def toggle_script(
     script_id: int,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Toggle script enabled/disabled."""
     result = await db.execute(select(Script).where(Script.id == script_id))
@@ -575,6 +581,7 @@ async def rebuild_environment(
     script_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Rebuild the script's virtual environment."""
     result = await db.execute(select(Script).where(Script.id == script_id))
@@ -607,6 +614,7 @@ async def start_install(
     script_id: int,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Start environment setup in background with streaming support."""
     result = await db.execute(select(Script).where(Script.id == script_id))
@@ -1048,6 +1056,7 @@ async def revert_to_version(
     script_id: int,
     version_number: int,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Revert script to a specific version."""
     from app.models.script_version import ScriptVersion
@@ -1122,6 +1131,7 @@ async def revert_to_version(
 async def rerun_script(
     script_id: int,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Re-run the script immediately (same as manual run)."""
     result = await db.execute(select(Script).where(Script.id == script_id))
@@ -1213,6 +1223,7 @@ async def bulk_action(
     action: str,
     payload: BulkScriptIds,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Bulk enable / disable / delete scripts. `action` is one of
     `enable`, `disable`, `delete`. Returns the per-id result so the UI

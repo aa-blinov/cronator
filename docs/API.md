@@ -2,8 +2,11 @@
 
 Every endpoint below requires HTTP Basic Auth
 (`Authorization: Basic base64(username:password)`) except `/api/locale`,
-`/health`, and `/metrics`. FastAPI also serves interactive docs at
-`/docs` (Swagger UI) and `/redoc` — this page is a curl-first companion
+`/health`, and `/metrics`. On top of that, every `POST`/`PUT`/`DELETE`
+endpoint requires the `admin` role — a `viewer` account gets `403` on all
+of them and `200` on every `GET` (see
+[Security → RBAC](SECURITY.md#rbac)). FastAPI also serves interactive docs
+at `/docs` (Swagger UI) and `/redoc` — this page is a curl-first companion
 to those, organized by resource with the "why" that isn't obvious from the
 schema alone.
 
@@ -80,7 +83,7 @@ in the audit log (`/api/scripts/{id}/audit`).
 
 | Method & Path | Purpose |
 | --------------- | --------- |
-| `GET /users`             | List. Any authenticated user can call this (see [Security → RBAC](SECURITY.md#rbac)) |
+| `GET /users`             | List, admin only |
 | `POST /users`            | Create; `409` if the username already exists, `422` if the password is under 8 characters |
 | `DELETE /users/{id}`     | Blocked with `400` if it would delete the last remaining admin |
 

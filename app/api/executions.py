@@ -12,6 +12,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.api.dependencies import require_admin
 from app.config import get_settings
 from app.database import get_db
 from app.models.artifact import Artifact
@@ -259,6 +260,7 @@ async def get_execution_log(
 async def cancel_execution(
     execution_id: int,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Cancel a running execution."""
     result = await db.execute(select(Execution).where(Execution.id == execution_id))
@@ -406,6 +408,7 @@ async def stream_execution_output(
 async def delete_execution(
     execution_id: int,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Delete an execution record."""
     result = await db.execute(select(Execution).where(Execution.id == execution_id))
@@ -440,6 +443,7 @@ async def clear_old_executions(
     days: int = 30,
     script_id: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Delete executions older than specified days."""
     from datetime import datetime, timedelta
@@ -573,6 +577,7 @@ async def delete_artifact(
     execution_id: int,
     artifact_id: int,
     db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
 ):
     """Delete a specific artifact."""
     # Get artifact
