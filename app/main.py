@@ -67,6 +67,19 @@ logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
     handlers=handlers,
 )
+
+# uvicorn's CLI (`uvicorn app.main:app`) configures its own "uvicorn",
+# "uvicorn.error" and "uvicorn.access" loggers *before* this module is
+# imported, each with propagate=False and uvicorn's own plain-text
+# handler. Without this, HTTP access lines (status code, path, latency —
+# exactly what a log aggregator wants) never reach cronator.log and are
+# never JSON-formatted even when LOG_FORMAT=json, regardless of anything
+# configured above. Point them at the same handlers instead.
+for _uvicorn_logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+    _uvicorn_logger = logging.getLogger(_uvicorn_logger_name)
+    _uvicorn_logger.handlers = handlers
+    _uvicorn_logger.propagate = False
+
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
