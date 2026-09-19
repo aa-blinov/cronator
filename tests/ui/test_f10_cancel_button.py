@@ -55,11 +55,15 @@ def test_f10_cancel_button_visible_for_running(page: Page, base_url: str) -> Non
         screenshot(page, "f10_02_running_execution_with_cancel_button")
 
         # Cancel the specific execution via API (don't actually click to avoid JS confirm dialog)
-        with httpx.Client(base_url="http://localhost:8080", auth=("admin", "admin"), timeout=10) as c:
+        with httpx.Client(
+            base_url="http://localhost:8080", auth=("admin", "admin"), timeout=10
+        ) as c:
             result = c.post(f"/api/executions/{exec_id}/cancel")
             assert result.status_code == 200, f"cancel failed: {result.text}"
     finally:
-        with httpx.Client(base_url="http://localhost:8080", auth=("admin", "admin"), timeout=10) as c:
+        with httpx.Client(
+            base_url="http://localhost:8080", auth=("admin", "admin"), timeout=10
+        ) as c:
             c.delete(f"/api/scripts/{script_id}")
 
 

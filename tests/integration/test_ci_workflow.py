@@ -84,6 +84,4 @@ def test_ruff_passes_locally():
         timeout=60,
     )
     if result.returncode != 0:
-        pytest.fail(
-            f"ruff check failed:\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-        )
+        pytest.fail(f"ruff check failed:\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}")

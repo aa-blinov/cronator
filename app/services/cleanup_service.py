@@ -125,9 +125,7 @@ class CleanupService:
                         shutil.rmtree(artifact_dir)
                         deleted_artifact_dirs += 1
                     except Exception as exc:
-                        logger.warning(
-                            "Failed to remove artifact dir %s: %s", artifact_dir, exc
-                        )
+                        logger.warning("Failed to remove artifact dir %s: %s", artifact_dir, exc)
 
             await db.execute(delete(Execution).where(Execution.id.in_(to_delete)))
             await db.commit()

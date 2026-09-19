@@ -100,10 +100,12 @@ from cronator_lib import get_logger
 
 log = get_logger()
 
+
 def main():
     log.info("Starting...")
     # your code here
     log.success("Done!")
+
 
 if __name__ == "__main__":
     main()

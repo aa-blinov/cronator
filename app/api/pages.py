@@ -23,6 +23,7 @@ from app.services.scheduler import scheduler_service
 router = APIRouter()
 DEFAULT_THEME = "dim"
 
+
 async def _get_user_theme() -> str:
     """Return the persisted theme preference (default: 'dim')."""
     from app.services.settings_service import settings_service
@@ -91,10 +92,15 @@ async def dashboard(
         is_unhealthy = False
 
         # Failed today
-        if last_exec and last_started >= today_start and last_exec.status in [
-            ExecutionStatus.FAILED.value,
-            ExecutionStatus.TIMEOUT.value,
-        ]:
+        if (
+            last_exec
+            and last_started >= today_start
+            and last_exec.status
+            in [
+                ExecutionStatus.FAILED.value,
+                ExecutionStatus.TIMEOUT.value,
+            ]
+        ):
             is_unhealthy = True
 
         # Enabled but no successful run in 7 days
@@ -565,9 +571,7 @@ async def rerun_execution_action(
     db: AsyncSession = Depends(get_db),
 ):
     """Re-run the script that produced this execution."""
-    result = await db.execute(
-        select(Execution).where(Execution.id == execution_id)
-    )
+    result = await db.execute(select(Execution).where(Execution.id == execution_id))
     execution = result.scalar_one_or_none()
     if not execution:
         raise HTTPException(status_code=404, detail="Execution not found")

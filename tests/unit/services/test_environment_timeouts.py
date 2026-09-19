@@ -51,9 +51,7 @@ def service(tmp_path) -> EnvironmentService:
 async def test_create_env_times_out_instead_of_hanging(service):
     proc = _hanging_process()
     with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)):
-        ok, msg = await asyncio.wait_for(
-            service.create_env("stalled_script"), timeout=5
-        )
+        ok, msg = await asyncio.wait_for(service.create_env("stalled_script"), timeout=5)
 
     assert ok is False
     assert "timed out" in msg.lower()

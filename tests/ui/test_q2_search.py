@@ -68,7 +68,9 @@ def test_q2_scripts_search_endpoint_filters_by_content(page):
 
 def test_q2_executions_search_endpoint_matches_stdout(page):
     """The /api/executions?search= endpoint matches stdout."""
-    script_id = _create_script_via_api(page, f"q2_exec_a_{int(time.time())}", "print('hello q2 stdout')")
+    script_id = _create_script_via_api(
+        page, f"q2_exec_a_{int(time.time())}", "print('hello q2 stdout')"
+    )
 
     # Run the script — this may take a moment to land an execution row
     run_resp = page.request.post(
@@ -94,7 +96,9 @@ def test_q2_executions_page_search_input_filters(page):
     """The /executions page has a search input that filters server-side."""
     # Seed a script + execution with a known marker so we can search for it
     marker = f"q2ui{int(time.time())}"
-    script_id = _create_script_via_api(page, f"q2ui_script_{int(time.time())}", f"print('{marker}')")
+    script_id = _create_script_via_api(
+        page, f"q2ui_script_{int(time.time())}", f"print('{marker}')"
+    )
     page.request.post(
         f"{BASE_URL}/api/scripts/{script_id}/run",
         headers={"Authorization": "Basic " + _basic_auth()},
@@ -139,7 +143,10 @@ if __name__ == "__main__":
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        for fn in [test_q2_executions_page_search_input_filters, test_q2_executions_page_search_submits_form]:
+        for fn in [
+            test_q2_executions_page_search_input_filters,
+            test_q2_executions_page_search_submits_form,
+        ]:
             try:
                 fn(page)
                 print(f"PASS {fn.__name__}")

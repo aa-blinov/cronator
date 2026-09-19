@@ -305,9 +305,7 @@ class EnvironmentService:
 
                 async with self._tracked_subprocess(*cmd) as process:
                     try:
-                        stdout, stderr = await asyncio.wait_for(
-                            process.communicate(), timeout=60.0
-                        )
+                        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
                     except TimeoutError:
                         process.kill()
                         await process.wait()

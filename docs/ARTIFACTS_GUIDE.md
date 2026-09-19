@@ -24,7 +24,7 @@ from cronator_lib import get_logger, save_artifact
 
 log = get_logger()
 
-data = "Hello, World!".encode('utf-8')
+data = "Hello, World!".encode("utf-8")
 
 try:
     saved_name = save_artifact("report.txt", data)
@@ -42,11 +42,11 @@ from cronator_lib import save_artifact
 
 csv_buffer = StringIO()
 writer = csv.writer(csv_buffer)
-writer.writerow(['Date', 'Metric', 'Value'])
-writer.writerow(['2026-01-27', 'Users', 1523])
-writer.writerow(['2026-01-27', 'Revenue', 45236.50])
+writer.writerow(["Date", "Metric", "Value"])
+writer.writerow(["2026-01-27", "Users", 1523])
+writer.writerow(["2026-01-27", "Revenue", 45236.50])
 
-csv_data = csv_buffer.getvalue().encode('utf-8')
+csv_data = csv_buffer.getvalue().encode("utf-8")
 save_artifact("daily_report.csv", csv_data)
 ```
 
@@ -60,10 +60,10 @@ from cronator_lib import save_artifact
 config = {
     "version": "1.0",
     "timestamp": datetime.now().isoformat(),
-    "settings": {"debug": False, "max_retries": 3}
+    "settings": {"debug": False, "max_retries": 3},
 }
 
-json_data = json.dumps(config, indent=2).encode('utf-8')
+json_data = json.dumps(config, indent=2).encode("utf-8")
 save_artifact("config_backup.json", json_data)
 ```
 

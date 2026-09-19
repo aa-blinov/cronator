@@ -72,6 +72,6 @@ def test_schema_has_max_length_for_content():
 
     field = ScriptCreate.model_fields["content"]
     # json_schema_extra or Field metadata
-    assert (
-        field.metadata or "max_length" in str(field)
-    ), f"ScriptCreate.content has no max_length constraint: {field}"
+    assert field.metadata or "max_length" in str(field), (
+        f"ScriptCreate.content has no max_length constraint: {field}"
+    )

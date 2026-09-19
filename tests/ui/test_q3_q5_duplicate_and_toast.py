@@ -84,9 +84,7 @@ def test_q3_toast_levels_render_distinct_styling(page):
         page.evaluate(f"window.showToast('{level} toast', '{level}')")
     toasts = page.locator('[data-testid="toast"]')
     expect(toasts).to_have_count(4)
-    levels = [
-        toasts.nth(i).get_attribute("data-toast-level") for i in range(4)
-    ]
+    levels = [toasts.nth(i).get_attribute("data-toast-level") for i in range(4)]
     assert set(levels) == {"success", "error", "warning", "info"}
     screenshot(page, "q3_04_toast_levels")
 

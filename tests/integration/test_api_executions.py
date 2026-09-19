@@ -72,9 +72,7 @@ class TestExecutionsAPI:
             stdout="one\ntwo\nthree\n",
         )
 
-        response = await test_client.get(
-            f"/api/executions/{execution.id}/logs/stdout?tail_lines=2"
-        )
+        response = await test_client.get(f"/api/executions/{execution.id}/logs/stdout?tail_lines=2")
         assert response.status_code == 200
         assert response.text == "two\nthree\n"
         assert response.headers["x-log-total-lines"] == "3"

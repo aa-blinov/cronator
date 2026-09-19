@@ -150,9 +150,7 @@ class TestConcurrencyIntegration:
         assert eid1 != eid2
 
         await db_session.rollback()
-        result = await db_session.execute(
-            select(Execution).where(Execution.script_id == script_id)
-        )
+        result = await db_session.execute(select(Execution).where(Execution.script_id == script_id))
         executions = result.scalars().all()
         assert len(executions) == 2
 

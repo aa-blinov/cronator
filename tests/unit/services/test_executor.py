@@ -410,7 +410,9 @@ class TestSubprocessEnvIsolation:
         assert "DATABASE_URL" not in env, "DATABASE_URL leaked into subprocess!"
         assert "ADMIN_PASSWORD" not in env, "ADMIN_PASSWORD leaked into subprocess!"
         assert "SECRET_KEY" not in env, "SECRET_KEY leaked into subprocess!"
-        assert "CRONATOR_INTERNAL_TOKEN" not in env, "CRONATOR_INTERNAL_TOKEN leaked into subprocess!"
+        assert "CRONATOR_INTERNAL_TOKEN" not in env, (
+            "CRONATOR_INTERNAL_TOKEN leaked into subprocess!"
+        )
 
     @pytest.mark.asyncio
     async def test_oracle_client_vars_present_in_subprocess(self):
@@ -590,9 +592,7 @@ class TestTimeoutOnHungProcess:
 
             # The test itself times out fast if the underlying bug regresses,
             # instead of hanging the whole suite for the default pytest timeout.
-            await asyncio.wait_for(
-                service._run_script(script_id=1, execution_id=42), timeout=5
-            )
+            await asyncio.wait_for(service._run_script(script_id=1, execution_id=42), timeout=5)
 
         proc.kill.assert_called_once()
         assert len(finish_calls) == 1

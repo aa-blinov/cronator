@@ -60,12 +60,15 @@ def timer(label: str = "", logger=None) -> Generator[dict, None, None]:
         if os.environ.get("CRONATOR_EXECUTION_ID"):
             # In Cronator context — emit JSON with TIMER level so UI renders it distinctly
             print(
-                json.dumps({
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "level": "TIMER",
-                    "message": msg,
-                    "logger": "cronator.timer",
-                }, ensure_ascii=False),
+                json.dumps(
+                    {
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "level": "TIMER",
+                        "message": msg,
+                        "logger": "cronator.timer",
+                    },
+                    ensure_ascii=False,
+                ),
                 flush=True,
             )
         else:

@@ -21,7 +21,9 @@ async def test_script_create_schema_has_example(test_client):
     """The POST /api/scripts request body schema (or its $ref target) must have an example."""
     spec = (await test_client.get("/openapi.json")).json()
     # Walk: paths → /api/scripts → post → requestBody → content → application/json → schema
-    schema = spec["paths"]["/api/scripts"]["post"]["requestBody"]["content"]["application/json"]["schema"]
+    schema = spec["paths"]["/api/scripts"]["post"]["requestBody"]["content"]["application/json"][
+        "schema"
+    ]
     # Resolve $ref if needed (FastAPI emits $ref + inline schema_extra at component level)
     if "$ref" in schema:
         ref_name = schema["$ref"].rsplit("/", 1)[-1]
@@ -30,7 +32,9 @@ async def test_script_create_schema_has_example(test_client):
             f"referenced schema {ref_name} has no example: {resolved}"
         )
     else:
-        assert "example" in schema or "examples" in schema, f"script create schema has no example: {schema}"
+        assert "example" in schema or "examples" in schema, (
+            f"script create schema has no example: {schema}"
+        )
 
 
 @pytest.mark.asyncio

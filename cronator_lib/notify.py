@@ -1,7 +1,5 @@
 """Manual notification support for Cronator scripts."""
 
-
-
 # Marker parsed by the executor to trigger an email alert
 _NOTIFY_MARKER = "CRONATOR_NOTIFY:"
 

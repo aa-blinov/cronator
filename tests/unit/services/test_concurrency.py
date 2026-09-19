@@ -63,6 +63,7 @@ class TestScriptLock:
         service = ExecutorService()
         assert service._get_script_lock(1) is not service._get_script_lock(2)
 
+
 # ─────────────────────────── _running_scripts ────────────────────────────────
 
 
@@ -75,7 +76,9 @@ class TestRunningScripts:
         service = ExecutorService()
         service._running_scripts.add(1)
 
-        with patch("app.services.executor.async_session_maker", _make_session_maker(prevent_overlap=False)):
+        with patch(
+            "app.services.executor.async_session_maker", _make_session_maker(prevent_overlap=False)
+        ):
             with pytest.raises(ValueError, match="already running"):
                 await service.execute_script(1)
 
@@ -104,7 +107,10 @@ class TestRunningScripts:
         service = ExecutorService()
 
         with (
-            patch("app.services.executor.async_session_maker", _make_session_maker(99, prevent_overlap=False)),
+            patch(
+                "app.services.executor.async_session_maker",
+                _make_session_maker(99, prevent_overlap=False),
+            ),
             patch(
                 "app.services.executor.asyncio.create_task",
                 side_effect=_discard_background_task,

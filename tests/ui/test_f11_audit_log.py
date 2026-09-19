@@ -81,7 +81,9 @@ def test_f11_audit_log_api_renders(page: Page, base_url: str) -> None:
         screenshot(page, "f11_01_audit_log_rendered")
         assert "timeout" in page.content()
     finally:
-        with httpx.Client(base_url="http://localhost:8080", auth=("admin", "admin"), timeout=10) as c:
+        with httpx.Client(
+            base_url="http://localhost:8080", auth=("admin", "admin"), timeout=10
+        ) as c:
             c.delete(f"/api/scripts/{script_id}")
 
 
@@ -109,5 +111,7 @@ def test_f11_audit_endpoint_returns_expected_fields(page: Page, base_url: str) -
             assert e.get("old_value") is not None or e.get("new_value") is not None, e
         screenshot(page, "f11_02_audit_entries_rendered")
     finally:
-        with httpx.Client(base_url="http://localhost:8080", auth=("admin", "admin"), timeout=10) as c:
+        with httpx.Client(
+            base_url="http://localhost:8080", auth=("admin", "admin"), timeout=10
+        ) as c:
             c.delete(f"/api/scripts/{script_id}")

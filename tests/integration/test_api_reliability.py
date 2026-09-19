@@ -11,6 +11,7 @@ from app.models.execution import ExecutionStatus
 # GET /api/scripts/templates
 # ---------------------------------------------------------------------------
 
+
 class TestListTemplates:
     @pytest.mark.asyncio
     async def test_returns_200(self, test_client: AsyncClient):
@@ -33,8 +34,17 @@ class TestListTemplates:
     @pytest.mark.asyncio
     async def test_each_template_has_required_fields(self, test_client: AsyncClient):
         response = await test_client.get("/api/scripts/templates")
-        required = {"id", "name", "description", "category", "icon", "code",
-                    "cron_expression", "python_version", "timeout"}
+        required = {
+            "id",
+            "name",
+            "description",
+            "category",
+            "icon",
+            "code",
+            "cron_expression",
+            "python_version",
+            "timeout",
+        }
         for t in response.json()["items"]:
             missing = required - set(t.keys())
             assert not missing, f"Template {t.get('id')!r} missing fields: {missing}"
@@ -63,67 +73,86 @@ class TestListTemplates:
 # POST /api/scripts — reliability fields persisted
 # ---------------------------------------------------------------------------
 
+
 class TestCreateScriptReliabilityFields:
     @pytest.mark.asyncio
     async def test_create_with_retry_count(self, test_client: AsyncClient):
-        response = await test_client.post("/api/scripts", json={
-            "name": "retry-script",
-            "content": "print('hi')",
-            "cron_expression": "0 * * * *",
-            "retry_count": 3,
-        })
+        response = await test_client.post(
+            "/api/scripts",
+            json={
+                "name": "retry-script",
+                "content": "print('hi')",
+                "cron_expression": "0 * * * *",
+                "retry_count": 3,
+            },
+        )
         assert response.status_code == 201
         assert response.json()["retry_count"] == 3
 
     @pytest.mark.asyncio
     async def test_create_with_prevent_overlap_false(self, test_client: AsyncClient):
-        response = await test_client.post("/api/scripts", json={
-            "name": "overlap-script",
-            "content": "print('hi')",
-            "cron_expression": "0 * * * *",
-            "prevent_overlap": False,
-        })
+        response = await test_client.post(
+            "/api/scripts",
+            json={
+                "name": "overlap-script",
+                "content": "print('hi')",
+                "cron_expression": "0 * * * *",
+                "prevent_overlap": False,
+            },
+        )
         assert response.status_code == 201
         assert response.json()["prevent_overlap"] is False
 
     @pytest.mark.asyncio
     async def test_create_defaults_prevent_overlap_true(self, test_client: AsyncClient):
-        response = await test_client.post("/api/scripts", json={
-            "name": "default-overlap",
-            "content": "print('hi')",
-            "cron_expression": "0 * * * *",
-        })
+        response = await test_client.post(
+            "/api/scripts",
+            json={
+                "name": "default-overlap",
+                "content": "print('hi')",
+                "cron_expression": "0 * * * *",
+            },
+        )
         assert response.status_code == 201
         assert response.json()["prevent_overlap"] is True
 
     @pytest.mark.asyncio
     async def test_create_defaults_retry_count_zero(self, test_client: AsyncClient):
-        response = await test_client.post("/api/scripts", json={
-            "name": "default-retry",
-            "content": "print('hi')",
-            "cron_expression": "0 * * * *",
-        })
+        response = await test_client.post(
+            "/api/scripts",
+            json={
+                "name": "default-retry",
+                "content": "print('hi')",
+                "cron_expression": "0 * * * *",
+            },
+        )
         assert response.status_code == 201
         assert response.json()["retry_count"] == 0
 
     @pytest.mark.asyncio
     async def test_create_retry_count_above_max_rejected(self, test_client: AsyncClient):
-        response = await test_client.post("/api/scripts", json={
-            "name": "bad-retry",
-            "content": "print('hi')",
-            "cron_expression": "0 * * * *",
-            "retry_count": 99,
-        })
+        response = await test_client.post(
+            "/api/scripts",
+            json={
+                "name": "bad-retry",
+                "content": "print('hi')",
+                "cron_expression": "0 * * * *",
+                "retry_count": 99,
+            },
+        )
         assert response.status_code == 422
 
     @pytest.mark.asyncio
     async def test_create_retry_delay_below_min_rejected(self, test_client: AsyncClient):
-        response = await test_client.post("/api/scripts", json={
-            "name": "bad-delay",
-            "content": "print('hi')",
-            "cron_expression": "0 * * * *",
-            "retry_delay": 1,
-        })
+        response = await test_client.post(
+            "/api/scripts",
+            json={
+                "name": "bad-delay",
+                "content": "print('hi')",
+                "cron_expression": "0 * * * *",
+                "retry_delay": 1,
+            },
+        )
         assert response.status_code == 422
 
     @pytest.mark.asyncio
@@ -143,39 +172,49 @@ class TestCreateScriptReliabilityFields:
 # PUT /api/scripts/{id} — update reliability fields
 # ---------------------------------------------------------------------------
 
+
 class TestUpdateScriptReliabilityFields:
     @pytest.mark.asyncio
     async def test_update_retry_count(self, test_client: AsyncClient, sample_script):
-        response = await test_client.put(f"/api/scripts/{sample_script.id}", json={
-            "name": sample_script.name,
-            "content": sample_script.content,
-            "cron_expression": sample_script.cron_expression,
-            "retry_count": 2,
-        })
+        response = await test_client.put(
+            f"/api/scripts/{sample_script.id}",
+            json={
+                "name": sample_script.name,
+                "content": sample_script.content,
+                "cron_expression": sample_script.cron_expression,
+                "retry_count": 2,
+            },
+        )
         assert response.status_code == 200
         assert response.json()["retry_count"] == 2
 
     @pytest.mark.asyncio
     async def test_update_prevent_overlap(self, test_client: AsyncClient, sample_script):
-        response = await test_client.put(f"/api/scripts/{sample_script.id}", json={
-            "name": sample_script.name,
-            "content": sample_script.content,
-            "cron_expression": sample_script.cron_expression,
-            "prevent_overlap": False,
-        })
+        response = await test_client.put(
+            f"/api/scripts/{sample_script.id}",
+            json={
+                "name": sample_script.name,
+                "content": sample_script.content,
+                "cron_expression": sample_script.cron_expression,
+                "prevent_overlap": False,
+            },
+        )
         assert response.status_code == 200
         assert response.json()["prevent_overlap"] is False
 
     @pytest.mark.asyncio
     async def test_update_all_retry_fields(self, test_client: AsyncClient, sample_script):
-        response = await test_client.put(f"/api/scripts/{sample_script.id}", json={
-            "name": sample_script.name,
-            "content": sample_script.content,
-            "cron_expression": sample_script.cron_expression,
-            "retry_count": 5,
-            "retry_delay": 30,
-            "max_retry_window": 600,
-        })
+        response = await test_client.put(
+            f"/api/scripts/{sample_script.id}",
+            json={
+                "name": sample_script.name,
+                "content": sample_script.content,
+                "cron_expression": sample_script.cron_expression,
+                "retry_count": 5,
+                "retry_delay": 30,
+                "max_retry_window": 600,
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["retry_count"] == 5
@@ -186,6 +225,7 @@ class TestUpdateScriptReliabilityFields:
 # ---------------------------------------------------------------------------
 # POST /api/scripts/{id}/rerun
 # ---------------------------------------------------------------------------
+
 
 class TestRerunEndpoint:
     @pytest.mark.asyncio
@@ -218,9 +258,7 @@ class TestRerunEndpoint:
         ) as mock_execute:
             await test_client.post(f"/api/scripts/{sample_script.id}/rerun")
 
-        mock_execute.assert_called_once_with(
-            sample_script.id, triggered_by="manual"
-        )
+        mock_execute.assert_called_once_with(sample_script.id, triggered_by="manual")
 
     @pytest.mark.asyncio
     async def test_rerun_while_running_returns_skipped_execution(
@@ -249,6 +287,7 @@ class TestRerunEndpoint:
 # SKIPPED status in executions API
 # ---------------------------------------------------------------------------
 
+
 class TestSkippedExecutionStatus:
     @pytest.mark.asyncio
     async def test_skipped_execution_visible_in_list(
@@ -259,9 +298,7 @@ class TestSkippedExecutionStatus:
             status=ExecutionStatus.SKIPPED.value,
             triggered_by="scheduler",
         )
-        response = await test_client.get(
-            f"/api/executions?script_id={sample_script.id}"
-        )
+        response = await test_client.get(f"/api/executions?script_id={sample_script.id}")
         assert response.status_code == 200
         statuses = [e["status"] for e in response.json()["items"]]
         assert "skipped" in statuses

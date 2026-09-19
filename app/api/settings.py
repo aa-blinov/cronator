@@ -285,9 +285,7 @@ async def cleanup_executions(days: int = 90):
     result = await cleanup_service.cleanup_older_than_days(days)
     return {
         "success": True,
-        "message": (
-            f"Deleted {result['deleted_executions']} executions older than {days} days"
-        ),
+        "message": (f"Deleted {result['deleted_executions']} executions older than {days} days"),
         "deleted_executions": result["deleted_executions"],
         "deleted_artifact_dirs": result["deleted_artifact_dirs"],
     }
@@ -485,9 +483,7 @@ async def restore_backup(file: UploadFile = File(...)):
     openapi_extra={
         "requestBody": {
             "content": {
-                "application/json": {
-                    "example": {"webhook_url": "https://example.com/webhook"}
-                }
+                "application/json": {"example": {"webhook_url": "https://example.com/webhook"}}
             }
         }
     },

@@ -19,6 +19,7 @@ from app.services.executor import ExecutorService
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_script(
     id: int = 1,
     prevent_overlap: bool = True,
@@ -83,6 +84,7 @@ def _session_ctx_returning(obj) -> MagicMock:
 # Tests: ExecutionStatus enum
 # ---------------------------------------------------------------------------
 
+
 class TestExecutionStatusSkipped:
     def test_skipped_value(self):
         assert ExecutionStatus.SKIPPED.value == "skipped"
@@ -109,6 +111,7 @@ class TestExecutionStatusSkipped:
 # ---------------------------------------------------------------------------
 # Tests: Script model new fields
 # ---------------------------------------------------------------------------
+
 
 class TestScriptReliabilityFields:
     def test_script_has_retry_count(self):
@@ -144,6 +147,7 @@ class TestScriptReliabilityFields:
 # Tests: Execution model — attempt field
 # ---------------------------------------------------------------------------
 
+
 class TestExecutionAttempt:
     def test_attempt_defaults_to_one(self):
         """attempt=1 means it's the first (original) run."""
@@ -165,6 +169,7 @@ class TestExecutionAttempt:
 # ---------------------------------------------------------------------------
 # Tests: prevent_overlap — SKIPPED record creation
 # ---------------------------------------------------------------------------
+
 
 class TestPreventOverlap:
     @pytest.mark.asyncio
@@ -317,6 +322,7 @@ class TestPreventOverlap:
 # Tests: Retry logic
 # ---------------------------------------------------------------------------
 
+
 class TestRetryScheduling:
     @pytest.mark.asyncio
     async def test_delayed_retry_calls_execute_script_after_delay(self):
@@ -432,6 +438,7 @@ class TestRetryScheduling:
 # Tests: Stat tracking logic
 # ---------------------------------------------------------------------------
 
+
 class TestStatTracking:
     """
     Tests for last_success_at / last_failure_at / consecutive_failures update logic.
@@ -531,6 +538,7 @@ class TestStatTracking:
 # ---------------------------------------------------------------------------
 # Tests: ExecutorService._delayed_retry integration
 # ---------------------------------------------------------------------------
+
 
 class TestDelayedRetryIntegration:
     @pytest.mark.asyncio
