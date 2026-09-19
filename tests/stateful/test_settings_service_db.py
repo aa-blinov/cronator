@@ -1,5 +1,5 @@
 """DB round-trip half of settings_service encryption coverage — see
-tests/unit/services/test_settings_service_encryption.py for the pure
+tests/stateless/services/test_settings_service_encryption.py for the pure
 encrypt/decrypt logic (no DB fixtures there).
 """
 

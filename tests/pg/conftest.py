@@ -4,6 +4,17 @@ PostgreSQL fixtures for tests/pg/.
 Overrides the test_engine fixture from the root conftest.py:
 all tests in this directory automatically run against PostgreSQL.
 
+tests/pg/ is a *sibling* of tests/stateful/, not a child of it, so
+pytest's conftest.py lookup (which only walks up a test file's own
+directory tree) never finds tests/stateful/conftest.py — db_session,
+test_client, script_factory, etc. simply don't exist here otherwise.
+Re-exporting them below (an ordinary import — pytest discovers fixtures
+by scanning this module's namespace, not by where they were originally
+defined) makes them visible. Each one's own `test_engine`/`db_session`
+parameters still resolve dynamically against *this* directory's fixture
+graph, so they end up running against the PostgreSQL engine overridden
+below, not SQLite.
+
 Operating modes:
   1. CI / docker-compose: TEST_DATABASE_URL already set to postgresql+asyncpg://...
      → used directly, no testcontainers needed.
@@ -22,6 +33,17 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.database import Base
+from tests.stateful.conftest import (  # noqa: F401
+    _reset_executor_service_stream_state,
+    db_script,
+    db_session,
+    exec_service,
+    execution_factory,
+    sample_execution,
+    sample_script,
+    script_factory,
+    test_client,
+)
 
 
 def _normalize_pg_url(url: str) -> str:
