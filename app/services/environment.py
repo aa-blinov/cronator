@@ -54,6 +54,10 @@ class EnvironmentService:
             "max_delay": 30.0,  # seconds
             "backoff_factor": 2.0,  # exponential backoff multiplier
         }
+        # Ceiling for any single uv subprocess call (venv creation, pip
+        # install) — without this, a stalled network call hangs forever
+        # since readline()-based streaming has no timeout of its own.
+        self.install_timeout = 300.0  # seconds
 
     def get_env_path(self, script_name: str) -> Path:
         """Get the path to a script's virtual environment."""
@@ -161,7 +165,16 @@ class EnvironmentService:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, stderr = await process.communicate()
+                try:
+                    stdout, stderr = await asyncio.wait_for(
+                        process.communicate(), timeout=self.install_timeout
+                    )
+                except TimeoutError:
+                    process.kill()
+                    await process.wait()
+                    logger.error(f"Timed out creating environment for {script_name}")
+                    timeout_s = self.install_timeout
+                    return False, f"Environment creation timed out after {timeout_s:.0f}s"
 
                 if process.returncode != 0:
                     error_msg = stderr.decode() if stderr else "Unknown error"
@@ -384,7 +397,15 @@ class EnvironmentService:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, stderr = await process.communicate()
+                try:
+                    stdout, stderr = await asyncio.wait_for(
+                        process.communicate(), timeout=self.install_timeout
+                    )
+                except TimeoutError:
+                    process.kill()
+                    await process.wait()
+                    logger.error(f"Timed out installing dependencies for {script_name}")
+                    return False, f"Installation timed out after {self.install_timeout:.0f}s"
 
                 output = stdout.decode() if stdout else ""
                 errors = stderr.decode() if stderr else ""
@@ -475,7 +496,14 @@ class EnvironmentService:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await process.communicate()
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(), timeout=self.install_timeout
+                )
+            except TimeoutError:
+                process.kill()
+                await process.wait()
+                return False, f"cronator_lib install timed out after {self.install_timeout:.0f}s"
 
             if process.returncode != 0:
                 return False, stderr.decode() if stderr else "Unknown error"
@@ -674,12 +702,25 @@ class EnvironmentService:
                         if queue and text:
                             await queue.put(("log", f"  {prefix}{text}"))
 
-                await asyncio.gather(
-                    read_stream(process.stdout),
-                    read_stream(process.stderr),
-                )
-
-                await process.wait()
+                try:
+                    # Bounded together with process.wait(): readline() blocks
+                    # until EOF (i.e. process exit), so a stalled `uv venv`
+                    # (e.g. downloading a missing Python build) would hang
+                    # forever otherwise.
+                    await asyncio.wait_for(
+                        asyncio.gather(
+                            read_stream(process.stdout),
+                            read_stream(process.stderr),
+                        ),
+                        timeout=self.install_timeout,
+                    )
+                    await process.wait()
+                except TimeoutError:
+                    process.kill()
+                    await process.wait()
+                    if queue:
+                        await queue.put(("log", "\n❌ Environment creation timed out"))
+                    return False, f"uv venv timed out after {self.install_timeout:.0f}s"
 
                 if process.returncode != 0:
                     return False, f"uv venv failed with code {process.returncode}"
@@ -724,12 +765,19 @@ class EnvironmentService:
                     if queue and text:
                         await queue.put(("log", f"  {text}"))
 
-            await asyncio.gather(
-                read_stream(process.stdout),
-                read_stream(process.stderr),
-            )
-
-            await process.wait()
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(
+                        read_stream(process.stdout),
+                        read_stream(process.stderr),
+                    ),
+                    timeout=self.install_timeout,
+                )
+                await process.wait()
+            except TimeoutError:
+                process.kill()
+                await process.wait()
+                return False, f"cronator_lib install timed out after {self.install_timeout:.0f}s"
 
             if process.returncode != 0:
                 return False, f"pip install failed with code {process.returncode}"
@@ -805,36 +853,54 @@ class EnvironmentService:
                             if queue and text:
                                 await queue.put(("log", f"  {text}"))
 
-                    await asyncio.gather(
-                        read_stream(process.stdout, stdout_lines),
-                        read_stream(process.stderr, stderr_lines),
-                    )
-
-                    await process.wait()
+                    timed_out = False
+                    try:
+                        # Bounded together with process.wait(): readline()
+                        # blocks until EOF, so a stalled download would hang
+                        # this whole retry loop forever otherwise.
+                        await asyncio.wait_for(
+                            asyncio.gather(
+                                read_stream(process.stdout, stdout_lines),
+                                read_stream(process.stderr, stderr_lines),
+                            ),
+                            timeout=self.install_timeout,
+                        )
+                        await process.wait()
+                    except TimeoutError:
+                        process.kill()
+                        await process.wait()
+                        timed_out = True
 
                     # Success case
-                    if process.returncode == 0:
+                    if not timed_out and process.returncode == 0:
                         logger.info(
                             f"Dependencies installed for {script_name} "
                             f"(attempt {attempt}/{max_attempts})"
                         )
                         return True, "Dependencies installed"
 
-                    # Failed - check if retryable
-                    all_output = "\n".join(stdout_lines + stderr_lines).lower()
-                    last_error = f"pip install failed with code {process.returncode}"
+                    if timed_out:
+                        # Treat like a network hiccup — worth retrying rather
+                        # than failing outright on a single stalled attempt.
+                        last_error = f"pip install timed out after {self.install_timeout:.0f}s"
+                        is_retryable = True
+                        is_non_retryable = False
+                    else:
+                        # Failed - check if retryable
+                        all_output = "\n".join(stdout_lines + stderr_lines).lower()
+                        last_error = f"pip install failed with code {process.returncode}"
 
-                    # Check for retryable network errors
-                    is_retryable = any(
-                        error_indicator in all_output
-                        for error_indicator in RETRYABLE_NETWORK_ERRORS
-                    )
+                        # Check for retryable network errors
+                        is_retryable = any(
+                            error_indicator in all_output
+                            for error_indicator in RETRYABLE_NETWORK_ERRORS
+                        )
 
-                    # Check for non-retryable errors (config issues)
-                    is_non_retryable = any(
-                        error_indicator.lower() in all_output
-                        for error_indicator in NON_RETRYABLE_ERRORS
-                    )
+                        # Check for non-retryable errors (config issues)
+                        is_non_retryable = any(
+                            error_indicator.lower() in all_output
+                            for error_indicator in NON_RETRYABLE_ERRORS
+                        )
 
                     if is_non_retryable:
                         logger.warning(f"Non-retryable error for {script_name}: {last_error}")
