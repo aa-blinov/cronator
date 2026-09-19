@@ -2,9 +2,9 @@
 {% import "icons.html" as icons %}
 
 {% block extra_head %}
-<!-- CodeMirror for syntax highlighting -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css">
+<!-- CodeMirror for syntax highlighting (self-hosted — see script_editor.html) -->
+<link rel="stylesheet" href="/static/vendor/codemirror/codemirror.min.css">
+<link rel="stylesheet" href="/static/vendor/codemirror/theme/dracula.min.css">
 <style>
     .CodeMirror {
         height: auto;
@@ -118,8 +118,8 @@
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/python/python.min.js"></script>
+<script src="/static/vendor/codemirror/codemirror.min.js"></script>
+<script src="/static/vendor/codemirror/mode/python/python.min.js"></script>
 <script>
 const scriptId = {{ script.id }};
 const versionNumber = {{ version.version_number }};
