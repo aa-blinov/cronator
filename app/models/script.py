@@ -57,7 +57,17 @@ class Script(Base):
     last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
-    # Alert Throttling
+    # Alert Throttling — separate from last_alert_at (a general "last
+    # alert of any kind" field also shown in the UI). A single shared
+    # column meant an unthrottled success alert reset the failure-alert
+    # throttle window too: fail at 09:00 (alert sent), succeed at 10:30
+    # (alert sent, unthrottled, overwrites the timestamp), fail again at
+    # 10:35 — throttled, even though the last *failure* alert was 1h35m
+    # ago. The operator gets no notification for a script that's actually
+    # broken, just because it happened to succeed once in between.
+    last_failure_alert_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_alert_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Metadata

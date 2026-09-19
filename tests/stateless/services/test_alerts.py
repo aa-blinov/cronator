@@ -26,6 +26,7 @@ def _make_script(
     alert_on_success: bool = False,
     alert_on_failure: bool = False,
     last_alert_at: datetime | None = None,
+    last_failure_alert_at: datetime | None = None,
 ) -> MagicMock:
     script = MagicMock()
     script.id = 1
@@ -33,6 +34,7 @@ def _make_script(
     script.alert_on_success = alert_on_success
     script.alert_on_failure = alert_on_failure
     script.last_alert_at = last_alert_at
+    script.last_failure_alert_at = last_failure_alert_at
     return script
 
 
@@ -158,8 +160,8 @@ class TestSendFailureAlert:
 
     @pytest.mark.asyncio
     async def test_sends_alert_when_enabled_no_previous_alert(self):
-        """alert_on_failure=True, last_alert_at=None → alert is sent."""
-        script = _make_script(alert_on_failure=True, last_alert_at=None)
+        """alert_on_failure=True, last_failure_alert_at=None → alert is sent."""
+        script = _make_script(alert_on_failure=True, last_failure_alert_at=None)
         execution = _make_execution()
         mock_send = AsyncMock(return_value=True)
 
@@ -180,9 +182,9 @@ class TestSendFailureAlert:
 
     @pytest.mark.asyncio
     async def test_throttled_when_last_alert_is_recent(self):
-        """If the last alert was sent <1 hour ago, the new alert is throttled."""
+        """If the last failure alert was sent <1 hour ago, the new alert is throttled."""
         recent = datetime.now(UTC) - timedelta(minutes=30)
-        script = _make_script(alert_on_failure=True, last_alert_at=recent)
+        script = _make_script(alert_on_failure=True, last_failure_alert_at=recent)
         execution = _make_execution()
         mock_send = AsyncMock()
 
@@ -203,9 +205,9 @@ class TestSendFailureAlert:
 
     @pytest.mark.asyncio
     async def test_sends_alert_when_last_alert_is_old(self):
-        """If the last alert was sent >1 hour ago, throttling does not apply."""
+        """If the last failure alert was sent >1 hour ago, throttling does not apply."""
         old = datetime.now(UTC) - timedelta(hours=2)
-        script = _make_script(alert_on_failure=True, last_alert_at=old)
+        script = _make_script(alert_on_failure=True, last_failure_alert_at=old)
         execution = _make_execution()
         mock_send = AsyncMock(return_value=True)
 
@@ -226,9 +228,9 @@ class TestSendFailureAlert:
 
     @pytest.mark.asyncio
     async def test_throttled_with_naive_datetime(self):
-        """last_alert_at without tzinfo (naive) is still throttled correctly."""
+        """last_failure_alert_at without tzinfo (naive) is still throttled correctly."""
         recent_naive = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=10)
-        script = _make_script(alert_on_failure=True, last_alert_at=recent_naive)
+        script = _make_script(alert_on_failure=True, last_failure_alert_at=recent_naive)
         execution = _make_execution()
         mock_send = AsyncMock()
 
@@ -292,8 +294,9 @@ class TestSendFailureAlert:
 
     @pytest.mark.asyncio
     async def test_updates_last_alert_at_after_send(self):
-        """After the alert is sent, last_alert_at must be updated."""
-        script = _make_script(alert_on_failure=True, last_alert_at=None)
+        """After the alert is sent, both last_alert_at (display) and
+        last_failure_alert_at (throttle) must be updated."""
+        script = _make_script(alert_on_failure=True, last_failure_alert_at=None)
         execution = _make_execution()
 
         with (
@@ -312,3 +315,39 @@ class TestSendFailureAlert:
 
         assert script.last_alert_at is not None
         assert script.last_alert_at >= before
+        assert script.last_failure_alert_at is not None
+        assert script.last_failure_alert_at >= before
+
+    @pytest.mark.asyncio
+    async def test_success_alert_does_not_reset_failure_throttle(self):
+        """Regression: last_alert_at is shared with the (unthrottled)
+        success-alert path — a success alert must not reset the
+        *failure*-alert throttle window, or a script that fails
+        repeatedly could go unreported just because it also succeeded
+        once in between."""
+        old_failure_alert = datetime.now(UTC) - timedelta(hours=2)
+        script = _make_script(
+            alert_on_failure=True,
+            alert_on_success=True,
+            last_failure_alert_at=old_failure_alert,
+            # A success alert fired 5 minutes ago and touched last_alert_at
+            # (the shared display field) — this alone must not matter.
+            last_alert_at=datetime.now(UTC) - timedelta(minutes=5),
+        )
+        execution = _make_execution()
+        mock_send = AsyncMock(return_value=True)
+
+        with (
+            patch(
+                "app.services.executor.async_session_maker",
+                return_value=_make_db_ctx(script),
+            ),
+            patch(
+                "app.services.alerting.alerting_service.send_failure_alert",
+                mock_send,
+            ),
+        ):
+            service = ExecutorService()
+            await service._send_failure_alert(execution)
+
+        mock_send.assert_awaited_once_with(script, execution)
