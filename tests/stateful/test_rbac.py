@@ -1,14 +1,17 @@
-"""TDD tests for F21: Multi-user RBAC (compressed).
+"""TDD tests for F21: Multi-user RBAC.
 
-Full RBAC is out of scope for this release; we ship the minimum viable version:
 - A `User` table with id, username, password_hash, role
 - An `admin` role and a `viewer` role
 - Auth verifies username/password against the User table (not just env vars)
 - /api/users endpoints for admin to create/list users
 - Default admin user seeded from ADMIN_USERNAME/ADMIN_PASSWORD env if no users exist
 
-The role gating on every endpoint is incremental — for now only admin can
-manage users; everyone else has the same access as before.
+Every mutating endpoint across scripts/executions/settings/users/pages
+requires admin (via require_admin in app/api/dependencies.py); viewers get
+read-only access everywhere. These tests use the test_client fixture's
+blanket verify_credentials override, which always resolves as admin — see
+tests/stateful/test_rbac_enforcement.py for tests that authenticate as a
+real DB-backed viewer/admin user and actually exercise role gating.
 """
 
 import pytest
