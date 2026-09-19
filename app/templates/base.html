@@ -10,17 +10,15 @@
     
     {% import "icons.html" as icons %}
     
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    
+    <!-- Fonts (self-hosted under /static/vendor — the CSP only allows
+         'self' for style-src, so the fonts.googleapis.com stylesheet was
+         silently blocked by the browser and the whole UI fell back to
+         system fonts) -->
+    <link rel="stylesheet" href="/static/vendor/fonts/fonts.css">
+
     <!-- Tailwind CSS + DaisyUI (production build) -->
     <link rel="stylesheet" href="/static/output.css">
-    
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@0.303.0/font/lucide.min.css">
-    
+
     {% block extra_head %}{% endblock %}
 </head>
 <body class="text-base-content">
