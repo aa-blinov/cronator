@@ -336,6 +336,18 @@ SQLite in-memory by default; `tests/pg/` and the `test-postgres` CI job use a re
 PostgreSQL container. In both cases `SKIP_ALEMBIC_MIGRATIONS=1` is set and the schema is
 created directly from SQLAlchemy models.
 
+## Documentation
+
+This README covers the quickstart. For deeper reference, see [`docs/`](docs/README.md):
+
+- [Architecture](docs/ARCHITECTURE.md) — components, the execution engine, data model
+- [Configuration](docs/CONFIGURATION.md) — every environment variable, env vs. DB precedence
+- [Deployment](docs/DEPLOYMENT.md) — production Docker Compose, reverse proxy, log rotation, scaling limits
+- [Operations](docs/OPERATIONS.md) — backups/restore, disk space, alerting, health checks, troubleshooting
+- [Security](docs/SECURITY.md) — auth, RBAC scope, secrets at rest, the script execution trust model
+- [API Reference](docs/API.md) — every endpoint, grouped by resource
+- [Development](docs/DEVELOPMENT.md) — running tests, migrations, project layout
+
 ## Security
 
 Before going to production:
