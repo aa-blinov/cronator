@@ -61,6 +61,40 @@ async def test_create_env_times_out_instead_of_hanging(service):
 
 
 @pytest.mark.asyncio
+async def test_active_processes_tracked_while_running_and_cleared_after(service):
+    """_active_processes (what graceful shutdown iterates to kill orphaned
+    uv subprocesses) must contain the process while it runs and be cleared
+    once it's done — whether it succeeded or hung and got killed."""
+    ok_proc = MagicMock()
+    ok_proc.pid = 1
+    ok_proc.returncode = 0
+    ok_proc.communicate = AsyncMock(return_value=(b"", b""))
+
+    seen_during_run = []
+
+    async def capture_and_communicate():
+        seen_during_run.append(set(service._active_processes))
+        return b"", b""
+
+    ok_proc.communicate = AsyncMock(side_effect=capture_and_communicate)
+
+    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=ok_proc)):
+        await service.create_env("tracked_script")
+
+    assert seen_during_run == [{ok_proc}]
+    assert service._active_processes == set()
+
+
+@pytest.mark.asyncio
+async def test_active_processes_cleared_after_a_timeout_kill(service):
+    proc = _hanging_process()
+    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)):
+        await asyncio.wait_for(service.create_env("stalled_script"), timeout=5)
+
+    assert service._active_processes == set()
+
+
+@pytest.mark.asyncio
 async def test_install_dependencies_times_out_instead_of_hanging(service):
     env_path = service.get_env_path("stalled_script")
     env_path.mkdir(parents=True)
@@ -108,6 +142,37 @@ async def test_streaming_install_retries_after_a_timed_out_attempt_then_succeeds
 
     assert ok is True
     hung.kill.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_streaming_install_cleans_up_queue_even_if_client_never_connects(service):
+    """install_queues[script_id] used to be deleted only by the SSE endpoint's
+    `finally` block, on the consumer side. If a client never opened the
+    stream (closed tab, network error before connecting), the Queue — and
+    every log line pushed to it — stayed in memory forever. The producer
+    must clean up its own entry regardless of whether anyone was listening.
+    """
+    env_path = service.get_env_path("never_watched")
+    env_path.mkdir(parents=True)
+
+    ok_proc = MagicMock()
+    ok_proc.pid = 999
+    ok_proc.returncode = 0
+    ok_proc.stdout = AsyncMock()
+    ok_proc.stdout.readline = AsyncMock(return_value=b"")
+    ok_proc.stderr = AsyncMock()
+    ok_proc.stderr.readline = AsyncMock(return_value=b"")
+    ok_proc.wait = AsyncMock(return_value=0)
+
+    service.install_queues[1] = asyncio.Queue()  # nobody ever reads from this
+
+    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=ok_proc)):
+        await asyncio.wait_for(
+            service.setup_environment_streaming(1, "never_watched", "3.12", ""),
+            timeout=5,
+        )
+
+    assert 1 not in service.install_queues
 
 
 @pytest.mark.asyncio

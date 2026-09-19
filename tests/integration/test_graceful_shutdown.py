@@ -137,3 +137,26 @@ async def test_graceful_shutdown_tolerates_db_close_failure():
 
     # Should not raise
     await graceful_shutdown(fake_scheduler, fake_executor, fake_close_db)
+
+
+@pytest.mark.asyncio
+async def test_graceful_shutdown_kills_in_flight_environment_subprocesses():
+    """A pip install / uv venv in progress isn't tracked in
+    executor.running_processes (that dict only ever holds a script's own
+    process, set after environment setup finishes) — it must still be
+    killed on shutdown instead of being left running as an orphan."""
+    fake_scheduler = MagicMock()
+    fake_scheduler.stop = AsyncMock()
+    fake_executor = MagicMock()
+    fake_executor.running_processes = {}
+    fake_close_db = AsyncMock()
+
+    from app.services.environment import environment_service
+
+    fake_uv_process = MagicMock()
+    environment_service._active_processes.add(fake_uv_process)
+    try:
+        await graceful_shutdown(fake_scheduler, fake_executor, fake_close_db)
+        fake_uv_process.kill.assert_called_once()
+    finally:
+        environment_service._active_processes.discard(fake_uv_process)
