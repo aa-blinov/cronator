@@ -26,7 +26,11 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://cronator:${POSTGRES_PASSWORD}@db:5432/cronator
     ports:
-      - "${PORT}:8080"
+      # The app binds to $PORT inside the container too (env_file above,
+      # consumed by the Dockerfile's CMD and HEALTHCHECK) — mapping to a
+      # hardcoded 8080 here would silently break as soon as PORT is
+      # changed from the default in .env.
+      - "${PORT}:${PORT}"
     volumes:
       # Scripts directory - add your scripts here
       - ./scripts:/app/scripts
@@ -37,9 +41,14 @@ services:
       # Logs
       - ./logs:/app/logs
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/health')"]
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import os,httpx; httpx.get('http://localhost:' + os.getenv('PORT','8080') + '/health')\"",
+        ]
       interval: 15s
       timeout: 5s
       start_period: 10s
@@ -83,7 +92,8 @@ services:
           fi
         done
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - cronator-network
 
