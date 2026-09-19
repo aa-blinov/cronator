@@ -38,10 +38,13 @@ _SMTP alerts, timeouts, and app-wide configuration_
 - **Execution history** — every run is stored with stdout, stderr, exit code, duration, and trigger source
 - **Live log streaming** — watch output appear in real time over SSE
 - **Reliability controls** — per-script retries, retry delay, max retry window, overlap prevention
-- **Alerting** — email notifications on failure (SMTP, configurable per script)
+- **Alerting** — email (SMTP) and webhook notifications on failure or success, configurable per script
+- **`/scripts` management page** — search, filter by status, bulk enable/disable/delete, duplicate
+- **Dashboard triage** — scripts that failed today or haven't run in 7 days surface in a dedicated section instead of being buried in the full list
 - **"Run again" button** — re-run any past execution instantly from the history view
 - **Script versioning** — full content stored per execution for reproducibility
 - **REST API** — every action available via API with Basic Auth
+- **Security headers + CSP** — restrictive `Content-Security-Policy`, HSTS, and the other OWASP baseline headers on every response
 - **Docker-first** — one `docker compose up` to production; PostgreSQL + daily backups included
 - **SQLite for dev** — no database setup needed for local development
 
@@ -317,38 +320,20 @@ docker compose -f docker-compose.test.yml up --build --abort-on-container-exit -
 
 ```
 tests/
-├── conftest.py                        # fixtures, test DB setup
-├── unit/
-│   ├── test_models.py                 # Script and Execution model tests
-│   ├── test_cronator_lib.py           # CronatorLogger, get_logger, save_artifact
-│   ├── test_cronator_lib_new.py       # CronatorContext, timer, notify
-│   ├── test_script_templates.py       # all 19 templates: fields, syntax, structure
-│   ├── test_reliability_schema.py     # Pydantic schema validation for reliability fields
-│   └── services/
-│       ├── test_scheduler.py          # SchedulerService
-│       ├── test_executor.py           # ExecutorService, subprocess env isolation
-│       ├── test_alerts.py             # _send_success_alert, _send_failure_alert
-│       ├── test_concurrency.py        # per-script lock, _running_scripts
-│       └── test_reliability.py        # retries, overlap prevention, stat tracking
-└── integration/
-    ├── test_api_scripts.py            # /api/scripts CRUD
-    ├── test_api_executions.py         # /api/executions
-    ├── test_api_settings.py           # /api/settings
-    ├── test_api_reliability.py        # templates endpoint, rerun, SKIPPED status
-    ├── test_api_artifacts.py          # artifact upload, download, delete
-    ├── test_concurrency.py            # concurrent execution with real DB
-    ├── test_versioning.py             # script version history and revert
-    ├── test_streaming.py              # SSE live log streaming
-    ├── test_env_protection.py         # subprocess env isolation (integration)
-    └── test_diagnostic.py             # /api/diagnostics endpoint
-pg/                                    # same tests re-run against PostgreSQL
-    ├── conftest.py                    # testcontainers PostgreSQL fixture
-    ├── test_pg_concurrency.py
-    ├── test_pg_versioning.py
-    └── test_pg_streaming.py
+├── conftest.py       # shared fixtures: test DB, authenticated client, factories
+├── unit/              # models, cronator_lib, script templates, and services/
+│   └── services/      # ExecutorService, EnvironmentService, scheduler, alerting, retries
+├── integration/       # full API surface: scripts, executions, settings, RBAC,
+│                       # streaming, versioning, artifacts, security headers, CI checks
+├── ui/                # Playwright end-to-end flows with baseline screenshots
+└── pg/                # a subset of the above re-run against a real PostgreSQL 16
+                        # container via testcontainers, to catch SQLite-only assumptions
 ```
 
-Tests use SQLite in-memory by default. The `tests/pg/` suite spins up a real PostgreSQL 16 container via `testcontainers`. In both cases, `SKIP_ALEMBIC_MIGRATIONS=1` is set and the schema is created directly from SQLAlchemy models.
+800+ tests as of this writing (`pytest --collect-only -q` for the exact count). Tests use
+SQLite in-memory by default; `tests/pg/` and the `test-postgres` CI job use a real
+PostgreSQL container. In both cases `SKIP_ALEMBIC_MIGRATIONS=1` is set and the schema is
+created directly from SQLAlchemy models.
 
 ## Security
 
