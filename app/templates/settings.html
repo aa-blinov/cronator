@@ -67,7 +67,26 @@
             {% endif %}
         </div>
     </div>
-    
+
+    <!-- Webhook Settings -->
+    <div class="glass-card rounded-xl p-6">
+        <h3 class="text-lg font-semibold mb-4">Webhook Alerts</h3>
+
+        <div id="settings-webhook-summary" class="space-y-4">
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Webhook URL</span>
+                <span>{{ settings.webhook_url or 'Not configured' }}</span>
+            </div>
+            {% if settings.webhook_url %}
+            <div class="mt-4">
+                <button onclick="testWebhook()" class="btn btn-sm btn-outline gap-2">
+                    {{ icons.bolt("w-4 h-4") }} Send Test Webhook
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- Maintenance & Backups -->
     <div class="glass-card rounded-xl p-6">
         <h3 class="text-lg font-semibold mb-4">Backups & Maintenance</h3>
@@ -210,7 +229,16 @@
                     </label>
                 </div>
             </div>
-            
+
+            <!-- Webhook Settings -->
+            <div class="border border-base-300 rounded-lg p-4">
+                <h4 class="font-semibold mb-3">Webhook Alerts</h4>
+                <label class="form-control">
+                    <span class="label-text">Webhook URL</span>
+                    <input type="url" name="webhook_url" value="{{ settings.webhook_url }}" placeholder="https://example.com/webhook" class="input input-bordered input-sm">
+                </label>
+            </div>
+
             <!-- Execution Settings -->
             <div class="border border-base-300 rounded-lg p-4">
                 <h4 class="font-semibold mb-3">Execution</h4>
@@ -238,10 +266,13 @@
 {% block extra_scripts %}
 <script>
     const mailIcon = `{{ icons.envelope("w-4 h-4") }}`.trim();
+    const boltIcon = `{{ icons.bolt("w-4 h-4") }}`.trim();
 
-    // Load stats on page load
+    // Load stats on page load. refreshSettingsSummary() also replaces the
+    // server-rendered email/webhook cards (those come from env defaults,
+    // not the DB-backed settings) with the actual persisted values.
     window.addEventListener('DOMContentLoaded', async () => {
-        await Promise.all([loadArtifactsStats(), loadExecutionStats()]);
+        await Promise.all([loadArtifactsStats(), loadExecutionStats(), refreshSettingsSummary()]);
     });
 
     function escapeHtml(text) {
@@ -290,6 +321,27 @@
             </div>
             ${smtpDetails}
         `;
+
+        const webhookSummary = document.getElementById('settings-webhook-summary');
+        if (!webhookSummary) return;
+
+        const webhookTestButton = settings.webhook_url
+            ? `
+                <div class="mt-4">
+                    <button onclick="testWebhook()" class="btn btn-sm btn-outline gap-2">
+                        ${boltIcon} Send Test Webhook
+                    </button>
+                </div>
+            `
+            : '';
+
+        webhookSummary.innerHTML = `
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Webhook URL</span>
+                <span>${escapeHtml(settings.webhook_url || 'Not configured')}</span>
+            </div>
+            ${webhookTestButton}
+        `;
     }
 
     function syncSettingsForm(settings) {
@@ -305,6 +357,7 @@
         form.elements.smtp_password.value = '';
         form.elements.smtp_from.value = settings.smtp_from || '';
         form.elements.alert_email.value = settings.alert_email || '';
+        form.elements.webhook_url.value = settings.webhook_url || '';
         form.elements.default_timeout.value = settings.default_timeout ?? '';
     }
 
@@ -436,7 +489,8 @@
         if (formData.get('smtp_password')) data.smtp_password = formData.get('smtp_password');
         if (formData.get('smtp_from')) data.smtp_from = formData.get('smtp_from');
         if (formData.get('alert_email')) data.alert_email = formData.get('alert_email');
-        
+        if (formData.get('webhook_url')) data.webhook_url = formData.get('webhook_url');
+
         if (formData.get('default_timeout')) data.default_timeout = parseInt(formData.get('default_timeout'));
         
         try {
@@ -470,6 +524,16 @@
         }
     }
     
+    async function testWebhook() {
+        try {
+            const response = await fetch('/api/settings/test-webhook', { method: 'POST' });
+            const data = await response.json();
+            window.showToast?.(data.message || 'Test webhook sent', data.success ? 'success' : 'warning');
+        } catch (err) {
+            window.showToast?.(err.message || 'Failed to send test webhook', 'error');
+        }
+    }
+
     async function reloadScheduler() {
         try {
             const response = await fetch('/api/settings/reload-scheduler', { method: 'POST' });

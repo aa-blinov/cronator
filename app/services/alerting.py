@@ -1,10 +1,12 @@
-"""Email alerting service."""
+"""Email + webhook alerting service."""
 
 import logging
+from datetime import UTC, datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import aiosmtplib
+import httpx
 
 from app.config import get_settings
 from app.models.execution import Execution
@@ -94,7 +96,7 @@ class AlertingService:
                     start_tls=True,
                 )
 
-            logger.info(f"Alert email sent to {self.to_addr}: {subject}")
+            logger.info(f"Alert email sent to {cfg['to_addr']}: {subject}")
             return True
 
         except Exception as e:
@@ -166,8 +168,7 @@ border-radius: 4px; overflow-x: auto; max-height: 300px;">
         }
             
             <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">
-                This alert was sent by Cronator. 
-                <a href="#">View Execution Details</a>
+                This alert was sent by Cronator.
             </p>
         </body>
         </html>
@@ -188,7 +189,9 @@ Stderr:
 {execution.stderr[:1000]}{"..." if len(execution.stderr) > 1000 else ""}
         """
 
-        return await self.send_email(subject, body_html, body_text)
+        email_sent = await self.send_email(subject, body_html, body_text)
+        await self.send_webhook("execution_failed", script, execution)
+        return email_sent
 
     async def send_success_alert(self, script: Script, execution: Execution) -> bool:
         """Send an alert for a successful execution."""
@@ -233,7 +236,44 @@ Stderr:
         </html>
         """
 
-        return await self.send_email(subject, body_html)
+        email_sent = await self.send_email(subject, body_html)
+        await self.send_webhook("execution_succeeded", script, execution)
+        return email_sent
+
+    async def send_webhook(self, event_type: str, script: Script, execution: Execution) -> bool:
+        """POST an execution event to the configured webhook URL (F17).
+
+        Silently a no-op when no webhook is configured — same as email
+        alerts being a no-op when SMTP is disabled.
+        """
+        from app.services.settings_service import settings_service
+
+        target = await settings_service.get("webhook_url", "")
+        if not target:
+            return False
+
+        payload = {
+            "type": event_type,
+            "app": "Cronator",
+            "script": {"id": script.id, "name": script.name},
+            "execution": {
+                "id": execution.id,
+                "status": execution.status,
+                "exit_code": execution.exit_code,
+                "duration_formatted": execution.duration_formatted,
+                "started_at": execution.started_at.isoformat(),
+            },
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.post(target, json=payload)
+            r.raise_for_status()
+            logger.info(f"Webhook sent for {event_type} ({script.name}): HTTP {r.status_code}")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to send webhook for {event_type} ({script.name}): {e}")
+            return False
 
     async def test_connection(self) -> tuple[bool, str]:
         """Test SMTP connection."""
