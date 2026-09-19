@@ -12,10 +12,14 @@ from app.models.execution import Execution, ExecutionStatus
 
 logger = logging.getLogger(__name__)
 
-# How many executions to keep per script × status
+# How many executions to keep per script × status. TIMEOUT is retained like
+# FAILED — it's a failure mode, not a terminal state that should be skipped —
+# it was missing here entirely, so timed-out executions never got cleaned up
+# by the daily job and accumulated in the DB without bound.
 RETENTION_BY_STATUS: dict[str, int] = {
     ExecutionStatus.SUCCESS.value: 200,
     ExecutionStatus.FAILED.value: 500,
+    ExecutionStatus.TIMEOUT.value: 500,
     ExecutionStatus.SKIPPED.value: 100,
     ExecutionStatus.CANCELLED.value: 100,
 }
