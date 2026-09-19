@@ -17,7 +17,9 @@ def test_f4_changelog_link_in_footer(page: Page, base_url: str) -> None:
     # Footer should now have a 'Changelog' link
     footer_links = page.locator("footer a, .footer a, body a").all()
     hrefs = [a.get_attribute("href") for a in footer_links]
-    assert any(h and "/changelog" in h for h in hrefs), f"no /changelog link in footer; links: {hrefs}"
+    assert any(h and "/changelog" in h for h in hrefs), (
+        f"no /changelog link in footer; links: {hrefs}"
+    )
 
 
 def test_f4_changelog_page_renders(page: Page, base_url: str) -> None:

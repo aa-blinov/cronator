@@ -64,7 +64,7 @@ _TEMPLATES: list[ScriptTemplate] = [
             '        if result["ok"]:\n'
             "            logger.info(f\"OK  {result['url']} -> {result['status']}\")\n"
             "        else:\n"
-            "            err = result.get(\"error\", f\"HTTP {result['status']}\")\n"
+            '            err = result.get("error", f"HTTP {result[\'status\']}")\n'
             "            logger.error(f\"FAIL {result['url']} -> {err}\")\n"
             '            failures.append(result["url"])\n'
             "\n"
@@ -108,9 +108,9 @@ _TEMPLATES: list[ScriptTemplate] = [
             "        pct = used / total * 100\n"
             "        return {\n"
             '            "path": path,\n'
-            "            \"total_gb\": total / 1e9,\n"
-            "            \"used_gb\": used / 1e9,\n"
-            "            \"free_gb\": free / 1e9,\n"
+            '            "total_gb": total / 1e9,\n'
+            '            "used_gb": used / 1e9,\n'
+            '            "free_gb": free / 1e9,\n'
             '            "pct": pct,\n'
             "        }\n"
             "    except Exception as exc:\n"
@@ -242,7 +242,7 @@ _TEMPLATES: list[ScriptTemplate] = [
             'OUTPUT_FILENAME = os.environ.get("OUTPUT_FILENAME", "export.csv")\n'
             "\n"
             "\n"
-            "def fetch(url: str, token: str = \"\") -> list:\n"
+            'def fetch(url: str, token: str = "") -> list:\n'
             "    req = urllib.request.Request(url)\n"
             "    if token:\n"
             '        req.add_header("Authorization", f"Bearer {token}")\n'
@@ -309,7 +309,7 @@ _TEMPLATES: list[ScriptTemplate] = [
             'TARGET_TOKEN = os.environ.get("TARGET_TOKEN", "")\n'
             "\n"
             "\n"
-            "def fetch(url: str, token: str = \"\") -> list | dict:\n"
+            'def fetch(url: str, token: str = "") -> list | dict:\n'
             "    req = urllib.request.Request(url)\n"
             "    if token:\n"
             '        req.add_header("Authorization", f"Bearer {token}")\n'
@@ -318,7 +318,7 @@ _TEMPLATES: list[ScriptTemplate] = [
             "        return json.loads(resp.read().decode())\n"
             "\n"
             "\n"
-            "def push(url: str, data: list | dict, token: str = \"\") -> dict:\n"
+            'def push(url: str, data: list | dict, token: str = "") -> dict:\n'
             "    payload = json.dumps(data).encode()\n"
             '    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})\n'
             "    if token:\n"
@@ -507,7 +507,7 @@ _TEMPLATES: list[ScriptTemplate] = [
             "SLACK_ICON_EMOJI=:robot_face:\n"
             "SLACK_CHANNEL="
         ),
-        "code": '''\
+        "code": """\
 import json
 import os
 import urllib.request
@@ -563,7 +563,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-''',
+""",
     },
     {
         "id": "email-report",
@@ -702,12 +702,9 @@ if __name__ == "__main__":
         "timeout": 60,
         "dependencies": "",
         "environment_vars": (
-            "HOSTS=example.com,api.example.com\n"
-            "PORT=443\n"
-            "WARN_DAYS=30\n"
-            "CRITICAL_DAYS=7"
+            "HOSTS=example.com,api.example.com\nPORT=443\nWARN_DAYS=30\nCRITICAL_DAYS=7"
         ),
-        "code": '''\
+        "code": """\
 import os
 import socket
 import ssl
@@ -770,7 +767,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-''',
+""",
     },
     # ------------------------------------------------------------------
     # Monitoring (continued)
@@ -786,7 +783,7 @@ if __name__ == "__main__":
         "timeout": 60,
         "dependencies": "",
         "environment_vars": "TARGETS=redis-host:6379,db-host:5432\nTIMEOUT=5",
-        "code": '''\
+        "code": """\
 import os
 import socket
 from cronator_lib import get_logger, notify, timer
@@ -854,7 +851,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-''',
+""",
     },
     {
         "id": "dns-check",
@@ -867,7 +864,7 @@ if __name__ == "__main__":
         "timeout": 60,
         "dependencies": "",
         "environment_vars": "HOSTS=example.com,api.example.com\nEXPECTED_IP=",
-        "code": '''\
+        "code": """\
 import os
 import socket
 from cronator_lib import get_logger, notify, timer
@@ -914,7 +911,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-''',
+""",
     },
     {
         "id": "heartbeat",
@@ -998,7 +995,7 @@ if __name__ == "__main__":
         "timeout": 3600,
         "dependencies": "",
         "environment_vars": "DB_HOST=localhost\nDB_PORT=3306\nDB_NAME=mydb\nDB_USER=root\nMYSQL_PWD=secret",
-        "code": '''\
+        "code": """\
 import gzip
 import os
 import subprocess
@@ -1060,7 +1057,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-''',
+""",
     },
     {
         "id": "s3-upload",
@@ -1166,7 +1163,7 @@ if __name__ == "__main__":
         "timeout": 300,
         "dependencies": "psycopg2-binary",
         "environment_vars": "DB_HOST=localhost\nDB_PORT=5432\nDB_NAME=mydb\nDB_USER=postgres\nDB_PASSWORD=\nQUERY=SELECT id, name, created_at FROM users ORDER BY created_at DESC LIMIT 100\nOUTPUT_FILENAME=report.csv",
-        "code": '''\
+        "code": """\
 import csv
 import os
 from datetime import datetime
@@ -1231,7 +1228,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-''',
+""",
     },
     # ------------------------------------------------------------------
     # Maintenance (continued)
@@ -1247,7 +1244,7 @@ if __name__ == "__main__":
         "timeout": 3600,
         "dependencies": "psycopg2-binary",
         "environment_vars": "DB_HOST=localhost\nDB_PORT=5432\nDB_NAME=mydb\nDB_USER=postgres\nDB_PASSWORD=\nTABLES=\nANALYZE=true",
-        "code": '''\
+        "code": """\
 import os
 
 import psycopg2
@@ -1305,7 +1302,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-''',
+""",
     },
     # ------------------------------------------------------------------
     # Notification (continued)
@@ -1321,7 +1318,7 @@ if __name__ == "__main__":
         "timeout": 30,
         "dependencies": "",
         "environment_vars": "NTFY_URL=https://ntfy.sh\nNTFY_TOPIC=my-topic\nNTFY_TOKEN=\nMESSAGE=Cronator: scheduled report at {time}\nTITLE=Cronator\nPRIORITY=default\nTAGS=white_check_mark",
-        "code": '''\
+        "code": """\
 import os
 import urllib.request
 from datetime import datetime
@@ -1368,7 +1365,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-''',
+""",
     },
     {
         "id": "pushover-notify",
@@ -1381,7 +1378,7 @@ if __name__ == "__main__":
         "timeout": 30,
         "dependencies": "",
         "environment_vars": "PUSHOVER_TOKEN=\nPUSHOVER_USER=\nMESSAGE=Cronator: scheduled report at {time}\nTITLE=Cronator\nPRIORITY=0\nSOUND=",
-        "code": '''\
+        "code": """\
 import json
 import os
 import urllib.request
@@ -1440,7 +1437,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-''',
+""",
     },
 ]
 

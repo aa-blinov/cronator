@@ -44,9 +44,7 @@ async def test_metrics_app_info_present(test_client):
     """A constant `1` gauge labeled with the app version."""
     r = await test_client.get("/metrics")
     body = r.text
-    match = re.search(
-        r'crinator_app_info\{version="[^"]+"\}\s+1\.0', body
-    ) or re.search(
+    match = re.search(r'crinator_app_info\{version="[^"]+"\}\s+1\.0', body) or re.search(
         r'cronitor_app_info\{version="[^"]+"\}\s+1\.0', body
     )
     assert match, f"cronitor_app_info gauge not found in:\n{body[:500]}"

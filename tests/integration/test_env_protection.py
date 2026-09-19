@@ -40,7 +40,9 @@ async def test_cannot_delete_script_while_running(test_client):
 
         # Try to delete (should fail with 409)
         response = await test_client.delete(f"/api/scripts/{script_id}")
-        assert response.status_code == 409, f"expected 409, got {response.status_code}: {response.text}"
+        assert response.status_code == 409, (
+            f"expected 409, got {response.status_code}: {response.text}"
+        )
         assert "running" in response.json()["detail"].lower()
 
     finally:
@@ -76,7 +78,9 @@ async def test_cannot_install_dependencies_while_running(test_client):
 
         # Try to install dependencies (should fail with 409)
         response = await test_client.post(f"/api/scripts/{script_id}/install")
-        assert response.status_code == 409, f"expected 409, got {response.status_code}: {response.text}"
+        assert response.status_code == 409, (
+            f"expected 409, got {response.status_code}: {response.text}"
+        )
         assert "running" in response.json()["detail"].lower()
 
     finally:
@@ -108,7 +112,9 @@ async def test_cannot_rebuild_env_while_running(test_client):
 
         # Try to rebuild environment (should fail with 409)
         response = await test_client.post(f"/api/scripts/{script_id}/rebuild-env")
-        assert response.status_code == 409, f"expected 409, got {response.status_code}: {response.text}"
+        assert response.status_code == 409, (
+            f"expected 409, got {response.status_code}: {response.text}"
+        )
         assert "running" in response.json()["detail"].lower()
 
     finally:

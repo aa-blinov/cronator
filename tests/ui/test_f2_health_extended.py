@@ -43,8 +43,8 @@ def _render_health_json_in_browser(page: Page, base_url: str) -> dict:
         "</style></head><body>"
         "<h1>Cronator /health (live response)</h1>"
         f'<div class="status {body.get("status", "")}">{body.get("status", "?").upper()}</div>'
-        f'<div>version: <code>{body.get("version", "?")}</code> &middot; '
-        f'app: <code>{body.get("app", "?")}</code></div>'
+        f"<div>version: <code>{body.get('version', '?')}</code> &middot; "
+        f"app: <code>{body.get('app', '?')}</code></div>"
         "<h2 style='color:#94a3b8;font-size:14px;margin-top:20px;'>Components</h2>"
         "<table><thead><tr><th>Component</th><th>Status / Details</th></tr></thead><tbody>"
     )

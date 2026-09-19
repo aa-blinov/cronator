@@ -71,7 +71,9 @@ async def test_scripts_search_is_case_insensitive(test_client, script_factory):
 async def test_executions_search_matches_stdout(test_client, script_factory, execution_factory):
     """Search by a marker that appears in stdout of one execution."""
     script = await script_factory(name="exec_search_q2", content="print(1)")
-    await execution_factory(script_id=script.id, stdout="found_marker_token_here\n", status="success")
+    await execution_factory(
+        script_id=script.id, stdout="found_marker_token_here\n", status="success"
+    )
     other_script = await script_factory(name="exec_search_q2_other", content="print(1)")
     await execution_factory(script_id=other_script.id, stdout="nothing relevant", status="success")
 
@@ -100,7 +102,9 @@ async def test_executions_search_matches_stderr(test_client, script_factory, exe
 
 
 @pytest.mark.asyncio
-async def test_executions_search_matches_script_name(test_client, script_factory, execution_factory):
+async def test_executions_search_matches_script_name(
+    test_client, script_factory, execution_factory
+):
     """Search by a script name finds all its executions even if their output is empty."""
     script = await script_factory(name="named_marker_script", content="print(1)")
     await execution_factory(script_id=script.id, stdout="", status="success")

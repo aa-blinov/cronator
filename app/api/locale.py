@@ -45,15 +45,7 @@ async def get_locale():
 
 @router.post(
     "/locale",
-    openapi_extra={
-        "requestBody": {
-            "content": {
-                "application/json": {
-                    "example": {"locale": "ru"}
-                }
-            }
-        }
-    },
+    openapi_extra={"requestBody": {"content": {"application/json": {"example": {"locale": "ru"}}}}},
 )
 async def set_locale(payload: LocaleSetRequest):
     """Set the active locale for the current user (persisted to settings).

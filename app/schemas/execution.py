@@ -54,7 +54,7 @@ class ExecutionRead(BaseModel):
                 "finished_at": "2026-09-16T18:33:49.197953Z",
                 "duration_ms": 3137,
                 "exit_code": 0,
-                "stdout": "{\"timestamp\": \"...\", \"level\": \"INFO\", \"message\": \"done\"}\n",
+                "stdout": '{"timestamp": "...", "level": "INFO", "message": "done"}\n',
                 "stderr": "",
                 "triggered_by": "manual",
                 "is_test": False,

@@ -21,6 +21,7 @@ def _attach_header_capture(page: Page, captured: dict[str, dict[str, str]]) -> N
     Playwright's `response.headers` exposes the full response headers including
     those filtered out by the browser's JS fetch API (e.g. X-Frame-Options).
     """
+
     def on_response(response: Response) -> None:
         try:
             captured[response.url] = dict(response.headers)
@@ -33,8 +34,12 @@ def _attach_header_capture(page: Page, captured: dict[str, dict[str, str]]) -> N
 def _assert_security_headers(headers: dict, label: str) -> None:
     assert headers.get("x-content-type-options") == "nosniff", f"[{label}] {headers}"
     assert headers.get("x-frame-options") == "DENY", f"[{label}] {headers}"
-    assert headers.get("referrer-policy") == "strict-origin-when-cross-origin", f"[{label}] {headers}"
-    assert "default-src 'self'" in headers.get("content-security-policy", ""), f"[{label}] {headers}"
+    assert headers.get("referrer-policy") == "strict-origin-when-cross-origin", (
+        f"[{label}] {headers}"
+    )
+    assert "default-src 'self'" in headers.get("content-security-policy", ""), (
+        f"[{label}] {headers}"
+    )
     assert "camera=()" in headers.get("permissions-policy", ""), f"[{label}] {headers}"
 
 
@@ -72,4 +77,6 @@ def test_f1_security_headers_apis_have_headers(page: Page, base_url: str) -> Non
     api_response = page.request.get(f"{base_url}/api/scripts")
     screenshot(page, "f1_03_api_responses_have_headers")
     assert api_response.status == 200
-    _assert_security_headers(dict(api_response.headers), f"api /api/scripts status={api_response.status}")
+    _assert_security_headers(
+        dict(api_response.headers), f"api /api/scripts status={api_response.status}"
+    )

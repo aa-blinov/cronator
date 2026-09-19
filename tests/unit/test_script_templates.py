@@ -11,9 +11,17 @@ TEMPLATES = get_templates()
 TEMPLATE_IDS = [t["id"] for t in TEMPLATES]
 
 REQUIRED_FIELDS = {
-    "id", "name", "description", "category",
-    "icon", "code", "dependencies", "cron_expression",
-    "python_version", "environment_vars", "timeout",
+    "id",
+    "name",
+    "description",
+    "category",
+    "icon",
+    "code",
+    "dependencies",
+    "cron_expression",
+    "python_version",
+    "environment_vars",
+    "timeout",
 }
 
 VALID_CATEGORIES = {"monitoring", "data", "maintenance", "notification"}
@@ -22,10 +30,23 @@ VALID_PYTHON_VERSIONS = {"3.9", "3.10", "3.11", "3.12", "3.13"}
 
 # Icons that are defined in icons.html / TEMPLATE_ICONS JS map
 VALID_ICONS = {
-    "check_circle", "exclamation_triangle", "archive_box", "clipboard",
-    "arrow_path", "trash", "envelope", "bolt", "lock_closed",
-    "signal", "globe_alt", "heart", "arrow_up_tray", "bell",
-    "device_phone_mobile", "document", "cog",
+    "check_circle",
+    "exclamation_triangle",
+    "archive_box",
+    "clipboard",
+    "arrow_path",
+    "trash",
+    "envelope",
+    "bolt",
+    "lock_closed",
+    "signal",
+    "globe_alt",
+    "heart",
+    "arrow_up_tray",
+    "bell",
+    "device_phone_mobile",
+    "document",
+    "cog",
 }
 
 CRONATOR_LIB_EXPORTS = {"get_logger", "notify", "save_artifact", "timer"}
@@ -34,6 +55,7 @@ CRONATOR_LIB_EXPORTS = {"get_logger", "notify", "save_artifact", "timer"}
 # ---------------------------------------------------------------------------
 # Collection-level checks
 # ---------------------------------------------------------------------------
+
 
 class TestTemplateCollection:
     def test_at_least_one_template(self):
@@ -70,18 +92,16 @@ class TestTemplateCollection:
 # Per-template parametrized checks
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("template", TEMPLATES, ids=TEMPLATE_IDS)
 class TestEachTemplate:
-
     def test_has_all_required_fields(self, template):
         missing = REQUIRED_FIELDS - set(template.keys())
         assert not missing, f"Missing fields: {missing}"
 
     def test_id_is_slug(self, template):
         """ID must be lowercase alphanumeric + hyphens only."""
-        assert re.fullmatch(r"[a-z0-9-]+", template["id"]), (
-            f"Invalid id format: {template['id']!r}"
-        )
+        assert re.fullmatch(r"[a-z0-9-]+", template["id"]), f"Invalid id format: {template['id']!r}"
 
     def test_name_is_non_empty_string(self, template):
         assert isinstance(template["name"], str)
@@ -114,8 +134,7 @@ class TestEachTemplate:
     def test_cron_expression_has_five_parts(self, template):
         parts = template["cron_expression"].split()
         assert len(parts) == 5, (
-            f"cron_expression must have 5 parts, got {len(parts)}: "
-            f"{template['cron_expression']!r}"
+            f"cron_expression must have 5 parts, got {len(parts)}: {template['cron_expression']!r}"
         )
 
     def test_code_is_non_empty_string(self, template):
@@ -142,15 +161,12 @@ class TestEachTemplate:
     def test_code_has_main_function(self, template):
         """Every template must define a main() function."""
         tree = ast.parse(template["code"])
-        func_names = {
-            node.name for node in ast.walk(tree)
-            if isinstance(node, ast.FunctionDef)
-        }
+        func_names = {node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
         assert "main" in func_names, "Template must define a main() function"
 
     def test_code_has_main_guard(self, template):
         """Must have if __name__ == '__main__': main() guard."""
-        assert '__name__' in template["code"] and "__main__" in template["code"], (
+        assert "__name__" in template["code"] and "__main__" in template["code"], (
             "Template must have if __name__ == '__main__' guard"
         )
 
@@ -164,6 +180,7 @@ class TestEachTemplate:
 # ---------------------------------------------------------------------------
 # get_template() lookup
 # ---------------------------------------------------------------------------
+
 
 class TestGetTemplate:
     def test_returns_template_by_id(self):
@@ -189,6 +206,7 @@ class TestGetTemplate:
 # Code quality spot-checks
 # ---------------------------------------------------------------------------
 
+
 class TestCodeQuality:
     def test_no_template_uses_print_for_logging(self):
         """Templates should use get_logger(), not print()."""
@@ -198,9 +216,7 @@ class TestCodeQuality:
                 if isinstance(node, ast.Call):
                     func = node.func
                     if isinstance(func, ast.Name) and func.id == "print":
-                        pytest.fail(
-                            f"Template {t['id']!r} uses print() — use logger instead"
-                        )
+                        pytest.fail(f"Template {t['id']!r} uses print() — use logger instead")
 
     def test_no_template_uses_os_environ_copy(self):
         """
@@ -222,9 +238,7 @@ class TestCodeQuality:
         for t in notification_templates:
             # notification templates send messages themselves — notify() is optional
             # but they should at least log
-            assert "logger" in t["code"], (
-                f"Notification template {t['id']!r} must use logger"
-            )
+            assert "logger" in t["code"], f"Notification template {t['id']!r} must use logger"
 
     @pytest.mark.parametrize("template", TEMPLATES, ids=TEMPLATE_IDS)
     def test_no_hardcoded_credentials(self, template):

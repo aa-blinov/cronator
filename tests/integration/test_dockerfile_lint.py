@@ -61,9 +61,7 @@ def test_docker_compose_files_validate():
         )
         if "Cannot connect to the Docker daemon" in (result.stderr or ""):
             pytest.skip("Docker daemon not available")
-        assert result.returncode == 0, (
-            f"{compose_file} failed validation:\nstderr: {result.stderr}"
-        )
+        assert result.returncode == 0, f"{compose_file} failed validation:\nstderr: {result.stderr}"
 
 
 def test_ci_workflow_references_docker_lint():

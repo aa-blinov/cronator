@@ -27,6 +27,7 @@ if _PLAYWRIGHT_IMPORT_ERROR is not None:
     def _skip_when_playwright_missing(request):  # pragma: no cover
         pytest.skip(f"playwright not installed: {_PLAYWRIGHT_IMPORT_ERROR}")
 
+
 # Below this point we only define fixtures when playwright is importable.
 if _PLAYWRIGHT_IMPORT_ERROR is None:
     import os

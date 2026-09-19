@@ -62,9 +62,7 @@ class TestScriptVersioning:
     # ── SHA256 deduplication ──────────────────────────────────────────────────
 
     @pytest.mark.asyncio
-    async def test_same_content_update_does_not_create_new_version(
-        self, test_client: AsyncClient
-    ):
+    async def test_same_content_update_does_not_create_new_version(self, test_client: AsyncClient):
         """PUT with the same content → deduplication by hash, no new version created."""
         script = await _create_script(test_client, "ver-dedup", content="print('stable')")
 
@@ -75,9 +73,7 @@ class TestScriptVersioning:
         assert resp.json()["total"] == 1  # only v1, no new version
 
     @pytest.mark.asyncio
-    async def test_content_change_after_dedup_creates_version(
-        self, test_client: AsyncClient
-    ):
+    async def test_content_change_after_dedup_creates_version(self, test_client: AsyncClient):
         """After a dedup skip, a real content change still creates a new version."""
         script = await _create_script(test_client, "ver-dedup2", content="print('a')")
         await _update_content(test_client, script["id"], "print('a')")  # skipped
@@ -108,9 +104,7 @@ class TestScriptVersioning:
     # ── fetching a specific version ───────────────────────────────────────────
 
     @pytest.mark.asyncio
-    async def test_get_specific_version_returns_full_content(
-        self, test_client: AsyncClient
-    ):
+    async def test_get_specific_version_returns_full_content(self, test_client: AsyncClient):
         """GET /versions/1 → returns full content, not a preview."""
         script = await _create_script(test_client, "ver-get", content="print('original')")
         await _update_content(test_client, script["id"], "print('updated')")
@@ -137,9 +131,7 @@ class TestScriptVersioning:
         script = await _create_script(test_client, "ver-revert", content="print('original')")
         await _update_content(test_client, script["id"], "print('changed')")
 
-        revert_resp = await test_client.post(
-            f"/api/scripts/{script['id']}/revert/1"
-        )
+        revert_resp = await test_client.post(f"/api/scripts/{script['id']}/revert/1")
         assert revert_resp.status_code == 200
         assert "reverted" in revert_resp.json()["message"].lower()
 
@@ -152,23 +144,21 @@ class TestScriptVersioning:
         script = await _create_script(test_client, "ver-revert-audit", content="print('v1')")
         await _update_content(test_client, script["id"], "print('v2')")
 
-        versions_before = (
-            await test_client.get(f"/api/scripts/{script['id']}/versions")
-        ).json()["total"]
+        versions_before = (await test_client.get(f"/api/scripts/{script['id']}/versions")).json()[
+            "total"
+        ]
 
         await test_client.post(f"/api/scripts/{script['id']}/revert/1")
 
-        versions_after = (
-            await test_client.get(f"/api/scripts/{script['id']}/versions")
-        ).json()["total"]
+        versions_after = (await test_client.get(f"/api/scripts/{script['id']}/versions")).json()[
+            "total"
+        ]
 
         # Revert with differing content should add a version
         assert versions_after >= versions_before
 
     @pytest.mark.asyncio
-    async def test_revert_to_nonexistent_version_returns_404(
-        self, test_client: AsyncClient
-    ):
+    async def test_revert_to_nonexistent_version_returns_404(self, test_client: AsyncClient):
         """POST /revert/9999 → 404."""
         script = await _create_script(test_client, "ver-revert-404")
 

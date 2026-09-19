@@ -21,6 +21,7 @@ from tests.ui.conftest import BASE_URL, screenshot
 
 def _basic_auth() -> str:
     import base64
+
     return base64.b64encode(b"admin:admin").decode("ascii")
 
 
