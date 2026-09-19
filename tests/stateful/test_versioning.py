@@ -171,6 +171,39 @@ class TestScriptVersioning:
         resp = await test_client.post("/api/scripts/99999/revert/1")
         assert resp.status_code == 404
 
+    @pytest.mark.asyncio
+    async def test_revert_reschedules_apscheduler_job(self, test_client: AsyncClient):
+        """Reverting cron_expression must also update the live APScheduler
+        job, not just the DB row — otherwise the script keeps running on
+        the pre-revert schedule until some unrelated update touches it."""
+        from app.services.scheduler import scheduler_service
+
+        resp = await test_client.post(
+            "/api/scripts",
+            json={
+                "name": "ver-revert-reschedule",
+                "content": "print('v1')",
+                "cron_expression": "0 1 * * *",
+                "enabled": True,
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        script_id = resp.json()["id"]
+
+        resp = await test_client.put(
+            f"/api/scripts/{script_id}", json={"cron_expression": "0 2 * * *"}
+        )
+        assert resp.status_code == 200, resp.text
+
+        job = scheduler_service.scheduler.get_job(f"script_{script_id}")
+        assert job.trigger.fields[5].expressions[0].first == 2  # hour=2
+
+        revert_resp = await test_client.post(f"/api/scripts/{script_id}/revert/1")
+        assert revert_resp.status_code == 200, revert_resp.text
+
+        job = scheduler_service.scheduler.get_job(f"script_{script_id}")
+        assert job.trigger.fields[5].expressions[0].first == 1  # back to hour=1
+
     # ── version isolation between scripts ────────────────────────────────────
 
     @pytest.mark.asyncio
