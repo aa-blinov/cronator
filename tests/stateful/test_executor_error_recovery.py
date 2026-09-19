@@ -51,7 +51,9 @@ class TestRunScriptOuterExceptRecovery:
                 new=AsyncMock(side_effect=RuntimeError("db gone")),
             ),
             patch.object(
-                exec_service, "_finish_execution", new=AsyncMock(side_effect=RuntimeError("still broken"))
+                exec_service,
+                "_finish_execution",
+                new=AsyncMock(side_effect=RuntimeError("still broken")),
             ),
             patch.object(exec_service, "close_stream", new=AsyncMock()) as mock_close_stream,
         ):
