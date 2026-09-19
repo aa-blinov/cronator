@@ -1,6 +1,6 @@
 """Page routes for HTML templates."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -68,12 +68,57 @@ async def dashboard(
             }
         )
 
+    # Calculate time boundaries
+    now = datetime.now(UTC)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    seven_days_ago = today_start - timedelta(days=7)
+
+    # Identify unhealthy scripts (requires attention)
+    attention_scripts = []
+    healthy_scripts = []
+
+    for item in scripts_data:
+        script = item["script"]
+        last_exec = item["last_execution"]
+        last_started = None
+        if last_exec:
+            last_started = last_exec.started_at
+            # SQLite (used in tests) drops tzinfo even on timezone(True)
+            # columns; treat a naive timestamp as UTC so comparisons below
+            # don't blow up with "can't compare offset-naive and offset-aware".
+            if last_started.tzinfo is None:
+                last_started = last_started.replace(tzinfo=UTC)
+        is_unhealthy = False
+
+        # Failed today
+        if last_exec and last_started >= today_start and last_exec.status in [
+            ExecutionStatus.FAILED.value,
+            ExecutionStatus.TIMEOUT.value,
+        ]:
+            is_unhealthy = True
+
+        # Enabled but no successful run in 7 days
+        if script.enabled and (
+            not last_exec
+            or last_started < seven_days_ago
+            or (last_exec.status in [ExecutionStatus.FAILED.value, ExecutionStatus.TIMEOUT.value])
+        ):
+            is_unhealthy = True
+
+        if is_unhealthy:
+            attention_scripts.append(item)
+        else:
+            healthy_scripts.append(item)
+
+    # Sort both lists: enabled first, then by name
+    attention_scripts.sort(key=lambda x: (not x["script"].enabled, x["script"].name))
+    healthy_scripts.sort(key=lambda x: (not x["script"].enabled, x["script"].name))
+
     # Get stats
     total_scripts = len(scripts)
     enabled_scripts = sum(1 for s in scripts if s.enabled)
 
     # Recent executions stats
-    today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     today_execs = (
         await db.scalar(
             select(func.count()).select_from(Execution).where(Execution.started_at >= today_start)
@@ -109,7 +154,8 @@ async def dashboard(
             "page_title": "Dashboard",
             "version": __version__,
             "theme": DEFAULT_THEME,
-            "scripts": scripts_data,
+            "scripts": healthy_scripts,
+            "attention_scripts": attention_scripts,
             "stats": {
                 "total_scripts": total_scripts,
                 "enabled_scripts": enabled_scripts,
@@ -117,7 +163,7 @@ async def dashboard(
                 "failed_today": failed_today,
                 "running_now": running_now,
             },
-            "now": datetime.now(UTC),
+            "now": now,
         },
     )
 

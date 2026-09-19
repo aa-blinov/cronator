@@ -60,6 +60,81 @@
     </div>
 </div>
 
+<!-- Requires Attention Section -->
+{% if attention_scripts %}
+<div class="glass-card rounded-xl overflow-hidden border-l-4 border-red-500/50">
+    <div class="px-6 py-4 border-b border-gray-700/50">
+        <h3 class="text-lg font-semibold flex items-center gap-2">
+            {{ icons.exclamation_triangle("w-5 h-5 text-yellow-500") }} Requires Attention
+        </h3>
+        <p class="text-sm text-gray-400 mt-1">{{ attention_scripts|length }} script(s) failed today or haven't run in 7 days</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="table w-full">
+            <thead>
+                <tr class="border-b border-gray-700/50">
+                    <th class="bg-transparent">Status</th>
+                    <th class="bg-transparent">Name</th>
+                    <th class="bg-transparent">Schedule</th>
+                    <th class="bg-transparent">Last Run</th>
+                    <th class="bg-transparent">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in attention_scripts %}
+                <tr class="border-b border-gray-700/30 hover:bg-red-950/20">
+                    <td>
+                        {% if item.script.enabled %}
+                            {% if item.last_execution %}
+                                <span class="status-badge {{ item.last_execution.status }}">
+                                    {% if item.last_execution.status == 'running' %}
+                                        <span class="pulse-dot"></span>
+                                    {% endif %}
+                                    {{ item.last_execution.status }}
+                                </span>
+                            {% else %}
+                                <span class="status-badge pending">pending</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge badge-ghost">disabled</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="/scripts/{{ item.script.id }}" class="font-medium hover:text-indigo-400 transition-colors">
+                            <div class="font-bold">{{ item.script.name }}</div>
+                        </a>
+                        {% if item.script.description %}
+                        <p class="text-xs text-gray-500 mt-0.5">{{ item.script.description[:50] }}{% if item.script.description|length > 50 %}...{% endif %}</p>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <code class="text-xs bg-gray-800 px-2 py-1 rounded">{{ item.script.cron_expression }}</code>
+                    </td>
+                    <td>
+                        {% if item.last_execution %}
+                            <span class="text-sm">{{ item.last_execution.started_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <span class="text-xs text-gray-500 block">{{ item.last_execution.duration_formatted }}</span>
+                        {% else %}
+                            <span class="text-gray-500">Never</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="flex items-center gap-2">
+                            <form action="/scripts/{{ item.script.id }}/run" method="POST" class="inline">
+                                <button type="submit" class="btn btn-ghost btn-xs" title="Run now">
+                                    {{ icons.play("w-4 h-4") }}
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 <!-- Scripts Table -->
 <div class="glass-card rounded-xl overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-700/50 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
