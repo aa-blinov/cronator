@@ -64,6 +64,22 @@ def test_docker_compose_files_validate():
         assert result.returncode == 0, f"{compose_file} failed validation:\nstderr: {result.stderr}"
 
 
+def test_all_services_cap_container_log_growth():
+    """Every service in docker-compose.yml needs a bounded `logging` block —
+    the default json-file driver has no size cap, and StreamHandler's
+    stdout (now including uvicorn access logs too) is unbounded unless
+    Docker itself is told to rotate it."""
+    import yaml
+
+    compose = yaml.safe_load((REPO_ROOT / "docker-compose.yml").read_text())
+    for name, service in compose["services"].items():
+        logging_cfg = service.get("logging")
+        assert logging_cfg, f"service {name!r} has no logging size cap configured"
+        assert logging_cfg.get("options", {}).get("max-size"), (
+            f"service {name!r} logging block is missing max-size"
+        )
+
+
 def test_ci_workflow_references_docker_lint():
     """CI workflow should run docker validation as part of docker-validate job."""
     _skip_if_not_on_host()

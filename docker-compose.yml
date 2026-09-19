@@ -16,6 +16,11 @@ services:
       retries: 5
     networks:
       - cronator-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   cronator:
     build: .
@@ -55,6 +60,11 @@ services:
       retries: 3
     networks:
       - cronator-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   # PostgreSQL backup service - runs daily at 2 AM
   db-backup:
@@ -96,6 +106,11 @@ services:
         condition: service_healthy
     networks:
       - cronator-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
 
 networks:
   cronator-network:
