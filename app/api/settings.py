@@ -3,10 +3,11 @@
 import shutil
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
+from app.api.dependencies import require_admin
 from app.config import get_settings
 from app.database import async_session_maker
 from app.models.artifact import Artifact
@@ -92,7 +93,7 @@ async def get_scheduler_status() -> SchedulerStatus:
 
 
 @router.post("/test-email")
-async def test_email():
+async def test_email(username: str = Depends(require_admin)):
     """Send a test email."""
     success, message = await alerting_service.test_connection()
 
@@ -114,7 +115,7 @@ async def test_email():
 
 
 @router.post("/reload-scheduler")
-async def reload_scheduler():
+async def reload_scheduler(username: str = Depends(require_admin)):
     """Reload all scheduler jobs from database."""
     await scheduler_service.reload_all_jobs()
     jobs = scheduler_service.get_all_jobs_info()
@@ -122,7 +123,7 @@ async def reload_scheduler():
 
 
 @router.get("/download-db")
-async def download_db():
+async def download_db(username: str = Depends(require_admin)):
     """Download the current database file."""
     import os
     import time
@@ -180,7 +181,7 @@ class UpdateSettingsRequest(BaseModel):
 
 
 @router.post("/update")
-async def update_settings(request: UpdateSettingsRequest):
+async def update_settings(request: UpdateSettingsRequest, username: str = Depends(require_admin)):
     """Update settings in database."""
     # Collect updates
     updates = {}
@@ -273,7 +274,7 @@ async def get_execution_stats():
 
 
 @router.post("/cleanup-executions")
-async def cleanup_executions(days: int = 90):
+async def cleanup_executions(days: int = 90, username: str = Depends(require_admin)):
     """Delete all executions older than `days` days (excluding running ones)."""
     if days < 1 or days > 3650:
         from fastapi import HTTPException
@@ -292,7 +293,7 @@ async def cleanup_executions(days: int = 90):
 
 
 @router.post("/clear-artifacts")
-async def clear_all_artifacts():
+async def clear_all_artifacts(username: str = Depends(require_admin)):
     """Delete all artifacts from database and filesystem."""
     import logging
 
@@ -374,7 +375,7 @@ async def list_available_backups():
 
 
 @router.post("/restore-backup")
-async def restore_backup(file: UploadFile = File(...)):
+async def restore_backup(file: UploadFile = File(...), username: str = Depends(require_admin)):
     """Restore from a user-uploaded .sql.gz backup file (F12).
 
     The upload is validated, decompressed, and applied via the database
@@ -562,7 +563,7 @@ async def restore_backup(file: UploadFile = File(...)):
         }
     },
 )
-async def test_webhook(payload: dict | None = None):
+async def test_webhook(payload: dict | None = None, username: str = Depends(require_admin)):
     """Send a test payload to the configured webhook URL (from body or stored setting)."""
     import httpx
 

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app import __version__
-from app.api.dependencies import verify_credentials
+from app.api.dependencies import require_admin, verify_credentials
 from app.config import get_settings
 from app.database import get_db
 from app.models.execution import Execution, ExecutionStatus
@@ -546,7 +546,7 @@ async def settings_page(
 @router.post("/scripts/{script_id}/run")
 async def run_script_action(
     script_id: int,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Run a script manually."""
@@ -567,7 +567,7 @@ async def run_script_action(
 @router.post("/executions/{execution_id}/rerun")
 async def rerun_execution_action(
     execution_id: int,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Re-run the script that produced this execution."""
@@ -587,7 +587,7 @@ async def rerun_execution_action(
 @router.post("/scripts/{script_id}/toggle")
 async def toggle_script_action(
     script_id: int,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Toggle script enabled/disabled."""

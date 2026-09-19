@@ -21,6 +21,6 @@ or extend it.
 Cronator is a self-hosted scheduler for a small set of Python scripts run by
 one team behind trusted authentication — not a multi-tenant SaaS product.
 Some of what's documented here is scope that's deliberately *not* built yet
-(full per-endpoint RBAC, script sandboxing); [Security](SECURITY.md) is
-explicit about which is which so you can decide whether it matters for your
-deployment.
+(script sandboxing / per-script CPU-memory limits); [Security](SECURITY.md)
+is explicit about which is which so you can decide whether it matters for
+your deployment.

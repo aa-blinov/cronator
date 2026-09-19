@@ -24,22 +24,31 @@ seeded from `ADMIN_USERNAME`/`ADMIN_PASSWORD` on first startup if the
 
 ## RBAC
 
-Two roles exist: `admin` and `viewer`. **This is intentionally incomplete
-scope, not a bug** — the RBAC test suite's own docstring says it outright:
+Two roles exist: `admin` and `viewer`. **Viewers get read-only access;
+every mutating action requires admin.** Enforced via `require_admin`
+(`app/api/dependencies.py`), applied to every `POST`/`PUT`/`DELETE`
+endpoint across scripts, executions, settings, and users, plus the three
+HTML-page action routes (`/scripts/{id}/run`, `/executions/{id}/rerun`,
+`/scripts/{id}/toggle`) that trigger the same mutations from the UI.
 
-> Full RBAC is out of scope for this release... The role gating on every
-> endpoint is incremental — for now only admin can manage users; everyone
-> else has the same access as before.
+`require_admin` wraps `verify_credentials`: a username with no matching
+`User` row (the legacy env-fallback account — only
+`ADMIN_USERNAME`/`ADMIN_PASSWORD` can authenticate that way) is always
+treated as admin, since that's the one account F21 seeds as admin in the
+first place. A DB-backed user is only let through if `role == "admin"`;
+anything else gets a `403`.
 
-Concretely: `/api/users` (create/list/delete users) is admin-gated. Every
-other endpoint — creating/editing/deleting scripts, running them,
-restoring backups, deleting artifacts, clearing execution history, changing
-SMTP/webhook settings — is available to any authenticated user, viewer or
-admin. A `viewer` account today functions as a second admin account with a
-different label.
+What a `viewer` **can** do: view scripts, executions, logs, live streams,
+settings, diagnostics — anything behind a `GET`.
 
-If you need real per-role restrictions before that work lands, don't create
-`viewer` accounts and expect them to be limited — they aren't.
+What a `viewer` **cannot** do: create/edit/delete/run/duplicate/revert a
+script, cancel or delete an execution, change any setting, restore a
+backup, or manage users. All of these return `403 Forbidden`.
+
+Tested with real HTTP Basic Auth against actual DB-backed viewer/admin
+accounts in `tests/stateful/test_rbac_enforcement.py` — the rest of the
+test suite uses a blanket auth override that always resolves as admin, so
+it wouldn't have caught a gap here.
 
 ## Secrets at rest
 

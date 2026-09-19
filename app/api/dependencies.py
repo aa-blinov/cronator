@@ -61,3 +61,22 @@ async def verify_credentials(credentials: HTTPBasicCredentials = Depends(securit
         )
 
     return credentials.username
+
+
+async def require_admin(username: str = Depends(verify_credentials)) -> str:
+    """Like verify_credentials, but additionally requires the admin role.
+
+    A username with no matching User row (the legacy env-fallback path —
+    which only ADMIN_USERNAME/ADMIN_PASSWORD can authenticate as) is
+    treated as admin: that account is the one F21 seeds as admin in the
+    first place, and there's no "viewer" concept without a User table.
+    """
+    from app.services.user_service import get_user
+
+    user = await get_user(username)
+    if user is not None and user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
+    return username
