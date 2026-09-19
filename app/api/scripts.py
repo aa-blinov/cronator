@@ -259,8 +259,6 @@ async def duplicate_script(
     db: AsyncSession = Depends(get_db),
 ):
     """Duplicate a script. Returns 201 with the new script body."""
-    from sqlalchemy import select
-
     original = await db.get(Script, script_id)
     if not original:
         raise HTTPException(status_code=404, detail="Script not found")
@@ -278,8 +276,20 @@ async def duplicate_script(
         candidate = f"{base}-{suffix}"
         suffix += 1
 
-    # Generate a unique path so the script can be written to disk
-    script_dir = Path(f"/scripts/{candidate}")
+    # Write the duplicated content to disk, same layout as create_script
+    script_dir = settings.scripts_dir / candidate
+    try:
+        script_dir.mkdir(parents=True, exist_ok=True)
+    except (PermissionError, OSError) as e:
+        logger.error(f"Could not create script directory {script_dir}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not create script directory: {e}",
+        )
+    script_file = script_dir / "script.py"
+    async with aiofiles.open(script_file, "w") as f:
+        await f.write(original.content or "")
+
     dup = Script(
         name=candidate,
         description=original.description,
@@ -290,7 +300,7 @@ async def duplicate_script(
         timeout=original.timeout,
         dependencies=original.dependencies,
         environment_vars=original.environment_vars,
-        path=str(script_dir / "main.py"),
+        path=f"{candidate}/script.py",
         retry_count=original.retry_count,
         retry_delay=original.retry_delay,
         max_retry_window=original.max_retry_window,
@@ -771,7 +781,6 @@ async def validate_script(
     import asyncio
     import json
     import tempfile
-    from pathlib import Path
 
     code = data.get("code", "")
 
@@ -1159,13 +1168,16 @@ async def _bulk_dispatch(action: str, payload: BulkScriptIds, db: AsyncSession) 
                 await scheduler_service.add_job(script)
             elif action == "disable":
                 script.enabled = False
-                await scheduler_service.remove_job(script)
+                await scheduler_service.remove_job(script.id)
             elif action == "delete":
                 if executor_service.is_script_running(sid):
                     raise RuntimeError(
                         f"Cannot delete script {sid} while it is running"
                     )
-                await scheduler_service.remove_job(script)
+                await scheduler_service.remove_job(script.id)
+                success, message = await environment_service.delete_env(script.name)
+                if not success:
+                    logger.warning(f"Failed to delete environment for {script.name}: {message}")
                 await db.delete(script)
             else:  # pragma: no cover — FastAPI path validation prevents this
                 raise RuntimeError(f"Unknown bulk action {action!r}")

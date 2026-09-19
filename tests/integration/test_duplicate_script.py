@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pytest
 
+from app.config import get_settings
+
 
 @pytest.mark.asyncio
 async def test_duplicate_creates_new_script(test_client, script_factory):
@@ -22,6 +24,21 @@ async def test_duplicate_creates_new_script(test_client, script_factory):
     assert body["id"] != original.id
     assert "orig_q5" in body["name"]
     assert body["name"].endswith("-copy") or body["name"] == "orig_q5-copy"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_writes_content_to_disk(test_client, script_factory):
+    """The duplicate's file must actually exist on disk with the copied
+    content, not just a Script row with a `path` pointing nowhere."""
+    original = await script_factory(name="orig_disk_q5", content="print('on disk')")
+
+    r = await test_client.post(f"/api/scripts/{original.id}/duplicate")
+    assert r.status_code == 201, r.text
+    dup = r.json()
+
+    script_file = get_settings().scripts_dir / dup["path"]
+    assert script_file.exists(), f"{script_file} was never written"
+    assert script_file.read_text() == "print('on disk')"
 
 
 @pytest.mark.asyncio
