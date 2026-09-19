@@ -58,6 +58,26 @@ class Settings(BaseSettings):
 
         suppress_config_warnings = bool(os.getenv("SUPPRESS_CONFIG_WARNINGS"))
 
+        # These are copy-pasted verbatim from .env.example often enough that
+        # a length check alone doesn't catch them — both placeholders are
+        # already 30+ chars, so "SECRET_KEY is too short" never fires. Since
+        # SECRET_KEY encrypts sensitive settings at rest (SMTP password,
+        # webhook credentials — see settings_service._get_cipher), anyone who
+        # forgot to change it is running with a publicly-known key on GitHub.
+        # This is a hard failure, not a warning: a warning is easy to miss in
+        # container logs and the consequence (silently unencrypted secrets)
+        # is worse than a blocked startup.
+        placeholder_secrets = {
+            "secret_key": "change-me-to-random-256-bit-key-in-production",
+            "admin_password": "change-your-admin-password-here",
+        }
+        for field_name, placeholder in placeholder_secrets.items():
+            if getattr(self, field_name) == placeholder:
+                raise ValueError(
+                    f"{field_name.upper()} is still set to the .env.example placeholder "
+                    f"value. Generate a real secret and set it before starting."
+                )
+
         if not suppress_config_warnings:
             if not self.database_url or str(self.database_url).startswith("sqlite"):
                 warnings.warn(
