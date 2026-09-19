@@ -1100,6 +1100,11 @@ async def revert_to_version(
     await db.commit()
     await db.refresh(script)
 
+    # The scheduler must be rescheduled too — cron_expression may have just
+    # been reverted, and update_script's equivalent schedule_changed branch
+    # would otherwise be the only path that keeps APScheduler's job in sync.
+    await scheduler_service.update_job(script)
+
     # Create new version for the revert
     await _create_version(
         db,
