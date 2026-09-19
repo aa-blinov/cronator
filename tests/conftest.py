@@ -75,6 +75,31 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
         await session.rollback()
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_executor_service_stream_state():
+    """executor_service is a module-level singleton shared by every test in
+    the process, but each test gets its own fresh event loop. close_stream()
+    schedules a fire-and-forget cleanup Task that sleeps 5 minutes before
+    self-removing; if a test's loop closes first (always, in practice), that
+    Task is left dangling — bound to a now-dead loop — under its
+    execution_id key. Since every test's DB starts execution ids over at 1,
+    a later test reusing that id sees close_stream() reuse the stale Task
+    (it isn't `.done()`, just stuck on a dead loop) instead of creating a
+    fresh one, and cancelling it in teardown raises "Event loop is closed".
+    Clearing this here — while this test's own loop is still alive — avoids
+    that cross-test collision. Real deployments never hit this: execution
+    ids are unique and monotonic over the process lifetime.
+    """
+    yield
+    from app.services.executor import executor_service
+
+    for task in executor_service._stream_cleanup_tasks.values():
+        if not task.done():
+            task.cancel()
+    executor_service._stream_cleanup_tasks.clear()
+    executor_service.stream_states.clear()
+
+
 @pytest_asyncio.fixture(scope="function")
 async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[AsyncClient, None]:
     """Create test HTTP client with test database and auth."""
