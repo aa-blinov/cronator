@@ -70,3 +70,8 @@ filterwarnings = [
     "ignore:ADMIN_PASSWORD is using default value:UserWarning",
     "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.1.0",
+]
