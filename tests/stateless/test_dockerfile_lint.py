@@ -69,6 +69,7 @@ def test_all_services_cap_container_log_growth():
     the default json-file driver has no size cap, and StreamHandler's
     stdout (now including uvicorn access logs too) is unbounded unless
     Docker itself is told to rotate it."""
+    _skip_if_not_on_host()
     import yaml
 
     compose = yaml.safe_load((REPO_ROOT / "docker-compose.yml").read_text())
