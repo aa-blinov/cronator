@@ -85,3 +85,18 @@ def test_log_rotator_count_in_diagnostics():
     """The /api/diagnostics endpoint reports the number of rotated log files."""
     # This is already implemented in F19 — re-verify it still works
     pass
+
+
+def test_uvicorn_loggers_use_the_same_handlers_as_the_app():
+    """uvicorn configures "uvicorn"/"uvicorn.error"/"uvicorn.access" with
+    propagate=False and its own plain-text handler before app.main is even
+    imported. Without repointing them at app.main's handlers, HTTP access
+    lines never reach cronator.log and are never JSON-formatted even with
+    LOG_FORMAT=json — regardless of what's configured for everything else.
+    """
+    import app.main as main_module
+
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        uvicorn_logger = logging.getLogger(name)
+        assert uvicorn_logger.propagate is False
+        assert uvicorn_logger.handlers == main_module.handlers
