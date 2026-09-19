@@ -783,7 +783,7 @@ class EnvironmentService:
 
                 for attempt in range(1, max_attempts + 1):
                     if attempt > 1 and queue:
-                        await queue.put(("log", f"\\n🔄 Retry attempt {attempt}/{max_attempts}..."))
+                        await queue.put(("log", f"\n🔄 Retry attempt {attempt}/{max_attempts}..."))
 
                     process = await asyncio.create_subprocess_exec(
                         *cmd,
@@ -821,7 +821,7 @@ class EnvironmentService:
                         return True, "Dependencies installed"
 
                     # Failed - check if retryable
-                    all_output = "\\n".join(stdout_lines + stderr_lines).lower()
+                    all_output = "\n".join(stdout_lines + stderr_lines).lower()
                     last_error = f"pip install failed with code {process.returncode}"
 
                     # Check for retryable network errors
@@ -840,7 +840,7 @@ class EnvironmentService:
                         logger.warning(f"Non-retryable error for {script_name}: {last_error}")
                         if queue:
                             error_msg = (
-                                "\\n❌ Installation failed with configuration error (not retrying)"
+                                "\n❌ Installation failed with configuration error (not retrying)"
                             )
                             await queue.put(("log", error_msg))
                         return False, last_error
