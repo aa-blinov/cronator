@@ -113,7 +113,9 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if script.last_success_at %}
+                        {% if script.last_failure_at and (not script.last_success_at or script.last_failure_at > script.last_success_at) %}
+                        <span class="text-xs text-error">{{ script.last_failure_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        {% elif script.last_success_at %}
                         <span class="text-xs">{{ script.last_success_at.strftime('%Y-%m-%d %H:%M') }}</span>
                         {% else %}
                         <span class="text-xs text-base-content/40">—</span>
