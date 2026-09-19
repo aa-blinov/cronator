@@ -7,6 +7,6 @@ fixtures (db_session, test_client, execution_factory, …) automatically
 run against PostgreSQL.
 """
 
-from tests.integration.test_streaming import TestStreamingSSE
+from tests.stateful.test_streaming import TestStreamingSSE
 
 __all__ = ["TestStreamingSSE"]

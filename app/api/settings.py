@@ -437,19 +437,37 @@ async def restore_backup(file: UploadFile = File(...)):
 
         # Apply via the application's existing async engine — no extra
         # dependency on psycopg2 (which isn't installed in the runtime image)
-        # and we don't conflict with the application's connection pool
-        # because each statement commits independently in its own transaction.
+        # and each plain SQL statement commits independently in its own
+        # transaction. pg_dump's data section is COPY ... FROM stdin, not
+        # INSERTs — a plain `;\n` split tears the COPY header away from its
+        # data and sends it through db.execute(), which either hangs the
+        # connection waiting for COPY-protocol data that never arrives, or
+        # (once the header/data split lands on a lucky boundary) silently
+        # drops every row while still reporting "success". COPY blocks need
+        # their own path via asyncpg's copy_to_table.
+        import io
+
         from app.database import async_session_maker
 
+        copy_header_re = re.compile(
+            r"^COPY\s+([^\s(]+)\s*(?:\(([^)]*)\))?\s+FROM\s+stdin;\s*$",
+            re.IGNORECASE,
+        )
+
         statements_applied = 0
+        rows_restored = 0
+        failed = 0
+        lines = sql_text.split("\n")
+        n = len(lines)
         async with async_session_maker() as db:
-            # Split on semicolons at end of lines; very basic SQL splitter.
-            # For pg_dump output this is sufficient because each statement
-            # ends with `;\n`.
-            for raw_stmt in sql_text.split(";\n"):
-                stmt = raw_stmt.strip()
+            buf: list[str] = []
+
+            async def flush_buf() -> None:
+                nonlocal statements_applied, failed
+                stmt = "\n".join(buf).strip()
+                buf.clear()
                 if not stmt:
-                    continue
+                    return
                 try:
                     await db.execute(text(stmt))
                     await db.commit()
@@ -457,15 +475,73 @@ async def restore_backup(file: UploadFile = File(...)):
                 except Exception as e:
                     logger.warning(f"Statement failed (skipped): {e}")
                     await db.rollback()
-                    continue
+                    failed += 1
+
+            i = 0
+            try:
+                while i < n:
+                    line = lines[i]
+                    match = copy_header_re.match(line.strip())
+                    if match:
+                        await flush_buf()
+                        table = match.group(1)
+                        schema_name, _, table_name = table.rpartition(".")
+                        data_lines: list[str] = []
+                        i += 1
+                        while i < n and lines[i] != "\\.":
+                            data_lines.append(lines[i])
+                            i += 1
+                        i += 1  # skip the `\.` terminator line
+                        data_text = "\n".join(data_lines)
+                        if data_text:
+                            try:
+                                conn = await db.connection()
+                                adapted = await conn.get_raw_connection()
+                                result = await adapted.driver_connection.copy_to_table(
+                                    table_name,
+                                    schema_name=schema_name or None,
+                                    source=io.BytesIO((data_text + "\n").encode("utf-8")),
+                                    format="text",
+                                )
+                                rows_restored += int(
+                                    (result or "COPY 0").rsplit(" ", 1)[-1]
+                                )
+                                statements_applied += 1
+                            except Exception as e:
+                                logger.warning(f"COPY into {table} failed (skipped): {e}")
+                                failed += 1
+                        continue
+                    buf.append(line)
+                    if line.rstrip().endswith(";"):
+                        await flush_buf()
+                    i += 1
+                await flush_buf()
+            finally:
+                # pg_dump sets search_path to '' for the whole session (not
+                # just the current transaction) so every object in the dump
+                # is forced to be schema-qualified. Left as-is, that empty
+                # search_path rides back to the connection pool with this
+                # session and breaks the next unrelated request that
+                # happens to reuse it — any unqualified `FROM some_table`
+                # would 500 with "relation does not exist" until that pooled
+                # connection is eventually recycled.
+                try:
+                    await db.execute(text("RESET search_path"))
+                    await db.commit()
+                except Exception:
+                    logger.exception("Failed to reset search_path after restore")
 
         return {
-            "success": True,
+            "success": failed == 0,
             "statements_applied": statements_applied,
+            "statements_failed": failed,
+            "rows_restored": rows_restored,
             "filename": file.filename,
             "message": (
-                f"Restored {statements_applied} statements from {file.filename}. "
-                "Note: in-flight executions may need to be cancelled."
+                f"Restored {statements_applied} statements ({rows_restored} rows) "
+                f"from {file.filename}"
+                + (f", {failed} statement(s) failed" if failed else "")
+                + ". Note: in-flight executions may need to be cancelled."
             ),
         }
     finally:
