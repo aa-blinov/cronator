@@ -85,7 +85,7 @@ class Settings(BaseSettings):
     # Authentication
     admin_username: str = "admin"
     admin_password: str  # required — no default, must be set via env var
-    secret_key: str      # required — no default, must be set via env var
+    secret_key: str  # required — no default, must be set via env var
 
     # SMTP for alerts
     smtp_enabled: bool = False

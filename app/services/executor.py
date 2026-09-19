@@ -108,9 +108,7 @@ class ExecutorService:
 
             try:
                 await asyncio.wait_for(
-                    state.condition.wait_for(
-                        lambda: len(state.events) > after_seq or state.closed
-                    ),
+                    state.condition.wait_for(lambda: len(state.events) > after_seq or state.closed),
                     timeout=timeout,
                 )
             except TimeoutError:
@@ -478,8 +476,7 @@ class ExecutorService:
                                 break
                             decoded = line.decode("utf-8", errors="replace")
                             is_internal_marker = (
-                                "CRONATOR_NOTIFY:" in decoded
-                                or "ARTIFACT_SAVED:" in decoded
+                                "CRONATOR_NOTIFY:" in decoded or "ARTIFACT_SAVED:" in decoded
                             )
                             if is_stderr:
                                 stderr_lines.append(decoded)
@@ -552,12 +549,19 @@ class ExecutorService:
                                                 )
                                             )
                                             from datetime import UTC, datetime
-                                            log_line = json.dumps({
-                                                "timestamp": datetime.now(UTC).isoformat(),
-                                                "level": "NOTIFY",
-                                                "message": display_msg,
-                                                "logger": "cronator.notify",
-                                            }, ensure_ascii=False) + "\n"
+
+                                            log_line = (
+                                                json.dumps(
+                                                    {
+                                                        "timestamp": datetime.now(UTC).isoformat(),
+                                                        "level": "NOTIFY",
+                                                        "message": display_msg,
+                                                        "logger": "cronator.notify",
+                                                    },
+                                                    ensure_ascii=False,
+                                                )
+                                                + "\n"
+                                            )
                                             stdout_lines.append(log_line)
                                             char_count = len(log_line)
                                             counts = self.live_output_char_counts[execution_id]
@@ -573,7 +577,9 @@ class ExecutorService:
                                 else:
                                     # Regular stdout line — store and stream
                                     stdout_lines.append(decoded)
-                                    self.live_output_char_counts[execution_id]["stdout"] += len(decoded)  # noqa: E501
+                                    self.live_output_char_counts[execution_id]["stdout"] += len(
+                                        decoded
+                                    )  # noqa: E501
 
                             # Stream to UI: skip internal markers converted elsewhere.
                             if not is_internal_marker:
@@ -757,7 +763,7 @@ class ExecutorService:
         """Update execution with final status."""
         # Refresh execution to get latest status (might have been cancelled)
         await db.refresh(execution)
-        
+
         # Don't overwrite CANCELLED status - it was set by user action
         if execution.status == ExecutionStatus.CANCELLED.value:
             logger.info(
@@ -781,7 +787,7 @@ class ExecutorService:
                 execution.error_message = error_message
             await db.commit()
             return
-        
+
         end_time = datetime.now(UTC)
 
         execution.status = status.value
@@ -899,9 +905,7 @@ class ExecutorService:
                 script.last_alert_at = datetime.now(UTC)
                 await db.commit()
 
-    async def _send_manual_alert(
-        self, execution_id: int, title: str, message: str
-    ) -> None:
+    async def _send_manual_alert(self, execution_id: int, title: str, message: str) -> None:
         """Send a manual alert triggered by notify() in a script."""
         from app.services.alerting import alerting_service
 

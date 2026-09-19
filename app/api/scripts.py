@@ -268,9 +268,7 @@ async def duplicate_script(
     candidate = base
     suffix = 2
     while True:
-        existing = await db.execute(
-            select(Script.id).where(Script.name == candidate)
-        )
+        existing = await db.execute(select(Script.id).where(Script.name == candidate))
         if existing.scalar_one_or_none() is None:
             break
         candidate = f"{base}-{suffix}"
@@ -389,12 +387,12 @@ async def update_script(
             new = update_data[field]
             if old != new:
                 audit_changes.append(
-            (
-                field,
-                str(old) if old is not None else None,
-                str(new) if new is not None else None,
-            )
-        )
+                    (
+                        field,
+                        str(old) if old is not None else None,
+                        str(new) if new is not None else None,
+                    )
+                )
 
     # Update fields
     for field, value in update_data.items():
@@ -1136,6 +1134,7 @@ async def rerun_script(
 
 class BulkScriptIds(BaseModel):
     """Body for bulk operations. `ids` must be non-empty."""
+
     ids: list[int] = Field(..., min_length=1)
 
 
@@ -1171,9 +1170,7 @@ async def _bulk_dispatch(action: str, payload: BulkScriptIds, db: AsyncSession) 
                 await scheduler_service.remove_job(script.id)
             elif action == "delete":
                 if executor_service.is_script_running(sid):
-                    raise RuntimeError(
-                        f"Cannot delete script {sid} while it is running"
-                    )
+                    raise RuntimeError(f"Cannot delete script {sid} while it is running")
                 await scheduler_service.remove_job(script.id)
                 success, message = await environment_service.delete_env(script.name)
                 if not success:

@@ -21,8 +21,7 @@ def test_editor_has_timeout_hint_text():
     lower = content.lower()
     assert "timeout" in lower, "no mention of timeout in editor template"
     assert any(
-        needle in lower
-        for needle in ("hint", "warning", "tip", "note", "maximum", "recommended")
+        needle in lower for needle in ("hint", "warning", "tip", "note", "maximum", "recommended")
     ), "no hint/warning text in editor template"
 
 
@@ -38,6 +37,5 @@ def test_editor_includes_warning_about_long_timeouts():
     """The hint must include the word 'long' or 'zombie' to flag the risk."""
     content = _read_editor().lower()
     assert any(
-        needle in content
-        for needle in ("long", "zombie", "migration", "export", "stuck")
+        needle in content for needle in ("long", "zombie", "migration", "export", "stuck")
     ), "editor template does not warn about long-running risks"

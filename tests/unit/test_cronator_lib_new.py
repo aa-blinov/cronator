@@ -15,7 +15,6 @@ from cronator_lib.timer import timer
 
 
 class TestCronatorContext:
-
     def test_is_cronator_true_when_execution_id_set(self):
         """CRONATOR_EXECUTION_ID set → is_cronator=True."""
         with patch.dict(os.environ, {"CRONATOR_EXECUTION_ID": "42"}):
@@ -72,6 +71,7 @@ class TestCronatorContext:
     def test_artifacts_dir_as_path(self):
         """artifacts_dir is returned as a Path object."""
         from pathlib import Path
+
         with patch.dict(os.environ, {"CRONATOR_ARTIFACTS_DIR": "/tmp/artifacts"}):
             ctx = get_context()
         assert ctx.artifacts_dir == Path("/tmp/artifacts")
@@ -112,7 +112,6 @@ class TestCronatorContext:
 
 
 class TestTimer:
-
     def test_logs_completion_message(self):
         """timer() logs a completion message."""
         mock_logger = MagicMock()
@@ -229,7 +228,6 @@ class TestTimer:
 
 
 class TestNotify:
-
     def test_prints_cronator_notify_marker(self, capsys):
         """notify() prints a CRONATOR_NOTIFY: marker to stdout."""
         notify("all done")
@@ -247,7 +245,7 @@ class TestNotify:
         notify("hello")
         out = capsys.readouterr().out
         marker_idx = out.find("CRONATOR_NOTIFY:")
-        payload = out[marker_idx + len("CRONATOR_NOTIFY:"):].strip()
+        payload = out[marker_idx + len("CRONATOR_NOTIFY:") :].strip()
         assert "|" not in payload
         assert payload == "hello"
 
@@ -262,7 +260,7 @@ class TestNotify:
         notify("body text", title="MyTitle")
         out = capsys.readouterr().out
         marker_idx = out.find("CRONATOR_NOTIFY:")
-        payload = out[marker_idx + len("CRONATOR_NOTIFY:"):].strip()
+        payload = out[marker_idx + len("CRONATOR_NOTIFY:") :].strip()
         assert "|" in payload
         title_part, body_part = payload.split("|", 1)
         assert title_part.strip() == "MyTitle"

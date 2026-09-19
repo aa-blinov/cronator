@@ -19,6 +19,7 @@ def _base_valid(**overrides) -> dict:
 # ScriptBase — retry_count
 # ---------------------------------------------------------------------------
 
+
 class TestRetryCount:
     def test_default_is_zero(self):
         s = ScriptBase(**_base_valid())
@@ -47,6 +48,7 @@ class TestRetryCount:
 # ---------------------------------------------------------------------------
 # ScriptBase — retry_delay
 # ---------------------------------------------------------------------------
+
 
 class TestRetryDelay:
     def test_default_is_60(self):
@@ -80,6 +82,7 @@ class TestRetryDelay:
 # ScriptBase — max_retry_window
 # ---------------------------------------------------------------------------
 
+
 class TestMaxRetryWindow:
     def test_default_is_3600(self):
         s = ScriptBase(**_base_valid())
@@ -108,6 +111,7 @@ class TestMaxRetryWindow:
 # ScriptBase — prevent_overlap
 # ---------------------------------------------------------------------------
 
+
 class TestPreventOverlap:
     def test_default_is_true(self):
         s = ScriptBase(**_base_valid())
@@ -126,6 +130,7 @@ class TestPreventOverlap:
 # ScriptCreate inherits reliability fields
 # ---------------------------------------------------------------------------
 
+
 class TestScriptCreateReliability:
     def test_create_inherits_retry_defaults(self):
         s = ScriptCreate(**_base_valid())
@@ -135,12 +140,14 @@ class TestScriptCreateReliability:
         assert s.prevent_overlap is True
 
     def test_create_with_all_reliability_fields(self):
-        s = ScriptCreate(**_base_valid(
-            retry_count=3,
-            retry_delay=120,
-            max_retry_window=7200,
-            prevent_overlap=False,
-        ))
+        s = ScriptCreate(
+            **_base_valid(
+                retry_count=3,
+                retry_delay=120,
+                max_retry_window=7200,
+                prevent_overlap=False,
+            )
+        )
         assert s.retry_count == 3
         assert s.retry_delay == 120
         assert s.max_retry_window == 7200
@@ -154,6 +161,7 @@ class TestScriptCreateReliability:
 # ---------------------------------------------------------------------------
 # ScriptUpdate — all reliability fields are optional
 # ---------------------------------------------------------------------------
+
 
 class TestScriptUpdateReliability:
     def test_empty_update_is_valid(self):
@@ -190,6 +198,7 @@ class TestScriptUpdateReliability:
 # ScriptRead — stats fields present and nullable
 # ---------------------------------------------------------------------------
 
+
 class TestScriptReadStats:
     def _make_read(self, **overrides) -> dict:
         return {
@@ -225,6 +234,7 @@ class TestScriptReadStats:
 
     def test_last_success_at_can_be_set(self):
         from datetime import UTC, datetime
+
         now = datetime.now(UTC)
         s = ScriptRead(**self._make_read(last_success_at=now.isoformat()))
         assert s.last_success_at is not None
@@ -233,6 +243,7 @@ class TestScriptReadStats:
 # ---------------------------------------------------------------------------
 # Cross-field logic checks (documented constraints)
 # ---------------------------------------------------------------------------
+
 
 class TestReliabilityConstraintLogic:
     def test_retry_window_should_accommodate_retries(self):

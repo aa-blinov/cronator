@@ -162,9 +162,7 @@ async def get_diagnostics(username: str = Depends(verify_credentials)):
         "exists": log_file.exists(),
         "size_bytes": log_file.stat().st_size if log_file.exists() else 0,
         "rotated_files": (
-            sorted(log_file.parent.glob("cronator.log.*"))
-            if log_file.parent.exists()
-            else []
+            sorted(log_file.parent.glob("cronator.log.*")) if log_file.parent.exists() else []
         ),
     }
 

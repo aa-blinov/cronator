@@ -21,7 +21,9 @@ from app.services.scheduler import scheduler_service
 async def test_bulk_disable_actually_removes_the_scheduler_job(test_client, script_factory):
     """Bulk-disable must unschedule the job, not just flip `enabled` in the DB
     (remove_job takes a script_id, not a Script object)."""
-    s = await script_factory(name="bulk_sched", content="print(1)", enabled=True, cron_expression="* * * * *")
+    s = await script_factory(
+        name="bulk_sched", content="print(1)", enabled=True, cron_expression="* * * * *"
+    )
     await scheduler_service.add_job(s)
     assert scheduler_service.scheduler.get_job(f"script_{s.id}") is not None
 
@@ -104,7 +106,9 @@ async def test_bulk_unknown_ids_appear_in_failed(test_client, script_factory):
 
 
 @pytest.mark.asyncio
-async def test_bulk_delete_running_script_is_recorded_failed(test_client, script_factory, monkeypatch):
+async def test_bulk_delete_running_script_is_recorded_failed(
+    test_client, script_factory, monkeypatch
+):
     """A script that's currently running must be reported in `failed`
     (cannot delete a running script), while non-running siblings still go through."""
     from app.services import executor as executor_module

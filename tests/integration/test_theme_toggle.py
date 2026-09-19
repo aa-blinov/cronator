@@ -52,7 +52,7 @@ def test_base_template_defaults_to_dim_theme():
     """The <html> tag must carry a data-theme attribute (default: dim)."""
     content = (REPO_ROOT / "app" / "templates" / "base.html").read_text()
     # Accept either the Jinja template form (with theme|default) or the literal "dim"
-    jinja_form = 'theme|default'
+    jinja_form = "theme|default"
     has_jinja_default = jinja_form in content and 'data-theme="{{' in content
     has_literal = 'data-theme="dim"' in content or "data-theme='dim'" in content
     assert has_jinja_default or has_literal, (

@@ -182,9 +182,7 @@ async def graceful_shutdown(scheduler, executor, close_db_fn):
             try:
                 await _exec_singleton.cancel_execution(execution_id)
             except Exception as e:
-                logger.warning(
-                    f"Error cancelling execution {execution_id} during shutdown: {e}"
-                )
+                logger.warning(f"Error cancelling execution {execution_id} during shutdown: {e}")
         if in_flight:
             logger.info(f"Cancelled {len(in_flight)} in-flight execution(s) during shutdown")
     except Exception as e:
@@ -248,11 +246,14 @@ async def metrics_endpoint():
     try:
         async with async_session_maker() as db:
             script_total = await db.scalar(select(func.count()).select_from(Script)) or 0
-            running = await db.scalar(
-                select(func.count())
-                .select_from(Execution)
-                .where(Execution.status == ExecutionStatus.RUNNING.value)
-            ) or 0
+            running = (
+                await db.scalar(
+                    select(func.count())
+                    .select_from(Execution)
+                    .where(Execution.status == ExecutionStatus.RUNNING.value)
+                )
+                or 0
+            )
             artifacts_total = await db.scalar(select(func.count()).select_from(Artifact)) or 0
         metrics_registry.gauge_set("crinator_scripts_total", float(script_total))
         metrics_registry.gauge_set("crinator_executions_running", float(running))
@@ -497,7 +498,10 @@ async def health_check():
                 if pending:
                     checks["status"] = "degraded"
     except Exception as e:
-        checks["components"]["migrations"] = {"status": "error", "error": f"{type(e).__name__}: {e}"}  # noqa: E501
+        checks["components"]["migrations"] = {
+            "status": "error",
+            "error": f"{type(e).__name__}: {e}",
+        }  # noqa: E501
 
     # Return 503 if any component is degraded
     status_code = 200 if checks["status"] == "healthy" else 503
