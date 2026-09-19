@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 SENSITIVE_KEYS = {
     "smtp_password",
     "admin_password",  # If we ever store it in DB
+    # Webhook URLs (Slack/Discord/Telegram/ntfy/...) carry their auth token
+    # directly in the path — storing this in plaintext is as bad as storing
+    # smtp_password unencrypted.
+    "webhook_url",
 }
 
 
