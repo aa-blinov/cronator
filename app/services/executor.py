@@ -714,18 +714,39 @@ class ExecutorService:
             except Exception as e:
                 logger.exception(f"Error executing script {script_id}")
 
+                # If we got here because a commit above failed, `db`'s
+                # transaction needs a rollback before it can be reused —
+                # otherwise the _finish_execution() call below immediately
+                # raises the same error again on its first query, which
+                # would skip close_stream() and leave the execution stuck
+                # at RUNNING forever (cleanup_stale_executions only runs
+                # once, at app startup).
+                try:
+                    await db.rollback()
+                except Exception:
+                    logger.exception(f"Failed to roll back session for execution {execution_id}")
+
                 # Try to get execution if not already available
                 if "execution" not in locals():
                     result = await db.execute(select(Execution).where(Execution.id == execution_id))
                     execution = result.scalar_one_or_none()
 
                 if execution:
-                    await self._finish_execution(
-                        db,
-                        execution,
-                        status=ExecutionStatus.FAILED,
-                        error_message=str(e),
-                    )
+                    try:
+                        await self._finish_execution(
+                            db,
+                            execution,
+                            status=ExecutionStatus.FAILED,
+                            error_message=str(e),
+                        )
+                    except Exception:
+                        logger.exception(
+                            f"Failed to record failure status for execution {execution_id}"
+                        )
+
+                # Always close the stream, even if the failure above
+                # couldn't be recorded — an SSE client should never be
+                # left waiting on a stream that's never going to finish.
                 await asyncio.sleep(0.1)
                 await self.close_stream(execution_id)
             finally:
