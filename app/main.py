@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -295,13 +296,21 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle validation errors with detailed information."""
+    """Handle validation errors with detailed information.
+
+    exc.errors() isn't JSON-serializable as-is: a custom field_validator
+    that raises ValueError produces an error dict with
+    ctx={"error": ValueError(...)} — the exception object itself. Passing
+    that straight to JSONResponse crashes the handler with a TypeError,
+    turning a 422 into an unhandled 500. jsonable_encoder converts it
+    (and any other non-primitive pydantic puts in there) to a plain string.
+    """
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "detail": "Validation error",
-            "errors": exc.errors(),
-            "body": exc.body,
+            "errors": jsonable_encoder(exc.errors()),
+            "body": jsonable_encoder(exc.body),
         },
     )
 
