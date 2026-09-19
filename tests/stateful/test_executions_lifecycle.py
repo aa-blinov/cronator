@@ -14,6 +14,33 @@ from app.models.execution import ExecutionStatus
 pytestmark = pytest.mark.asyncio
 
 
+class TestListExecutionsSearch:
+    async def test_search_matches_stdout(
+        self, test_client: AsyncClient, execution_factory, sample_script
+    ):
+        await execution_factory(script_id=sample_script.id, stdout="needle-in-haystack")
+        await execution_factory(script_id=sample_script.id, stdout="nothing here")
+
+        resp = await test_client.get("/api/executions", params={"search": "needle-in"})
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+    async def test_search_matches_script_name(
+        self, test_client: AsyncClient, execution_factory, script_factory
+    ):
+        script = await script_factory(name="findable-script-exec")
+        await execution_factory(script_id=script.id)
+
+        resp = await test_client.get("/api/executions", params={"search": "findable-script"})
+        assert resp.json()["total"] == 1
+
+    async def test_invalid_script_id_returns_400(self, test_client: AsyncClient):
+        resp = await test_client.get(
+            "/api/executions", params={"script_id": "not-a-number"}
+        )
+        assert resp.status_code == 400
+
+
 class TestGetExecution:
     async def test_include_logs_false_hides_stdout_stderr(
         self, test_client: AsyncClient, execution_factory, sample_script
@@ -34,6 +61,32 @@ class TestGetExecution:
     ):
         resp = await test_client.get(f"/api/executions/{sample_execution.id}/logs/combined")
         assert resp.status_code == 404
+
+    async def test_log_download_sets_content_disposition(
+        self, test_client: AsyncClient, execution_factory, sample_script
+    ):
+        execution = await execution_factory(script_id=sample_script.id, stdout="line1\nline2\n")
+        resp = await test_client.get(
+            f"/api/executions/{execution.id}/logs/stdout", params={"download": "true"}
+        )
+        assert resp.status_code == 200
+        assert (
+            resp.headers["content-disposition"]
+            == f'attachment; filename="execution-{execution.id}-stdout.log"'
+        )
+
+    async def test_log_tail_lines_limits_output(
+        self, test_client: AsyncClient, execution_factory, sample_script
+    ):
+        execution = await execution_factory(
+            script_id=sample_script.id, stdout="a\nb\nc\nd\n"
+        )
+        resp = await test_client.get(
+            f"/api/executions/{execution.id}/logs/stdout", params={"tail_lines": 2}
+        )
+        assert resp.text == "c\nd\n"
+        assert resp.headers["x-log-total-lines"] == "4"
+        assert resp.headers["x-log-displayed-lines"] == "2"
 
 
 class TestCancelExecution:

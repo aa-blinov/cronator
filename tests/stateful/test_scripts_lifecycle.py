@@ -294,3 +294,84 @@ class TestListScriptsSearch:
         data = resp.json()
         assert data["total"] == 1
         assert data["items"][0]["name"] == "findable-abc"
+
+    async def test_search_matches_by_content(self, test_client: AsyncClient, script_factory):
+        await script_factory(name="content-match", content="print('needle-xyz')")
+        await script_factory(name="content-miss", content="print('hay')")
+
+        resp = await test_client.get("/api/scripts", params={"search": "needle-xyz"})
+        assert resp.json()["total"] == 1
+
+
+class TestListAndGetScriptEnrichment:
+    async def test_list_scripts_includes_last_run_status(
+        self, test_client: AsyncClient, script_factory, execution_factory
+    ):
+        script = await script_factory(name="enriched-list")
+        await execution_factory(script_id=script.id, status="success")
+
+        resp = await test_client.get("/api/scripts")
+        item = next(i for i in resp.json()["items"] if i["id"] == script.id)
+        assert item["last_run_status"] == "success"
+        assert item["last_run_at"] is not None
+
+    async def test_get_script_includes_last_run_status(
+        self, test_client: AsyncClient, script_factory, execution_factory
+    ):
+        script = await script_factory(name="enriched-get")
+        await execution_factory(script_id=script.id, status="failed")
+
+        resp = await test_client.get(f"/api/scripts/{script.id}")
+        data = resp.json()
+        assert data["last_run_status"] == "failed"
+
+    async def test_get_script_registers_apscheduler_job_when_enabled(
+        self, test_client: AsyncClient
+    ):
+        """The test harness never starts APScheduler's own clock, so
+        next_run_at is always None here — but add_job() must still have
+        registered the job (checked directly, since that's what
+        get_next_run_time reads from in production)."""
+        from app.services.scheduler import scheduler_service
+
+        script = await _create_script(
+            test_client, "enriched-scheduled", cron_expression="0 3 * * *", enabled=True
+        )
+        assert scheduler_service.scheduler.get_job(f"script_{script['id']}") is not None
+
+
+class TestCreateScriptWithExplicitPath:
+    async def test_create_with_explicit_path_skips_directory_creation(
+        self, test_client: AsyncClient
+    ):
+        """When `path` is provided, create_script must not try to write a
+        script.py file under scripts_dir/<name> — it should use the given
+        path verbatim."""
+        resp = await test_client.post(
+            "/api/scripts",
+            json={
+                "name": "explicit-path-script",
+                "content": "print('hi')",
+                "cron_expression": "0 * * * *",
+                "path": "/some/external/path.py",
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["path"] == "/some/external/path.py"
+
+
+class TestValidateScriptRuff:
+    async def test_validate_script_catches_undefined_name(self, test_client: AsyncClient):
+        resp = await test_client.post(
+            "/api/scripts/validate-script",
+            json={"code": "print(undefined_variable)\n"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["valid"] is False
+        assert any(e["code"] == "F821" for e in data["errors"])
+
+    async def test_validate_script_empty_code(self, test_client: AsyncClient):
+        resp = await test_client.post("/api/scripts/validate-script", json={"code": "  "})
+        assert resp.status_code == 200
+        assert resp.json()["valid"] is True
