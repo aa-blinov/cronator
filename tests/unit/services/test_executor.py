@@ -426,3 +426,136 @@ class TestSubprocessEnvIsolation:
         assert "HOME" in env
         assert "LANG" in env
         assert "TZ" in env
+
+
+class TestTimeoutOnHungProcess:
+    """A script that hangs without ever writing to stdout/stderr must still
+    be killed at script.timeout. Previously, `read_stream`'s `readline()`
+    loop blocked until EOF with no timeout of its own and ran *before*
+    `asyncio.wait_for(process.wait(), ...)`, so a silent hang was never
+    reached the timeout check at all — the execution stayed RUNNING forever.
+    """
+
+    def _make_script(self) -> MagicMock:
+        script = MagicMock()
+        script.id = 1
+        script.name = "hung_script"
+        script.path = None
+        script.python_version = "3.12"
+        script.dependencies = None
+        script.timeout = 0.2  # seconds — must trip fast in this test
+        script.environment_vars = None
+        script.working_directory = None
+        return script
+
+    def _make_execution(self) -> MagicMock:
+        execution = MagicMock()
+        execution.id = 42
+        execution.status = ExecutionStatus.RUNNING.value
+        execution.exit_code = None
+        execution.stdout = ""
+        execution.stderr = ""
+        execution.finished_at = None
+        return execution
+
+    def _make_db_ctx(self, script: MagicMock, execution: MagicMock) -> MagicMock:
+        res_script = MagicMock()
+        res_script.scalar_one_or_none.return_value = script
+        res_exec = MagicMock()
+        res_exec.scalar_one_or_none.return_value = execution
+        # A third call comes from the post-execution "reliability stats" update,
+        # which opens its own async_session_maker() session and re-fetches the
+        # script; return the same script row for it too.
+        res_stats = MagicMock()
+        res_stats.scalar_one_or_none.return_value = script
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(side_effect=[res_script, res_exec, res_stats])
+        mock_db.commit = AsyncMock()
+        mock_db.refresh = AsyncMock()
+        mock_db.add = MagicMock()
+
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=mock_db)
+        ctx.__aexit__ = AsyncMock(return_value=None)
+        return ctx
+
+    def _make_settings(self) -> MagicMock:
+        exec_artifacts = MagicMock(spec=Path)
+        exec_artifacts.mkdir = MagicMock()
+        exec_artifacts.__str__ = lambda self: "/tmp/artifacts/42"
+        artifacts_dir = MagicMock(spec=Path)
+        artifacts_dir.__truediv__ = MagicMock(return_value=exec_artifacts)
+
+        s = MagicMock()
+        s.base_dir = Path("/app")
+        s.artifacts_dir = artifacts_dir
+        s.max_log_size = 1_000_000
+        return s
+
+    @pytest.mark.asyncio
+    async def test_hung_process_with_no_output_is_killed_at_timeout(self):
+        script = self._make_script()
+        execution = self._make_execution()
+
+        never_resolves = asyncio.Event()
+
+        async def _block_forever():
+            await never_resolves.wait()
+            return b""  # unreachable — the Event is never set
+
+        proc = MagicMock()
+        proc.pid = 12345
+        proc.returncode = None
+        # Simulates a process that never writes anything and never exits on
+        # its own — readline() would block forever without the fix.
+        proc.stdout = AsyncMock()
+        proc.stdout.readline = AsyncMock(side_effect=_block_forever)
+        proc.stderr = AsyncMock()
+        proc.stderr.readline = AsyncMock(side_effect=_block_forever)
+        proc.kill = MagicMock()
+        proc.wait = AsyncMock(return_value=-9)
+
+        async def fake_subprocess(*args, **kwargs):
+            return proc
+
+        python_path = MagicMock(spec=Path)
+        python_path.exists.return_value = True
+        python_path.__str__ = lambda self: "/venvs/hung_script/bin/python"
+        script_path = MagicMock(spec=Path)
+        script_path.exists.return_value = True
+        script_path.__str__ = lambda self: "/scripts/hung_script/main.py"
+        script_path.parent = Path("/scripts/hung_script")
+
+        service = ExecutorService()
+        finish_calls = []
+
+        async def fake_finish(self_, db, execution, status, **kwargs):
+            finish_calls.append((status, kwargs))
+
+        with (
+            patch(
+                "app.services.executor.async_session_maker",
+                return_value=self._make_db_ctx(script, execution),
+            ),
+            patch("app.services.executor.environment_service") as mock_env_svc,
+            patch.object(ExecutorService, "_get_script_path", return_value=script_path),
+            patch("asyncio.create_subprocess_exec", new=AsyncMock(side_effect=fake_subprocess)),
+            patch("app.services.executor.settings", self._make_settings()),
+            patch.object(ExecutorService, "_send_success_alert", new=AsyncMock()),
+            patch.object(ExecutorService, "_send_failure_alert", new=AsyncMock()),
+            patch.object(ExecutorService, "_finish_execution", new=fake_finish),
+        ):
+            mock_env_svc.env_exists = AsyncMock(return_value=True)
+            mock_env_svc.get_python_path.return_value = python_path
+
+            # The test itself times out fast if the underlying bug regresses,
+            # instead of hanging the whole suite for the default pytest timeout.
+            await asyncio.wait_for(
+                service._run_script(script_id=1, execution_id=42), timeout=5
+            )
+
+        proc.kill.assert_called_once()
+        assert len(finish_calls) == 1
+        status, kwargs = finish_calls[0]
+        assert status == ExecutionStatus.TIMEOUT

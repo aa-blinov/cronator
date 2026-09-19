@@ -55,6 +55,15 @@ class ExecutorService:
         self.live_output_char_counts: dict[int, dict[str, int]] = {}
         self._script_locks: dict[int, asyncio.Lock] = {}
         self._running_scripts: set[int] = set()
+        self._background_tasks: set[asyncio.Task] = set()
+
+    def _spawn(self, coro) -> asyncio.Task:
+        """Fire-and-forget a coroutine while keeping a strong reference to
+        the Task so it isn't garbage-collected mid-run (asyncio pitfall)."""
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
 
     def ensure_stream_state(self, execution_id: int) -> ExecutionStreamState:
         """Get or create replayable stream state for an execution."""
@@ -260,7 +269,7 @@ class ExecutorService:
             self.ensure_stream_state(execution_id)
 
         # Run execution in background
-        asyncio.create_task(
+        self._spawn(
             self._run_script(
                 script_id,
                 execution_id,
@@ -523,7 +532,7 @@ class ExecutorService:
                                                 notify_title = script.name
                                                 notify_body = payload.strip()
                                                 display_msg = notify_body
-                                            asyncio.create_task(
+                                            self._spawn(
                                                 self._send_manual_alert(
                                                     execution_id,
                                                     notify_title,
@@ -562,17 +571,19 @@ class ExecutorService:
                                     decoded,
                                 )
 
-                    # Read both streams concurrently
-                    await asyncio.gather(
-                        read_stream(process.stdout, False),
-                        read_stream(process.stderr, True),
-                    )
-
                     try:
-                        exit_code = await asyncio.wait_for(
-                            process.wait(),
+                        # Read both streams concurrently, under the same timeout as
+                        # the process itself: readline() blocks until EOF, so a
+                        # script that hangs without printing anything would never
+                        # reach process.wait() below if this weren't bounded too.
+                        await asyncio.wait_for(
+                            asyncio.gather(
+                                read_stream(process.stdout, False),
+                                read_stream(process.stderr, True),
+                            ),
                             timeout=script.timeout,
                         )
+                        exit_code = await process.wait()
 
                         stdout_text = "".join(stdout_lines)
                         stderr_text = "".join(stderr_lines)
@@ -606,10 +617,22 @@ class ExecutorService:
                         process.kill()
                         await process.wait()
                         status = ExecutionStatus.TIMEOUT
+
+                        # Keep whatever output was captured before the hang —
+                        # it's often the only clue as to why the script hung.
+                        stdout_text = "".join(stdout_lines)
+                        stderr_text = "".join(stderr_lines)
+                        if len(stdout_text) > settings.max_log_size:
+                            stdout_text = stdout_text[: settings.max_log_size] + "\n... (truncated)"
+                        if len(stderr_text) > settings.max_log_size:
+                            stderr_text = stderr_text[: settings.max_log_size] + "\n... (truncated)"
+
                         await self._finish_execution(
                             db,
                             execution,
                             status=status,
+                            stdout=stdout_text,
+                            stderr=stderr_text,
                             error_message=f"Script timed out after {script.timeout} seconds",
                             start_time=start_time,
                         )
@@ -648,7 +671,7 @@ class ExecutorService:
                                 f"Script {script_id} failed, scheduling retry "
                                 f"{attempt + 1}/{script.retry_count + 1} in {delay}s"
                             )
-                            asyncio.create_task(
+                            self._spawn(
                                 self._delayed_retry(
                                     script_id=script_id,
                                     triggered_by="retry",
