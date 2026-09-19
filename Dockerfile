@@ -148,4 +148,9 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD sh -c "python -c \"import os,httpx; httpx.get('http://localhost:' + os.getenv('PORT','8080') + '/health')\"" || exit 1
 
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}
+# `exec` replaces the shell process with uvicorn instead of forking a child
+# — without it, SIGTERM (docker stop / compose down) is delivered to the
+# shell, not uvicorn, which never runs the FastAPI lifespan shutdown
+# (cancelling in-flight executions, killing orphaned env-setup processes).
+# Docker just waits out the stop timeout and SIGKILLs everything instead.
+CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}
