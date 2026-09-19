@@ -163,9 +163,7 @@ class TestValidateDependencies:
         self, test_client: AsyncClient
     ):
         with patch("app.api.scripts.environment_service") as mock_env:
-            mock_env.validate_dependencies = AsyncMock(
-                return_value=(False, "unknown package", [])
-            )
+            mock_env.validate_dependencies = AsyncMock(return_value=(False, "unknown package", []))
             resp = await test_client.post(
                 "/api/scripts/validate-dependencies",
                 json={"dependencies": "not-a-real-pkg==1.0"},
@@ -187,9 +185,7 @@ class TestUpdateScriptEdgeCases:
         resp = await test_client.put(f"/api/scripts/{other.id}", json={"name": "taken"})
         assert resp.status_code == 400
 
-    async def test_update_content_rewrites_file_and_path(
-        self, test_client: AsyncClient
-    ):
+    async def test_update_content_rewrites_file_and_path(self, test_client: AsyncClient):
         script = await _create_script(test_client, "content-rewrite")
         resp = await test_client.put(
             f"/api/scripts/{script['id']}", json={"content": "print('new')"}
@@ -219,9 +215,7 @@ class TestUpdateScriptEdgeCases:
         script = await script_factory(name="bad-deps-update")
         with patch("app.api.scripts.environment_service") as mock_env:
             mock_env.validate_dependencies = AsyncMock(return_value=(False, "bad spec", []))
-            resp = await test_client.put(
-                f"/api/scripts/{script.id}", json={"dependencies": "???"}
-            )
+            resp = await test_client.put(f"/api/scripts/{script.id}", json={"dependencies": "???"})
         assert resp.status_code == 400
         assert "bad spec" in resp.json()["detail"]
 
@@ -273,9 +267,7 @@ class TestAuditLog:
 
     async def test_audit_log_lists_field_changes(self, test_client: AsyncClient):
         script = await _create_script(test_client, "audited-script")
-        await test_client.put(
-            f"/api/scripts/{script['id']}", json={"cron_expression": "5 5 * * *"}
-        )
+        await test_client.put(f"/api/scripts/{script['id']}", json={"cron_expression": "5 5 * * *"})
 
         resp = await test_client.get(f"/api/scripts/{script['id']}/audit")
         assert resp.status_code == 200

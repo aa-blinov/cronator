@@ -503,9 +503,7 @@ async def restore_backup(file: UploadFile = File(...)):
                                     source=io.BytesIO((data_text + "\n").encode("utf-8")),
                                     format="text",
                                 )
-                                rows_restored += int(
-                                    (result or "COPY 0").rsplit(" ", 1)[-1]
-                                )
+                                rows_restored += int((result or "COPY 0").rsplit(" ", 1)[-1])
                                 statements_applied += 1
                             except Exception as e:
                                 logger.warning(f"COPY into {table} failed (skipped): {e}")

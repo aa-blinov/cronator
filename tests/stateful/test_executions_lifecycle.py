@@ -35,9 +35,7 @@ class TestListExecutionsSearch:
         assert resp.json()["total"] == 1
 
     async def test_invalid_script_id_returns_400(self, test_client: AsyncClient):
-        resp = await test_client.get(
-            "/api/executions", params={"script_id": "not-a-number"}
-        )
+        resp = await test_client.get("/api/executions", params={"script_id": "not-a-number"})
         assert resp.status_code == 400
 
 
@@ -78,9 +76,7 @@ class TestGetExecution:
     async def test_log_tail_lines_limits_output(
         self, test_client: AsyncClient, execution_factory, sample_script
     ):
-        execution = await execution_factory(
-            script_id=sample_script.id, stdout="a\nb\nc\nd\n"
-        )
+        execution = await execution_factory(script_id=sample_script.id, stdout="a\nb\nc\nd\n")
         resp = await test_client.get(
             f"/api/executions/{execution.id}/logs/stdout", params={"tail_lines": 2}
         )
@@ -180,9 +176,7 @@ class TestClearOldExecutions:
         assert resp.status_code == 200
         assert resp.json()["deleted"] == 1
 
-        remaining = await test_client.get(
-            "/api/executions", params={"script_id": str(other.id)}
-        )
+        remaining = await test_client.get("/api/executions", params={"script_id": str(other.id)})
         assert remaining.json()["total"] == 1
 
     async def test_clear_never_deletes_running_executions(
@@ -204,9 +198,7 @@ class TestClearOldExecutions:
 
 class TestExecutionStatsScriptFilter:
     async def test_invalid_script_id_returns_400(self, test_client: AsyncClient):
-        resp = await test_client.get(
-            "/api/executions/stats", params={"script_id": "not-a-number"}
-        )
+        resp = await test_client.get("/api/executions/stats", params={"script_id": "not-a-number"})
         assert resp.status_code == 400
 
     async def test_stats_scoped_to_one_script(
@@ -261,21 +253,15 @@ class TestArtifactsWithoutRealExecution:
         await db_session.commit()
         await db_session.refresh(artifact)
 
-        resp = await test_client.delete(
-            f"/api/executions/{execution.id}/artifacts/{artifact.id}"
-        )
+        resp = await test_client.delete(f"/api/executions/{execution.id}/artifacts/{artifact.id}")
         assert resp.status_code == 200
 
         refreshed = await test_client.get(f"/api/executions/{execution.id}")
         assert refreshed.json()["artifacts_count"] == 0
         assert refreshed.json()["artifacts_size_bytes"] == 0
 
-    async def test_delete_unknown_artifact_404(
-        self, test_client: AsyncClient, sample_execution
-    ):
-        resp = await test_client.delete(
-            f"/api/executions/{sample_execution.id}/artifacts/99999"
-        )
+    async def test_delete_unknown_artifact_404(self, test_client: AsyncClient, sample_execution):
+        resp = await test_client.delete(f"/api/executions/{sample_execution.id}/artifacts/99999")
         assert resp.status_code == 404
 
     async def test_list_artifacts_for_unknown_execution_404(self, test_client: AsyncClient):
