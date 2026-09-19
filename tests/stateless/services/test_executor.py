@@ -257,14 +257,12 @@ class TestExecutorService:
 class TestExecutorServiceScriptPath:
     """Tests for script path handling in ExecutorService."""
 
-    @pytest.mark.asyncio
-    async def test_get_script_path_with_content(self, script_factory):
+    def test_get_script_path_with_content(self):
         """Test getting path for script with content."""
-        script = await script_factory(
-            name="path_test",
-            content="print('test')",
-            path="/scripts/path_test/main.py",
-        )
+        # MagicMock's `name` kwarg sets the mock's repr, not a `.name`
+        # attribute — set it explicitly instead.
+        script = MagicMock(path="/scripts/path_test/main.py")
+        script.name = "path_test"
 
         service = ExecutorService()
         path = service._get_script_path(script)

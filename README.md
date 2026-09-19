@@ -320,13 +320,14 @@ docker compose -f docker-compose.test.yml up --build --abort-on-container-exit -
 
 ```
 tests/
-├── conftest.py       # shared fixtures: test DB, authenticated client, factories
-├── unit/              # models, cronator_lib, script templates, and services/
-│   └── services/      # ExecutorService, EnvironmentService, scheduler, alerting, retries
-├── integration/       # full API surface: scripts, executions, settings, RBAC,
-│                       # streaming, versioning, artifacts, security headers, CI checks
-├── ui/                # Playwright end-to-end flows with baseline screenshots
-└── pg/                # a subset of the above re-run against a real PostgreSQL 16
+├── conftest.py         # env vars + event loop only, shared by both dirs below
+├── stateless/          # pure unit tests: no DB, no test_client — models, cronator_lib,
+│   └── services/       # script templates, ExecutorService, scheduler, alerting, retries
+├── stateful/           # conftest.py has the DB fixtures (test_engine, db_session,
+│                       # test_client, factories); full API surface: scripts, executions,
+│                       # settings, RBAC, streaming, versioning, artifacts, security headers
+├── ui/                 # Playwright end-to-end flows with baseline screenshots
+└── pg/                 # a subset of the above re-run against a real PostgreSQL 16
                         # container via testcontainers, to catch SQLite-only assumptions
 ```
 
