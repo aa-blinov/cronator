@@ -93,6 +93,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Playwright UI test infrastructure** — `tests/ui/` directory with shared
   fixtures (auth headers, browser context, screenshot helpers) and
   baseline screenshots of the four main pages.
+- **F23: Dashboard "Requires Attention" triage** — scripts that failed today
+  or haven't run in 7 days now surface in a dedicated section above the
+  alphabetical script list, sorted enabled-first, instead of requiring a
+  manual scan of the whole table. 3 tests.
+- **F24: Webhook notifications actually fire on execution events** —
+  `AlertingService.send_webhook()` is now called from
+  `send_failure_alert`/`send_success_alert`; previously `webhook_url` (F17)
+  had a working "Test Webhook" button and backend endpoint but nothing
+  ever invoked it on a real failure or success. Also added the missing
+  Settings UI for the field (it only existed via direct API calls before).
+  5 tests; verified live against a real HTTP listener.
 
 ### Fixed
 - **Race condition in `_running_scripts`** — `ExecutorService` now discards
@@ -114,6 +125,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Switched to the application's existing `async_session_maker` (asyncpg
   for PostgreSQL, aiosqlite for SQLite); each statement runs in its own
   transaction so per-statement failures are still isolated.
+- **Bulk disable/delete never touched the scheduler** — `remove_job()` was
+  called with the `Script` ORM object instead of its `id`, so the job-id
+  lookup never matched and disabled/deleted scripts kept firing on
+  schedule. `duplicate_script()` also never wrote the copied content to
+  disk (every run of a duplicate failed with "Script file not found"),
+  and bulk delete skipped `environment_service.delete_env()`, leaking a
+  venv per bulk-deleted script with dependencies.
+- **`/scripts` "Last Run" column ignored failures** — it only read
+  `last_success_at`, so a script failing on every run showed "—", visually
+  indistinguishable from one that had never run. Now shows whichever of
+  `last_success_at`/`last_failure_at` is more recent, failures in red.
+- **Script execution timeout never fired for a silently hung script** —
+  `read_stream()`'s `readline()` loop blocks until the process exits, and
+  it ran via `asyncio.gather()` *before* the `wait_for(process.wait(),
+  timeout=...)` call. A script that hangs without ever writing to
+  stdout/stderr (deadlock, stuck network call, infinite loop with no
+  print) never reached the timeout check — the execution stayed RUNNING
+  forever. Partial output captured before the hang is now kept instead of
+  discarded on timeout too.
+- **Every `uv` subprocess call (venv creation, pip install) had no
+  timeout** — same root cause as above, in `EnvironmentService`. A
+  stalled network call during dependency installation hung forever;
+  worse, `executor._run_script()` calls `setup_environment()` *before*
+  the script's own process starts, so `script.timeout` never guarded this
+  phase either. Added a shared 5-minute `install_timeout` wrapping every
+  `uv` call (plain and streaming/retry variants).
+- **Cancelling an execution during environment setup was silently
+  dropped** — `cancel_execution()` only checked
+  `running_processes[execution_id]`, which is only set *after*
+  `setup_environment()` returns (which can take minutes). Cancelling
+  during that window returned `False` without touching the DB — the
+  execution stayed RUNNING and the script ran anyway once setup finished.
+  Cancellation is now persisted regardless of process state, and
+  `_run_script()` re-checks it right after setup before ever starting the
+  script's process.
+- **Orphaned `uv` processes on shutdown, and two related resource leaks**
+  — `graceful_shutdown()` only killed processes tracked in
+  `executor.running_processes`, which never includes a script's
+  environment-setup subprocess; a deploy or restart during that window
+  left a `uv venv`/`uv pip install` running as an orphan. Every `uv`
+  subprocess call is now registered via a `_tracked_subprocess()` context
+  manager and killed on shutdown. Also: `install_queues[script_id]` was
+  only cleaned up by the SSE endpoint's consumer side, leaking the Queue
+  (and every buffered log line) if a client never opened
+  `/install-stream`; and `validate_dependencies()`'s 60s timeout never
+  killed the `uv pip compile` subprocess it gave up on.
+- **Code editor was completely broken by the CSP** — `script_editor.html`
+  and `script_version.html` loaded CodeMirror from `cdnjs.cloudflare.com`,
+  but the F1 CSP only allows `'self'` for `script-src`/`style-src`. The
+  browser silently blocked every CodeMirror `<script>`/`<link>`, leaving a
+  tiny unstyled `<textarea>` instead of a syntax-highlighted, line-numbered
+  editor (and the cron "Next runs" preview stuck on "Loading..." as a side
+  effect). Fixed by vendoring CodeMirror under `/static/vendor` instead of
+  loosening the CSP.
+- **Google Fonts silently blocked on every page** — same CSP cause;
+  `fonts.googleapis.com` isn't `'self'`, so Inter/JetBrains Mono never
+  loaded and the whole UI rendered on system-font fallback. Self-hosted
+  under `/static/vendor/fonts`. Also removed the `lucide-static` `<link>`
+  entirely — it was dead weight blocked by the same rule; every icon
+  already goes through `icons.html`'s inline SVG macros.
+- **Flaky `test_stream_live_execution_via_replay_buffer`** — root cause
+  was in the test setup, not app code: `executor_service` is a
+  module-level singleton shared by the whole pytest process, and
+  `close_stream()`'s fire-and-forget cleanup task could outlive its own
+  test's event loop and collide with a later test reusing the same
+  `execution_id`. Added an autouse fixture that clears the singleton's
+  stream-cleanup state after every test.
 
 ## [0.1.0] — 2026-09-06
 
