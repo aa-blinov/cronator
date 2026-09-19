@@ -1,5 +1,5 @@
 """Pure encrypt/decrypt logic — no DB involved. See
-tests/integration/test_settings_service_db.py for the DB round-trip half
+tests/stateful/test_settings_service_db.py for the DB round-trip half
 of this coverage (split out so this file has no stateful fixtures).
 """
 
