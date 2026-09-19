@@ -190,7 +190,21 @@ async def graceful_shutdown(scheduler, executor, close_db_fn):
     except Exception as e:
         logger.warning(f"Error iterating in-flight executions during shutdown: {e}")
 
-    # 3. Close the database engine
+    # 3. Kill any in-flight environment setup (venv creation / pip install).
+    #    These aren't tracked in executor.running_processes — that dict only
+    #    ever holds a script's own process, never its environment-setup
+    #    subprocess — so without this a pip install in progress would be
+    #    left running as an orphan after the app exits.
+    try:
+        from app.services.environment import environment_service
+
+        killed = environment_service.kill_all_processes()
+        if killed:
+            logger.info(f"Killed {killed} in-flight environment subprocess(es) during shutdown")
+    except Exception as e:
+        logger.warning(f"Error killing environment subprocesses during shutdown: {e}")
+
+    # 4. Close the database engine
     try:
         await close_db_fn()
     except Exception as e:
