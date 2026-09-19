@@ -68,9 +68,7 @@ class TestCleanupByStatus:
         from app.models.execution import Execution
 
         async with async_session_maker() as db:
-            rows = await db.execute(
-                select(Execution.id).where(Execution.script_id == script.id)
-            )
+            rows = await db.execute(select(Execution.id).where(Execution.script_id == script.id))
             remaining_ids = {r[0] for r in rows.all()}
 
         assert remaining_ids == {executions[0].id, executions[1].id}
@@ -223,9 +221,7 @@ class TestCleanupOlderThanDays:
         from app.models.execution import Execution
 
         async with async_session_maker() as db:
-            rows = await db.execute(
-                select(Execution.id).where(Execution.script_id == script.id)
-            )
+            rows = await db.execute(select(Execution.id).where(Execution.script_id == script.id))
             remaining = {r[0] for r in rows.all()}
 
         assert remaining == {old_running.id, recent_success.id}
@@ -338,9 +334,7 @@ class TestCleanupEndpointsUseTheTestDatabase:
             started_at=datetime.now(UTC) - timedelta(days=200),
         )
 
-        response = await test_client.post(
-            "/api/settings/cleanup-executions", json={"days": 90}
-        )
+        response = await test_client.post("/api/settings/cleanup-executions", json={"days": 90})
 
         assert response.status_code == 200
         assert response.json()["deleted_executions"] == 1
