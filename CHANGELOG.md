@@ -225,6 +225,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CSS is rebuilt; `npm run build:css`.)
 
 ### Fixed
+- **Most async buttons gave zero feedback while their request was in
+  flight.** A handful (Run Now, Cancel execution, Restore version) had
+  hand-rolled a disable+spinner+restore pattern; bulk enable/disable/
+  delete, every user-management action, and most of Settings (test
+  email/webhook, reload scheduler, cleanup, clear artifacts, save,
+  delete artifact, duplicate script, cancel from the script detail page)
+  had none — clicking just did nothing visible until the request
+  resolved. Added `window.withButtonLoading` (`app/static/app.js`) —
+  one shared implementation instead of a 5th/6th/7th slightly different
+  copy-paste — and wired it into all of the above.
 - **Sidebar didn't adapt to narrow viewports at all.** It was a fixed
   `w-64` flex child at every screen width, so on a phone or narrow
   window it just got clipped by the viewport instead of collapsing.

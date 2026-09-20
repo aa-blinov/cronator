@@ -94,7 +94,7 @@
             </div>
             {% if is_admin %}
             <div class="mt-4">
-                <button onclick="testEmail()" class="btn btn-sm btn-outline gap-2">
+                <button onclick="withButtonLoading(this, 'Sending...', () => testEmail())" class="btn btn-sm btn-outline gap-2">
                     {{ icons.envelope("w-4 h-4") }} Send Test Email
                 </button>
             </div>
@@ -114,7 +114,7 @@
             </div>
             {% if is_admin and settings.webhook_url %}
             <div class="mt-4">
-                <button onclick="testWebhook()" class="btn btn-sm btn-outline gap-2">
+                <button onclick="withButtonLoading(this, 'Sending...', () => testWebhook())" class="btn btn-sm btn-outline gap-2">
                     {{ icons.bolt("w-4 h-4") }} Send Test Webhook
                 </button>
             </div>
@@ -137,7 +137,7 @@
                 <a href="/api/settings/download-db" class="btn btn-sm btn-outline gap-2">
                     {{ icons.arrow_down_tray("w-4 h-4") }} Download DB Backup
                 </a>
-                <button onclick="reloadScheduler()" class="btn btn-sm btn-outline gap-2">
+                <button onclick="withButtonLoading(this, 'Reloading...', () => reloadScheduler())" class="btn btn-sm btn-outline gap-2">
                     {{ icons.arrow_path("w-4 h-4") }} Reload Scheduler Jobs
                 </button>
             </div>
@@ -186,7 +186,7 @@
                 class="input input-bordered input-sm w-24"
             >
             <span class="text-sm text-base-content/60">days</span>
-            <button onclick="cleanupOlderThan()" class="btn btn-sm btn-outline btn-warning gap-2">
+            <button onclick="withButtonLoading(this, 'Cleaning up...', () => cleanupOlderThan())" class="btn btn-sm btn-outline btn-warning gap-2">
                 {{ icons.trash("w-4 h-4") }} Delete older than
             </button>
         </div>
@@ -221,7 +221,7 @@
             
             {% if is_admin %}
             <div class="mt-4">
-                <button onclick="clearAllArtifacts()" class="btn btn-sm btn-outline btn-error gap-2">
+                <button onclick="clearAllArtifacts(this)" class="btn btn-sm btn-outline btn-error gap-2">
                     {{ icons.trash("w-4 h-4") }} Clear All Artifacts
                 </button>
             </div>
@@ -303,7 +303,7 @@
         
         <div class="modal-action">
             <button type="button" onclick="closeEditModal()" class="btn btn-ghost">Cancel</button>
-            <button type="button" onclick="saveSettings()" class="btn btn-primary">Save Changes</button>
+            <button type="button" onclick="withButtonLoading(this, 'Saving...', () => saveSettings())" class="btn btn-primary">Save Changes</button>
         </div>
     </div>
     <form method="dialog" class="modal-backdrop">
@@ -351,7 +351,7 @@
                     <span>${escapeHtml(settings.alert_email || 'Not configured')}</span>
                 </div>
                 <div class="mt-4">
-                    <button onclick="testEmail()" class="btn btn-sm btn-outline gap-2">
+                    <button onclick="withButtonLoading(this, 'Sending...', () => testEmail())" class="btn btn-sm btn-outline gap-2">
                         ${mailIcon} Send Test Email
                     </button>
                 </div>
@@ -372,7 +372,7 @@
         const webhookTestButton = settings.webhook_url
             ? `
                 <div class="mt-4">
-                    <button onclick="testWebhook()" class="btn btn-sm btn-outline gap-2">
+                    <button onclick="withButtonLoading(this, 'Sending...', () => testWebhook())" class="btn btn-sm btn-outline gap-2">
                         ${boltIcon} Send Test Webhook
                     </button>
                 </div>
@@ -488,26 +488,28 @@
         }
     }
 
-    async function clearAllArtifacts() {
+    async function clearAllArtifacts(btn) {
         if (!confirm('Are you sure you want to delete ALL artifacts? This cannot be undone!')) {
             return;
         }
-        
-        try {
-            const response = await fetch('/api/settings/clear-artifacts', {
-                method: 'POST'
-            });
-            const data = await response.json();
-            
-            if (data.success) {
-                window.showToast?.(data.message, 'success');
-                await loadArtifactsStats();
-            } else {
-                window.showToast?.('Failed to clear artifacts', 'error');
+
+        await window.withButtonLoading(btn, 'Clearing...', async () => {
+            try {
+                const response = await fetch('/api/settings/clear-artifacts', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    window.showToast?.(data.message, 'success');
+                    await loadArtifactsStats();
+                } else {
+                    window.showToast?.('Failed to clear artifacts', 'error');
+                }
+            } catch (err) {
+                window.showToast?.(err.message || 'Failed to clear artifacts', 'error');
             }
-        } catch (err) {
-            window.showToast?.(err.message || 'Failed to clear artifacts', 'error');
-        }
+        });
     }
     
     function openEditModal() {

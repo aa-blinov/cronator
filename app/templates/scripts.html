@@ -49,11 +49,11 @@
         <span data-testid="bulk-selected-count">0</span> selected
     </span>
     <button class="btn btn-sm btn-primary" data-testid="bulk-enable"
-            onclick="bulkAction('enable')">Enable</button>
+            onclick="bulkAction('enable', this)">Enable</button>
     <button class="btn btn-sm btn-warning" data-testid="bulk-disable"
-            onclick="bulkAction('disable')">Disable</button>
+            onclick="bulkAction('disable', this)">Disable</button>
     <button class="btn btn-sm btn-error" data-testid="bulk-delete"
-            onclick="bulkAction('delete')">Delete</button>
+            onclick="bulkAction('delete', this)">Delete</button>
     <button class="btn btn-sm btn-ghost ml-auto" onclick="clearSelection()">Clear</button>
 </div>
 {% endif %}
@@ -212,7 +212,7 @@ function clearSelection() {
     onRowChange();
 }
 
-async function bulkAction(action) {
+async function bulkAction(action, btn) {
     const ids = selectedIds();
     if (ids.length === 0) {
         window.showToast?.('Select at least one script first', 'warning');
@@ -223,34 +223,36 @@ async function bulkAction(action) {
     )) {
         return;
     }
-    try {
-        const r = await fetch(`/api/scripts/bulk/${action}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids }),
-        });
-        if (!r.ok) {
-            const data = await r.json().catch(() => ({}));
-            window.showToast?.(data.detail || `Bulk ${action} failed (HTTP ${r.status})`, 'error');
-            return;
+    await window.withButtonLoading(btn, `${action.charAt(0).toUpperCase()}${action.slice(1)}ing...`, async () => {
+        try {
+            const r = await fetch(`/api/scripts/bulk/${action}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids }),
+            });
+            if (!r.ok) {
+                const data = await r.json().catch(() => ({}));
+                window.showToast?.(data.detail || `Bulk ${action} failed (HTTP ${r.status})`, 'error');
+                return;
+            }
+            const body = await r.json();
+            const okCount = body.succeeded.length;
+            const failCount = body.failed.length;
+            const label = action.charAt(0).toUpperCase() + action.slice(1);
+            if (failCount === 0) {
+                window.showToast?.(`${label}: ${okCount} succeeded`, 'success');
+            } else {
+                window.showToast?.(
+                    `${label}: ${okCount} ok, ${failCount} failed (${body.failed.map(f => f.error).join('; ')})`,
+                    'warning',
+                );
+            }
+            // Reload the page to reflect the new state
+            window.location.reload();
+        } catch (err) {
+            window.showToast?.(`Error: ${err.message}`, 'error');
         }
-        const body = await r.json();
-        const okCount = body.succeeded.length;
-        const failCount = body.failed.length;
-        const label = action.charAt(0).toUpperCase() + action.slice(1);
-        if (failCount === 0) {
-            window.showToast?.(`${label}: ${okCount} succeeded`, 'success');
-        } else {
-            window.showToast?.(
-                `${label}: ${okCount} ok, ${failCount} failed (${body.failed.map(f => f.error).join('; ')})`,
-                'warning',
-            );
-        }
-        // Reload the page to reflect the new state
-        window.location.reload();
-    } catch (err) {
-        window.showToast?.(`Error: ${err.message}`, 'error');
-    }
+    });
 }
 </script>
 {% endblock %}

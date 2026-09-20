@@ -46,7 +46,7 @@
                             Reset password
                         </button>
                         <button class="btn btn-xs btn-error btn-outline" data-testid="delete-user-btn"
-                                onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                                onclick="deleteUser({{ user.id }}, '{{ user.username }}', this)">
                             Delete
                         </button>
                     </td>
@@ -106,7 +106,7 @@
         </form>
         <div class="modal-action">
             <button type="button" class="btn btn-ghost" onclick="document.getElementById('create-user-modal').close()">Cancel</button>
-            <button type="button" class="btn btn-primary" data-testid="create-user-submit" onclick="createUser()">Create</button>
+            <button type="button" class="btn btn-primary" data-testid="create-user-submit" onclick="withButtonLoading(this, 'Creating...', () => createUser())">Create</button>
         </div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
@@ -125,7 +125,7 @@
         </form>
         <div class="modal-action">
             <button type="button" class="btn btn-ghost" onclick="document.getElementById('reset-password-modal').close()">Cancel</button>
-            <button type="button" class="btn btn-primary" data-testid="reset-password-submit" onclick="submitResetPassword()">Reset</button>
+            <button type="button" class="btn btn-primary" data-testid="reset-password-submit" onclick="withButtonLoading(this, 'Resetting...', () => submitResetPassword())">Reset</button>
         </div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
@@ -213,20 +213,22 @@ async function submitResetPassword() {
     }
 }
 
-async function deleteUser(userId, username) {
+async function deleteUser(userId, username, btn) {
     if (!confirm(`Delete user ${username}? This cannot be undone.`)) return;
-    try {
-        const r = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-        if (!r.ok) {
-            const err = await r.json().catch(() => ({}));
-            window.showToast?.(err.detail || 'Failed to delete user', 'error');
-            return;
+    await window.withButtonLoading(btn, 'Deleting...', async () => {
+        try {
+            const r = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                window.showToast?.(err.detail || 'Failed to delete user', 'error');
+                return;
+            }
+            window.showToast?.(`User ${username} deleted`, 'success');
+            window.location.reload();
+        } catch (err) {
+            window.showToast?.(`Error: ${err.message}`, 'error');
         }
-        window.showToast?.(`User ${username} deleted`, 'success');
-        window.location.reload();
-    } catch (err) {
-        window.showToast?.(`Error: ${err.message}`, 'error');
-    }
+    });
 }
 
 const AUDIT_ACTION_BADGE = {
