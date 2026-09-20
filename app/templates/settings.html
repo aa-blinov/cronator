@@ -38,7 +38,38 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Appearance & About -->
+    <div class="glass-card rounded-xl p-6">
+        <h3 class="text-lg font-semibold mb-4">Appearance & About</h3>
+
+        <div class="space-y-4">
+            <label class="form-control">
+                <span class="label-text">Theme</span>
+                {# F16: Theme toggle. Reads current theme from localStorage so the
+                   choice persists across reloads without a server round-trip. #}
+                <select id="theme-select"
+                        class="select select-bordered select-sm w-full"
+                        data-current-theme="{{ theme|default('dim') }}"
+                        aria-label="UI theme">
+                    <option value="dim">Dim (dark)</option>
+                    <option value="light">Light</option>
+                    <option value="cupcake">Cupcake</option>
+                    <option value="dracula">Dracula</option>
+                    <option value="business">Business</option>
+                </select>
+            </label>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">Version</span>
+                <span>Cronator v{{ app_version or version or '0.0.0' }}</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <span class="text-base-content/60">What's new</span>
+                <a href="/changelog" class="link link-hover">Changelog</a>
+            </div>
+        </div>
+    </div>
+
     <!-- Email Settings -->
     <div class="glass-card rounded-xl p-6">
         <h3 class="text-lg font-semibold mb-4">Email Alerts</h3>
@@ -259,6 +290,15 @@
                     </label>
                 </div>
             </div>
+
+            <!-- Backups -->
+            <div class="border border-base-300 rounded-lg p-4">
+                <h4 class="font-semibold mb-3">Backups</h4>
+                <label class="form-control flex-row items-center gap-2">
+                    <input type="checkbox" name="auto_backup_enabled" class="toggle toggle-primary" {% if settings.auto_backup_enabled %}checked{% endif %}>
+                    <span class="label-text">Automatic daily backup (02:00 UTC, keeps the 7 most recent)</span>
+                </label>
+            </div>
         </form>
         
         <div class="modal-action">
@@ -284,12 +324,6 @@
     window.addEventListener('DOMContentLoaded', async () => {
         await Promise.all([loadArtifactsStats(), loadExecutionStats(), refreshSettingsSummary()]);
     });
-
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text ?? '';
-        return div.innerHTML;
-    }
 
     function applySettingsSummary(settings) {
         if (!settings) return;
@@ -369,6 +403,7 @@
         form.elements.alert_email.value = settings.alert_email || '';
         form.elements.webhook_url.value = settings.webhook_url || '';
         form.elements.default_timeout.value = settings.default_timeout ?? '';
+        form.elements.auto_backup_enabled.checked = Boolean(settings.auto_backup_enabled);
     }
 
     async function refreshSettingsSummary() {
@@ -502,6 +537,7 @@
         if (formData.get('webhook_url')) data.webhook_url = formData.get('webhook_url');
 
         if (formData.get('default_timeout')) data.default_timeout = parseInt(formData.get('default_timeout'));
+        data.auto_backup_enabled = formData.get('auto_backup_enabled') === 'on';
         
         try {
             const response = await fetch('/api/settings/update', {

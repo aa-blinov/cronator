@@ -74,3 +74,28 @@ def rate_limit(max_calls: int, period: int):
 def clear_rate_limits():
     """Clear all rate limit data (useful for testing)."""
     _rate_limit_store.clear()
+    _login_failures.clear()
+
+
+# Brute-force protection on login (P0): tracked separately from the
+# generic per-endpoint limiter above because it must count *failed*
+# attempts specifically, keyed by username, not every call to a route.
+_login_failures: dict[str, list[float]] = defaultdict(list)
+LOGIN_MAX_FAILURES = 10
+LOGIN_WINDOW_SECONDS = 300
+
+
+def check_login_lockout(username: str) -> None:
+    """Raise 429 if this username has hit the failed-login limit."""
+    key = f"login:{username}"
+    now = time.time()
+    _login_failures[key] = [t for t in _login_failures[key] if now - t < LOGIN_WINDOW_SECONDS]
+    if len(_login_failures[key]) >= LOGIN_MAX_FAILURES:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Try again later.",
+        )
+
+
+def record_login_failure(username: str) -> None:
+    _login_failures[f"login:{username}"].append(time.time())
