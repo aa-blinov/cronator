@@ -1460,7 +1460,13 @@ Packages: ${result.packages.join(', ')}`;
         }
     });
     
-    // Output console management
+    // Output console management. Unlike the execution detail page's
+    // windowed live log (LOG_RENDER_LINE_LIMIT there), this console had no
+    // cap at all — a genuinely chatty test script would keep appending
+    // DOM nodes forever for as long as Run Test stayed open, growing
+    // steadily slower and heavier the longer someone debugged. Same fix,
+    // same limit, for consistency.
+    const CONSOLE_LINE_LIMIT = 2000;
     const outputConsole = document.getElementById('output-console');
     const consoleStatus = document.getElementById('console-status');
     const clearOutputBtn = document.getElementById('clear-output-btn');
@@ -1532,6 +1538,11 @@ ${separator}
                 setTimeout(() => line.style.opacity = '1', 10);
             }
         });
+
+        while (outputConsole.children.length > CONSOLE_LINE_LIMIT) {
+            outputConsole.firstElementChild?.remove();
+        }
+
         // Auto-scroll to bottom (optional)
         if (autoScrollEnabled) {
             outputConsole.scrollTop = outputConsole.scrollHeight;
@@ -1756,13 +1767,24 @@ ${separator}
             runTestBtn.style.display = 'none';
             stopTestBtn.style.display = 'inline-flex';
             
-            // Connect to SSE stream
+            // Connect to SSE stream. /api/executions/{id}/stream always
+            // sends *named* events (event: stdout / stderr / done) — unlike
+            // /api/scripts/{id}/install-stream below, which sends plain
+            // unnamed `data:` lines and does fire onmessage. A bare
+            // `onmessage` handler here never fires for any of stdout/stderr,
+            // silently dropping every line of the script's actual output —
+            // the console only ever showed the synthetic start/finish
+            // markers, never anything the script itself printed.
             currentEventSource = new EventSource(`/api/executions/${currentExecutionId}/stream`);
-            
-            currentEventSource.onmessage = (event) => {
+
+            currentEventSource.addEventListener('stdout', (event) => {
                 appendToConsole(event.data, true);
-            };
-            
+            });
+
+            currentEventSource.addEventListener('stderr', (event) => {
+                appendToConsole(event.data, true);
+            });
+
             currentEventSource.addEventListener('done', (event) => {
                 const data = JSON.parse(event.data);
                 appendToConsole(`\n--- Test Finished: ${data.status} (exit code: ${data.exit_code}) ---`, false);

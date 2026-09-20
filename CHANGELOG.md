@@ -126,6 +126,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it's Fernet-encrypted at rest like every other credential.
 
 ### Fixed
+- **"Run Test" in the script editor never showed the script's actual
+  output.** `/api/executions/{id}/stream` sends *named* SSE events
+  (`event: stdout` / `stderr` / `done`) — the editor's console only had a
+  bare `onmessage` handler, which never fires for named events, plus a
+  `done` listener. Every line the script printed was silently dropped;
+  the console only ever showed the synthetic "Test Started"/"Test
+  Finished" markers, making the debug console useless for its actual
+  purpose. Found while profiling the frontend — a chatty test script's
+  output was conspicuously absent from a live capture. Added
+  `stdout`/`stderr` listeners (`/api/scripts/{id}/install-stream`, a
+  different endpoint used elsewhere in the same file, correctly sends
+  unnamed events and was never affected). Also gave this console the
+  same 2000-line sliding-window cap the execution detail page already
+  had — it had no cap at all, so a genuinely chatty script would keep
+  appending DOM nodes for as long as the tab stayed open.
 - **"Run Test" on a brand-new script silently created and scheduled it.**
   The script editor's Run Test button auto-saves before every test run —
   necessary since a test execution needs a real script row — but for a
