@@ -686,7 +686,7 @@ async def install_stream(
                     )
 
                     if event_type == "done":
-                        done_payload = json.dumps({"success": True})
+                        done_payload = json.dumps({"success": message == "true"})
                         yield f"event: done\ndata: {done_payload}\n\n"
                         break
                     elif event_type == "error":
