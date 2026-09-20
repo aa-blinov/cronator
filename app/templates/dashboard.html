@@ -8,7 +8,7 @@
     <div class="stat-card glass-card rounded-xl p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-400 text-sm">Total Scripts</p>
+                <p class="text-base-content/60 text-sm">Total Scripts</p>
                 <p class="text-3xl font-bold mt-1">{{ stats.total_scripts }}</p>
             </div>
             {{ icons.clipboard("w-10 h-10 opacity-50") }}
@@ -18,7 +18,7 @@
     <div class="stat-card glass-card rounded-xl p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-400 text-sm">Enabled</p>
+                <p class="text-base-content/60 text-sm">Enabled</p>
                 <p class="text-3xl font-bold mt-1 text-green-400">{{ stats.enabled_scripts }}</p>
             </div>
             {{ icons.check_circle("w-10 h-10 opacity-50 text-green-400") }}
@@ -28,7 +28,7 @@
     <div class="stat-card glass-card rounded-xl p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-400 text-sm">Today's Runs</p>
+                <p class="text-base-content/60 text-sm">Today's Runs</p>
                 <p class="text-3xl font-bold mt-1 text-blue-400">{{ stats.today_executions }}</p>
             </div>
             {{ icons.arrow_path("w-10 h-10 opacity-50 text-blue-400") }}
@@ -38,8 +38,8 @@
     <div class="stat-card glass-card rounded-xl p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-400 text-sm">Failed Today</p>
-                <p class="text-3xl font-bold mt-1 {% if stats.failed_today > 0 %}text-red-400{% else %}text-gray-400{% endif %}">
+                <p class="text-base-content/60 text-sm">Failed Today</p>
+                <p class="text-3xl font-bold mt-1 {% if stats.failed_today > 0 %}text-red-400{% else %}text-base-content/60{% endif %}">
                     {{ stats.failed_today }}
                 </p>
             </div>
@@ -50,8 +50,8 @@
     <div class="stat-card glass-card rounded-xl p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-400 text-sm">Running Now</p>
-                <p class="text-3xl font-bold mt-1 {% if stats.running_now > 0 %}text-yellow-400{% else %}text-gray-400{% endif %}">
+                <p class="text-base-content/60 text-sm">Running Now</p>
+                <p class="text-3xl font-bold mt-1 {% if stats.running_now > 0 %}text-yellow-400{% else %}text-base-content/60{% endif %}">
                     {{ stats.running_now }}
                 </p>
             </div>
@@ -63,16 +63,16 @@
 <!-- Requires Attention Section -->
 {% if attention_scripts %}
 <div class="glass-card rounded-xl overflow-hidden border-l-4 border-red-500/50">
-    <div class="px-6 py-4 border-b border-gray-700/50">
+    <div class="px-6 py-4 border-b border-base-content/10">
         <h3 class="text-lg font-semibold flex items-center gap-2">
             {{ icons.exclamation_triangle("w-5 h-5 text-yellow-500") }} Requires Attention
         </h3>
-        <p class="text-sm text-gray-400 mt-1">{{ attention_scripts|length }} script(s) failed today or haven't run in 7 days</p>
+        <p class="text-sm text-base-content/60 mt-1">{{ attention_scripts|length }} script(s) failed today or haven't run in 7 days</p>
     </div>
     <div class="overflow-x-auto">
         <table class="table w-full">
             <thead>
-                <tr class="border-b border-gray-700/50">
+                <tr class="border-b border-base-content/10">
                     <th class="bg-transparent">Status</th>
                     <th class="bg-transparent">Name</th>
                     <th class="bg-transparent">Schedule</th>
@@ -82,7 +82,7 @@
             </thead>
             <tbody>
                 {% for item in attention_scripts %}
-                <tr class="border-b border-gray-700/30 hover:bg-red-950/20">
+                <tr class="border-b border-base-content/5 hover:bg-red-950/20">
                     <td>
                         {% if item.script.enabled %}
                             {% if item.last_execution %}
@@ -104,18 +104,18 @@
                             <div class="font-bold">{{ item.script.name }}</div>
                         </a>
                         {% if item.script.description %}
-                        <p class="text-xs text-gray-500 mt-0.5">{{ item.script.description[:50] }}{% if item.script.description|length > 50 %}...{% endif %}</p>
+                        <p class="text-xs text-base-content/50 mt-0.5">{{ item.script.description[:50] }}{% if item.script.description|length > 50 %}...{% endif %}</p>
                         {% endif %}
                     </td>
                     <td>
-                        <code class="text-xs bg-gray-800 px-2 py-1 rounded">{{ item.script.cron_expression }}</code>
+                        <code class="text-xs bg-base-200 px-2 py-1 rounded">{{ item.script.cron_expression }}</code>
                     </td>
                     <td>
                         {% if item.last_execution %}
                             <span class="text-sm">{{ item.last_execution.started_at.strftime('%Y-%m-%d %H:%M') }}</span>
-                            <span class="text-xs text-gray-500 block">{{ item.last_execution.duration_formatted }}</span>
+                            <span class="text-xs text-base-content/50 block">{{ item.last_execution.duration_formatted }}</span>
                         {% else %}
-                            <span class="text-gray-500">Never</span>
+                            <span class="text-base-content/50">Never</span>
                         {% endif %}
                     </td>
                     <td>
@@ -139,7 +139,7 @@
 
 <!-- Scripts Table -->
 <div class="glass-card rounded-xl overflow-hidden">
-    <div class="px-6 py-4 border-b border-gray-700/50 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+    <div class="px-6 py-4 border-b border-base-content/10 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <h3 class="text-lg font-semibold">Scripts</h3>
         <div class="flex items-center gap-3">
             {% if scripts %}
@@ -163,7 +163,7 @@
     <div class="overflow-x-auto">
         <table class="table w-full">
             <thead>
-                <tr class="border-b border-gray-700/50">
+                <tr class="border-b border-base-content/10">
                     <th class="bg-transparent">Status</th>
                     <th class="bg-transparent">Name</th>
                     <th class="bg-transparent">Schedule</th>
@@ -175,7 +175,7 @@
             <tbody>
                 {% for item in scripts %}
                 <tr
-                    class="border-b border-gray-700/30 hover:bg-white/5"
+                    class="border-b border-base-content/5 hover:bg-white/5"
                     data-search="{{ (item.script.name ~ ' ' ~ (item.script.description or '') ~ ' ' ~ item.script.cron_expression)|lower }}"
                 >
                     <td>
@@ -199,7 +199,7 @@
                             <div class="font-bold">{{ item.script.name }}</div>
                         </a>
                         {% if item.script.description %}
-                        <p class="text-xs text-gray-500 mt-0.5">{{ item.script.description[:50] }}{% if item.script.description|length > 50 %}...{% endif %}</p>
+                        <p class="text-xs text-base-content/50 mt-0.5">{{ item.script.description[:50] }}{% if item.script.description|length > 50 %}...{% endif %}</p>
                         {% endif %}
                         {% if item.script.consecutive_failures > 0 %}
                         <span class="badge badge-error badge-sm mt-1" title="Last failure: {{ item.script.last_failure_at.strftime('%Y-%m-%d %H:%M UTC') if item.script.last_failure_at else 'unknown' }}">
@@ -208,21 +208,21 @@
                         {% endif %}
                     </td>
                     <td>
-                        <code class="text-xs bg-gray-800 px-2 py-1 rounded">{{ item.script.cron_expression }}</code>
+                        <code class="text-xs bg-base-200 px-2 py-1 rounded">{{ item.script.cron_expression }}</code>
                     </td>
                     <td>
                         {% if item.last_execution %}
                             <span class="text-sm">{{ item.last_execution.started_at.strftime('%Y-%m-%d %H:%M') }}</span>
-                            <span class="text-xs text-gray-500 block">{{ item.last_execution.duration_formatted }}</span>
+                            <span class="text-xs text-base-content/50 block">{{ item.last_execution.duration_formatted }}</span>
                         {% else %}
-                            <span class="text-gray-500">Never</span>
+                            <span class="text-base-content/50">Never</span>
                         {% endif %}
                     </td>
                     <td>
                         {% if item.next_run and item.script.enabled %}
                             <span class="text-sm">{{ item.next_run.strftime('%Y-%m-%d %H:%M') }}</span>
                         {% else %}
-                            <span class="text-gray-500">-</span>
+                            <span class="text-base-content/50">-</span>
                         {% endif %}
                     </td>
                     <td>
@@ -254,8 +254,8 @@
     {% else %}
     <div class="p-12 text-center">
         {{ icons.inbox("w-20 h-20 mb-4 opacity-50 mx-auto") }}
-        <h3 class="text-xl font-medium text-gray-400 mb-2">No scripts yet</h3>
-        <p class="text-gray-500 mb-6">Create your first script to get started</p>
+        <h3 class="text-xl font-medium text-base-content/60 mb-2">No scripts yet</h3>
+        <p class="text-base-content/50 mb-6">Create your first script to get started</p>
         {% if is_admin %}
         <a href="/scripts/new" class="btn btn-primary gap-2">
             {{ icons.sparkles("w-5 h-5") }} Create Script

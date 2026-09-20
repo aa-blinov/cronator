@@ -3,20 +3,6 @@ module.exports = {
   content: [
     "./app/templates/**/*.html",
   ],
-  safelist: [
-    'toast',
-    'toast-top',
-    'toast-end',
-    'toast-center',
-    'toast-bottom',
-    'toast-start',
-    'toast-middle',
-    'alert',
-    'alert-info',
-    'alert-success',
-    'alert-error',
-    'alert-warning',
-  ],
   theme: {
     extend: {
       fontFamily: {
@@ -57,9 +43,9 @@ module.exports = {
           "--rounded-box": "1rem",
           "--rounded-btn": "0.5rem",
           "--rounded-badge": "1rem",
-          "--animation-btn": "0.25s",
-          "--animation-input": "0.2s",
-          "--btn-focus-scale": "0.95",
+          "--animation-btn": "0s",
+          "--animation-input": "0s",
+          "--btn-focus-scale": "1",
           "--border-btn": "1px",
           "--tab-border": "1px",
           "--tab-radius": "0.5rem",

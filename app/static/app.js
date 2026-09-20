@@ -1,5 +1,14 @@
 const flashToastStorageKey = 'cronator:flash-toast';
 
+// Was copy-pasted into 4 templates with drift: two of them skipped the
+// `?? ''` null-guard, so escapeHtml(null)/escapeHtml(undefined) rendered
+// the literal string "undefined"/"null" instead of an empty string.
+window.escapeHtml = function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text ?? '';
+    return div.innerHTML;
+};
+
 window.showToast = function showToast(message, type = 'info', timeoutMs = 2000) {
     const container = document.getElementById('toast-container');
     if (!container) {
@@ -143,13 +152,15 @@ function consumeQueuedToast() {
 
 consumeQueuedToast();
 
-// F16: Theme toggle — persist to localStorage and POST to server
+// F16: Theme toggle — persist to localStorage and POST to server.
+// Applying the saved theme to <html data-theme> happens synchronously in
+// base.html's <head> (before first paint, to avoid a flash of the wrong
+// theme); this only needs to sync the <select> itself, when present.
 const themeSelect = document.getElementById('theme-select');
 if (themeSelect) {
     const savedTheme = localStorage.getItem('crinator-theme');
-    if (savedTheme && savedTheme !== themeSelect.value) {
+    if (savedTheme) {
         themeSelect.value = savedTheme;
-        document.documentElement.setAttribute('data-theme', savedTheme);
     }
     themeSelect.addEventListener('change', async () => {
         const newTheme = themeSelect.value;
@@ -167,11 +178,15 @@ if (themeSelect) {
     });
 }
 
-// Confirm dangerous actions
-document.querySelectorAll('[data-confirm]').forEach(el => {
-    el.addEventListener('click', (e) => {
-        if (!confirm(el.dataset.confirm)) {
-            e.preventDefault();
-        }
-    });
-});
+// Mobile sidebar toggle — the sidebar used to be a fixed-width flex
+// child at every viewport width, so it just got clipped by the
+// viewport instead of adapting below the lg breakpoint.
+window.openSidebar = function openSidebar() {
+    document.getElementById('sidebar')?.classList.remove('-translate-x-full');
+    document.getElementById('sidebar-backdrop')?.classList.remove('hidden');
+};
+
+window.closeSidebar = function closeSidebar() {
+    document.getElementById('sidebar')?.classList.add('-translate-x-full');
+    document.getElementById('sidebar-backdrop')?.classList.add('hidden');
+};

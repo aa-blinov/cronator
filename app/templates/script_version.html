@@ -2,9 +2,18 @@
 {% import "icons.html" as icons %}
 
 {% block extra_head %}
-<!-- CodeMirror for syntax highlighting (self-hosted — see script_editor.html) -->
+<!-- CodeMirror for syntax highlighting (self-hosted — see script_editor.html).
+     material-ocean, not dracula, to match the editor's own theme — one
+     click between viewing a version and editing it used to show two
+     different color schemes for the same code.
+     Preload hints: same reasoning as script_editor.html — the actual
+     <script> tags below sit mid-page, past which the browser's preload
+     scanner can't discover them until that much of the HTML has arrived,
+     visibly delaying syntax highlighting. -->
 <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.min.css">
-<link rel="stylesheet" href="/static/vendor/codemirror/theme/dracula.min.css">
+<link rel="stylesheet" href="/static/vendor/codemirror/theme/material-ocean.min.css">
+<link rel="preload" as="script" href="/static/vendor/codemirror/codemirror.min.js">
+<link rel="preload" as="script" href="/static/vendor/codemirror/mode/python/python.min.js">
 <style>
     .CodeMirror {
         height: auto;
@@ -40,18 +49,18 @@
             
             <div class="space-y-4">
                 <div>
-                    <p class="text-gray-400 text-sm">Created</p>
+                    <p class="text-base-content/60 text-sm">Created</p>
                     <p class="font-medium">{{ version.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
                 </div>
                 
                 <div>
-                    <p class="text-gray-400 text-sm">Created By</p>
+                    <p class="text-base-content/60 text-sm">Created By</p>
                     <p class="font-medium">{{ version.created_by or 'Unknown' }}</p>
                 </div>
                 
                 {% if version.change_summary %}
                 <div>
-                    <p class="text-gray-400 text-sm">Description</p>
+                    <p class="text-base-content/60 text-sm">Description</p>
                     <p class="font-medium">{{ version.change_summary }}</p>
                 </div>
                 {% endif %}
@@ -59,24 +68,24 @@
                 <div class="divider my-2"></div>
                 
                 <div>
-                    <p class="text-gray-400 text-sm">Python Version</p>
-                    <code class="text-sm bg-gray-800 px-2 py-1 rounded">{{ version.python_version }}</code>
+                    <p class="text-base-content/60 text-sm">Python Version</p>
+                    <code class="text-sm bg-base-200 px-2 py-1 rounded">{{ version.python_version }}</code>
                 </div>
                 
                 <div>
-                    <p class="text-gray-400 text-sm">Schedule</p>
-                    <code class="text-sm bg-gray-800 px-2 py-1 rounded">{{ version.cron_expression }}</code>
+                    <p class="text-base-content/60 text-sm">Schedule</p>
+                    <code class="text-sm bg-base-200 px-2 py-1 rounded">{{ version.cron_expression }}</code>
                 </div>
                 
                 <div>
-                    <p class="text-gray-400 text-sm">Timeout</p>
+                    <p class="text-base-content/60 text-sm">Timeout</p>
                     <p class="font-medium">{{ version.timeout }}s</p>
                 </div>
                 
                 {% if version.dependencies %}
                 <div>
-                    <p class="text-gray-400 text-sm mb-2">Dependencies</p>
-                    <pre class="log-output text-xs p-2 rounded bg-gray-900">{{ version.dependencies }}</pre>
+                    <p class="text-base-content/60 text-sm mb-2">Dependencies</p>
+                    <pre class="log-output text-xs p-2 rounded bg-base-300">{{ version.dependencies }}</pre>
                 </div>
                 {% endif %}
             </div>
@@ -92,7 +101,7 @@
                 </svg>
                 Restore this version
             </button>
-            <p class="text-xs text-gray-500 mt-2">
+            <p class="text-xs text-base-content/50 mt-2">
                 This will replace the current script content with this version and create a new version snapshot.
             </p>
         </div>
@@ -116,7 +125,7 @@
         {% if version.environment_vars %}
         <div class="glass-card rounded-xl p-6 mt-6">
             <h3 class="text-lg font-semibold mb-4">Environment Variables</h3>
-            <pre class="log-output text-xs p-3 rounded bg-gray-900">{{ version.environment_vars }}</pre>
+            <pre class="log-output text-xs p-3 rounded bg-base-300">{{ version.environment_vars }}</pre>
         </div>
         {% endif %}
     </div>
@@ -132,7 +141,7 @@ const restoredVersionToastKey = `script:${scriptId}:restored-version`;
 // Initialize CodeMirror (read-only)
 const editor = CodeMirror.fromTextArea(document.getElementById('code-viewer'), {
     mode: 'python',
-    theme: 'dracula',
+    theme: 'material-ocean',
     lineNumbers: true,
     readOnly: true,
     viewportMargin: Infinity,

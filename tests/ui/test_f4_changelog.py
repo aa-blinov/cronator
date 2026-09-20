@@ -11,14 +11,15 @@ from playwright.sync_api import Page
 from tests.ui.conftest import screenshot
 
 
-def test_f4_changelog_link_in_footer(page: Page, base_url: str) -> None:
-    """The page footer must link to the changelog."""
-    page.goto(f"{base_url}/", wait_until="networkidle")
-    # Footer should now have a 'Changelog' link
-    footer_links = page.locator("footer a, .footer a, body a").all()
-    hrefs = [a.get_attribute("href") for a in footer_links]
+def test_f4_changelog_link_on_settings_page(page: Page, base_url: str) -> None:
+    """Settings ("Appearance & About") must link to the changelog — moved
+    off the dashboard sidebar, which every page showed regardless of
+    relevance, onto the one page it actually belongs on."""
+    page.goto(f"{base_url}/settings", wait_until="networkidle")
+    links = page.locator("a").all()
+    hrefs = [a.get_attribute("href") for a in links]
     assert any(h and "/changelog" in h for h in hrefs), (
-        f"no /changelog link in footer; links: {hrefs}"
+        f"no /changelog link on settings page; links: {hrefs}"
     )
 
 
