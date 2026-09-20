@@ -45,6 +45,18 @@ What a `viewer` **cannot** do: create/edit/delete/run/duplicate/revert a
 script, cancel or delete an execution, change any setting, restore a
 backup, or manage users. All of these return `403 Forbidden`.
 
+The UI matches this: a `viewer` session doesn't render the "New Script"
+nav link, action buttons (Run/Edit/Toggle/Delete/Duplicate/Revert/Cancel),
+the bulk-action toolbar, or the settings maintenance controls — and the
+script editor pages (`/scripts/new`, `/scripts/{id}/edit`) return `403`
+outright rather than rendering an editor with no working Save button. A
+`403` on a remaining HTML page route (e.g. a stale cached page, or a
+direct URL) renders a proper error page instead of a raw JSON blob; API
+calls still get plain JSON. `401` always keeps the default JSON handling
+regardless of path — it carries the `WWW-Authenticate` header the browser
+needs to show its native Basic Auth prompt, which an HTML error page
+would silently break.
+
 Tested with real HTTP Basic Auth against actual DB-backed viewer/admin
 accounts in `tests/stateful/test_rbac_enforcement.py` — the rest of the
 test suite uses a blanket auth override that always resolves as admin, so

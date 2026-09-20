@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
 from app.api import api_router
@@ -335,6 +336,38 @@ async def value_error_handler(request: Request, exc: ValueError):
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content={"detail": str(exc)},
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Default JSON behavior everywhere, except a 403 on an HTML page route.
+
+    require_admin (app/api/dependencies.py) raises a plain 403 the same
+    way for /api/* calls and for the HTML page-action routes in
+    pages.py (/scripts/{id}/toggle, /scripts/{id}/run, etc.) — without
+    this, a viewer clicking a button the UI didn't hide would land on a
+    raw {"detail": "Admin privileges required"} JSON blob in their
+    browser instead of a page they can navigate away from. 401 keeps the
+    default handling unconditionally: it carries the WWW-Authenticate
+    header the browser needs to show its native Basic Auth prompt, which
+    an HTML error page would silently break.
+    """
+    if exc.status_code == status.HTTP_403_FORBIDDEN and not request.url.path.startswith("/api/"):
+        return request.app.state.templates.TemplateResponse(
+            "error.html",
+            {
+                "request": request,
+                "page_title": "Access Denied",
+                "status_code": exc.status_code,
+                "message": exc.detail,
+            },
+            status_code=exc.status_code,
+        )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
     )
 
 
