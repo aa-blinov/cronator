@@ -134,11 +134,11 @@
             <form id="change-password-form" class="space-y-4">
                 <label class="form-control">
                     <span class="label-text">Current password</span>
-                    <input type="password" name="current_password" class="input input-bordered input-sm w-full" required data-testid="current-password-input">
+                    <input type="password" name="current_password" class="input input-bordered input-sm w-full" required autocomplete="current-password" data-testid="current-password-input">
                 </label>
                 <label class="form-control">
                     <span class="label-text">New password</span>
-                    <input type="password" name="new_password" class="input input-bordered input-sm w-full" required minlength="8" maxlength="128" data-testid="new-own-password-input">
+                    <input type="password" name="new_password" class="input input-bordered input-sm w-full" required minlength="8" maxlength="128" autocomplete="new-password" data-testid="new-own-password-input">
                 </label>
             </form>
             <div class="modal-action">
