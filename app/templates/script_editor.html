@@ -384,7 +384,7 @@
                         </div>
                         
                         <label class="label">
-                            <span class="label-text-alt text-info-content/70 font-medium">Format: minute hour day month weekday</span>
+                            <span class="label-text-alt text-base-content/60 font-medium">Format: minute hour day month weekday</span>
                             <a href="https://crontab.guru/" target="_blank" class="label-text-alt link link-primary font-medium">Cron helper</a>
                         </label>
                     </div>
@@ -1930,7 +1930,7 @@ ${separator}
                                 <span class="text-xs text-base-content/50">${date}</span>
                                 <span class="text-xs text-base-content/60">${sizeKB} KB</span>
                             </div>
-                            ${v.change_summary ? `<div class="text-sm mt-1 text-info-content/70">${escapeHtml(v.change_summary)}</div>` : '<div class="text-xs mt-1 text-base-content/60 italic">No description</div>'}
+                            ${v.change_summary ? `<div class="text-sm mt-1 text-base-content/70">${escapeHtml(v.change_summary)}</div>` : '<div class="text-xs mt-1 text-base-content/60 italic">No description</div>'}
                         </div>
                         <div class="flex gap-2 ml-4">
                             <a href="/scripts/${scriptId}/versions/${v.version_number}" class="btn btn-sm btn-outline btn-info" title="View version ${v.version_number} content">
