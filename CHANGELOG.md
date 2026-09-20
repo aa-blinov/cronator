@@ -8,6 +8,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **P0 production-readiness batch: login lockout, CSRF-via-Basic-Auth
+  guard, user-management audit log, automated backups.**
+  - **Login lockout.** Failed Basic Auth attempts were never rate-limited
+    (only expensive script operations were, `app/api/rate_limit.py`) — a
+    password could be brute-forced with no throttling at all. Now 10
+    failed attempts against one username within 5 minutes returns `429`
+    for that username (`check_login_lockout`/`record_login_failure`,
+    wired into `verify_credentials`), even if a later attempt uses the
+    correct password.
+  - **CSRF guard for Basic Auth.** Browsers auto-attach cached Basic Auth
+    credentials to any same-origin request regardless of which page
+    triggered it — a form on an attacker's site could submit a
+    state-changing request here and have it silently authenticated.
+    `CsrfOriginGuardMiddleware` (`app/middleware/csrf_origin_guard.py`)
+    rejects `POST`/`PUT`/`PATCH`/`DELETE` requests whose `Origin` header
+    doesn't match this app's own origin; requests with no `Origin` at all
+    (curl, server-to-server API clients) are left alone. Accounts for
+    `X-Forwarded-Proto` so it doesn't misfire behind a TLS-terminating
+    reverse proxy.
+  - **User-management audit log.** Create/delete/role-change/password-reset
+    actions on other accounts, and self-service password changes, were
+    never recorded anywhere — `ScriptAuditLog` is script-specific
+    (`script_id` is a required FK). New `UserAuditLog` model +
+    `GET /api/users/audit` (admin-only) answer "who changed whose role to
+    admin" / "who reset whose password." Shown on the `/users` page as a
+    "Recent Activity" table (color-coded by action, most recent first),
+    refreshed after each action without a full page reload.
+  - **App-level automated backup (secondary mechanism).** docker-compose
+    deployments already get a real daily `pg_dump` via the `db-backup`
+    sidecar (`docker-compose.yml`) — that one's the primary mechanism and
+    is unaffected by this. It doesn't help a deployment that runs the
+    `cronator` container on its own against an external/managed Postgres
+    with no sidecar to add, so `BackupService`
+    (`app/services/backup_service.py`) adds an in-app fallback: a daily
+    gzipped backup at 02:00 UTC, off by default, opt-in per-deployment via
+    the new "Automatic daily backup" toggle in Settings, keeping the 7
+    most recent automated backups (never touches manually-made ones). It
+    avoids shelling out to `pg_dump` — not on `PATH` in the runtime image,
+    same constraint the existing restore-backup endpoint already works
+    around — and instead drives the same asyncpg COPY protocol directly,
+    producing a file in the exact format `POST /api/settings/restore-backup`
+    already parses. Data-only (no schema), so it assumes a target with
+    migrations already applied — unlike plain `pg_dump`, which dumps
+    schema too. Verified as a real round-trip (create → wipe → restore)
+    against PostgreSQL in `tests/pg/test_pg_auto_backup.py`. SQLite
+    deployments (dev/test only) get a plain gzip of the `.db` file.
+- **User management screen (`/users`) + password/role updates.** Admins
+  previously could only create and delete users — changing an existing
+  user's password or role meant deleting and recreating the account, and
+  no one (including admins) could change their own password without
+  editing `ADMIN_USERNAME`/`ADMIN_PASSWORD` in `.env` and restarting.
+  Added `PATCH /api/users/{id}` (admin-only, password and/or role, blocks
+  demoting the last remaining admin the same way deletion already blocks
+  removing the last admin) and `POST /api/users/me/password`
+  (self-service, any authenticated user, requires the current password).
+  The new `/users` page (admin-only, linked from the sidebar) lists users
+  with inline role change, password reset, and delete; every page's
+  sidebar footer got a "Change password" link for self-service.
 - **F1: Security headers middleware** — every response now carries
   `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
   `Referrer-Policy: strict-origin-when-cross-origin`,
@@ -126,6 +184,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it's Fernet-encrypted at rest like every other credential.
 
 ### Changed
+- **Removed the active-nav-item color accent entirely** (`.nav-link.active`,
+  `app/static/input.css`) — first pass only dropped the tinted background
+  fill and kept the left accent border; the ask was to remove the left-side
+  color accent itself, so the rule is gone, no replacement indicator added.
+- **CodeMirror syntax highlighting flashed in after a visible delay on
+  the script editor.** Its `<script>` tags sit at the end of `<body>`
+  (deliberately, so ~170KB of JS doesn't block first paint) — but on a
+  large page the browser's preload scanner can't discover them until it's
+  received that far into the document, so the code sat in plain,
+  uncolored text for a beat before suddenly flashing into syntax-highlighted
+  colors once the JS finally arrived. Added `<link rel="preload" as="script">`
+  hints in `<head>` (`app/templates/script_editor.html`) so those files
+  start downloading immediately, in parallel with the CSS — same
+  execution point, just an earlier download start.
+- **Disabled DaisyUI's button-pop animation and focus-shrink effect**
+  (`--animation-btn`, `--animation-input`, `--btn-focus-scale` in the
+  `dim` theme, `tailwind.config.js`) — every `.btn` across the app
+  (Settings included) had a quarter-second "pop" on click and shrank
+  slightly on focus; pure motion with no functional purpose.
+- **Theme selector, version, and changelog link moved from the sidebar
+  footer into Settings ("Appearance & About").** They cluttered the
+  bottom-left of every single page for something a user touches rarely.
+  Applying the persisted theme on page load no longer depends on the
+  `<select>` itself being present (`app/static/app.js`) — it used to,
+  which would have silently broken theme persistence on every page
+  except Settings the moment the selector moved off them.
 - **Script editor layout rebalanced.** The two-column layout (code+console
   on the left, settings on the right) let the settings column run far
   taller than the editor column, leaving several hundred pixels of empty
@@ -141,6 +225,110 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CSS is rebuilt; `npm run build:css`.)
 
 ### Fixed
+- **Sidebar didn't adapt to narrow viewports at all.** It was a fixed
+  `w-64` flex child at every screen width, so on a phone or narrow
+  window it just got clipped by the viewport instead of collapsing.
+  Turned it into an off-canvas panel below the `lg` breakpoint (slides
+  in as an overlay with a dismissible backdrop, toggled by a new
+  hamburger button in the header) while staying exactly as it was —
+  static, always visible — at `lg` and up. `app/templates/base.html`,
+  `app/static/app.js` (`openSidebar`/`closeSidebar`), two new icons
+  (`bars_3`, `x_mark_plain` in `icons.html`).
+- **Full UI audit: rendering performance + visual consistency.**
+  - **Version history diff viewer had the same "CodeMirror flash" bug
+    just fixed in the script editor.** `script_version.html`'s two
+    `<script>` tags sat mid-page with no preload hints, so a viewed
+    version rendered as plain text before syntax highlighting suddenly
+    kicked in. Added the same `<link rel="preload" as="script">` pair.
+    Also switched its CodeMirror theme from `dracula` to `material-ocean`
+    to match the editor — viewing a version and editing the same script
+    one click apart showed two different color schemes for the same code.
+  - **Half the app ignored the theme selector entirely.** `dashboard.html`
+    and `script_detail.html` used raw Tailwind gray utilities
+    (`text-gray-400`, `bg-gray-800`, `border-gray-700/50`, ...) exclusively;
+    `scripts.html`, `executions.html`, `script_editor.html`,
+    `script_version.html`, `users.html`, `execution_detail.html` were a
+    mix. Switching away from the `dim` theme did nothing on those pages —
+    they stayed the same dark grays no matter what was selected. Replaced
+    every raw gray utility with the matching DaisyUI theme token
+    (`text-base-content/60`, `bg-base-200`, `border-base-content/10`,
+    etc.) across all 7 files (~60 occurrences). Also fixed a specific
+    instance in `script_editor.html`'s cron-preview `.alert-info` box,
+    which used `text-gray-900`/`text-gray-700` (dark text, correct only
+    by accident against that particular alert color) — now
+    `text-info-content` for a properly paired, theme-correct contrast.
+  - **`/changelog` had a completely disconnected visual identity.** Being
+    a raw `HTMLResponse` rather than a Jinja template, its inline
+    `<style>` hardcoded hex colors (`#38bdf8`, `#1e293b`, `#020617`, ...)
+    instead of reading the DaisyUI theme, and never loaded
+    `/static/vendor/fonts/fonts.css`, so it silently fell back to system
+    fonts instead of the app's Inter typeface. Swapped every hardcoded hex
+    for the matching `oklch(var(--*))` theme variable and added the fonts
+    stylesheet — selecting a different theme now actually changes this
+    page too.
+  - **`escapeHtml` was copy-pasted into 4 templates with behavioral
+    drift.** `execution_detail.html` and `script_editor.html`'s copies
+    skipped the `?? ''` null-guard that `settings.html` and `users.html`'s
+    copies had, so `escapeHtml(null)`/`escapeHtml(undefined)` rendered the
+    literal string `"undefined"` instead of an empty string. Consolidated
+    into a single `window.escapeHtml` in `app/static/app.js`; deleted all
+    4 inline copies.
+  - **Dead code removed:** ~35 lines of unused `.toast`/`.toast-*`/
+    `toast-pop` CSS in `app/static/input.css` (the real toast
+    implementation in `app.js` never emits those classes — it builds
+    elements with plain Tailwind utility classes and `data-testid="toast"`
+    instead) and the matching dead `safelist` entries in
+    `tailwind.config.js`; a `[data-confirm]` click handler in `app.js`
+    that zero templates ever used (every destructive-action confirm is
+    hand-rolled with a dynamic message instead).
+- **Whole screen flashed to the wrong theme on every page load.** The
+  saved theme (`localStorage`) was only applied by `app.js` at the end of
+  `<body>` — the browser had already painted the server-rendered default
+  theme by the time that script ran, so anyone using a non-default theme
+  saw a visible flash on every navigation, worse on heavier pages like
+  the script editor. Moved theme application into an inline, synchronous
+  `<script>` at the very top of `<head>` (before any stylesheet) in
+  `base.html` — blocking script execution means no frame paints before
+  `data-theme` is correct. Every real page extends `base.html` except
+  `/changelog`, which is a raw `HTMLResponse` outside the Jinja template
+  system entirely and had no theme sync at all (always `dim`, hardcoded)
+  — gave it its own copy of the same inline script for consistency.
+- **Pages and static assets were transferred uncompressed with no cache
+  headers at all** — the script editor's ~170KB HTML plus ~170KB
+  CodeMirror JS plus ~105KB Tailwind CSS, in full, on every single
+  navigation. Found live: a remote user reported `/scripts/new` "very
+  slow to render" while the server itself answered in ~190ms — the whole
+  cost was transfer size and zero reuse across page loads. Added
+  `GZipMiddleware` (`app/main.py`) and a `CachedStaticFiles` wrapper that
+  sets `Cache-Control: no-cache` on everything under `/static` — the
+  browser still revalidates via the `ETag` `StaticFiles` already
+  generates (a 304 costs almost nothing) rather than a fixed `max-age`,
+  which would silently serve a stale asset for its whole duration after
+  every deploy. Caught exactly that risk live while testing this same
+  fix: an initial `max-age=86400` attempt made the very JS change under
+  test invisible to a browser that had already loaded the page once.
+- **`/changelog` rendered garbled, disconnected paragraphs instead of
+  proper nested lists.** The page prefers the real `markdown` library and
+  falls back to a tiny hand-rolled renderer if it isn't installed
+  (`app/api/pages.py`) — except `markdown` was never actually declared as
+  a project dependency anywhere, so every real deployment silently used
+  the fallback, which has no support for indented sub-bullets or wrapped
+  continuation lines (both of which this very CHANGELOG uses). Added
+  `markdown>=3.6` to `pyproject.toml` — a pre-existing bug on the running
+  production instance too, just never visually obvious until an entry
+  complex enough to expose it (this one) got added.
+- **A failed background dependency install after Create/Save silently
+  redirected to the script detail page as if it had succeeded.**
+  `POST /api/scripts/{id}/install-stream`'s `done` event hardcoded
+  `{"success": true}` regardless of whether `pip`/`uv` actually installed
+  the dependencies — `setup_environment_streaming`'s `finally` block put a
+  bare `("done", "")` on the queue with no result attached, and the
+  endpoint always translated that into `success: true`. The editor's own
+  JS correctly branches on `data.success` to decide between navigating
+  away and showing a retry button, but the field it trusted was never
+  wired to the real outcome. Now the queue carries the actual result and
+  the endpoint relays it. Found while checking production-readiness of the
+  script editor's Create/Save flow end to end.
 - **"Run Test" in the script editor never showed the script's actual
   output.** `/api/executions/{id}/stream` sends *named* SSE events
   (`event: stdout` / `stderr` / `done`) — the editor's console only had a

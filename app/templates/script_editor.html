@@ -6,14 +6,24 @@
 {% endblock %}
 
 {% block extra_head %}
-<!-- CodeMirror CSS only — kept in <head> to avoid a flash of the raw
-     <textarea> before it upgrades to the editor. The ~190KB of JS moved
-     to the end of <body> (extra_scripts) so it stops blocking HTML
-     parsing/first paint; execution order is preserved since these are
-     plain synchronous <script src> tags, not deferred. -->
+<!-- CodeMirror CSS in <head> to avoid a flash of the raw <textarea>
+     before it upgrades to the editor. The actual <script> tags stay at
+     the end of <body> (extra_scripts) so they don't block HTML
+     parsing/first paint — but the browser's preload scanner can only
+     discover them once it's received that far into a large (~170KB)
+     HTML document, which visibly delayed syntax highlighting kicking in
+     (plain text, then a sudden flash of color once the JS finally
+     arrives and runs). These preload hints start the JS downloads
+     immediately, in parallel with the CSS above, without changing where
+     they execute. -->
 <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.min.css">
 <link rel="stylesheet" href="/static/vendor/codemirror/theme/material-ocean.min.css">
 <link rel="stylesheet" href="/static/vendor/codemirror/addon/hint/show-hint.min.css">
+<link rel="preload" as="script" href="/static/vendor/codemirror/codemirror.min.js">
+<link rel="preload" as="script" href="/static/vendor/codemirror/mode/python/python.min.js">
+<link rel="preload" as="script" href="/static/vendor/codemirror/addon/edit/matchbrackets.min.js">
+<link rel="preload" as="script" href="/static/vendor/codemirror/addon/edit/closebrackets.min.js">
+<link rel="preload" as="script" href="/static/vendor/codemirror/addon/hint/show-hint.min.js">
 <style>
     .CodeMirror {
         height: 500px;
@@ -212,7 +222,7 @@
                               rows="6"
                               placeholder="requests&#10;pandas&#10;numpy==1.24.0">{{ script.dependencies if script else '' }}</textarea>
                     <label class="label">
-                        <span class="label-text-alt text-gray-500">One package per line (pip format)</span>
+                        <span class="label-text-alt text-base-content/50">One package per line (pip format)</span>
                     </label>
                 </div>
 
@@ -277,7 +287,7 @@
                               rows="4"
                               placeholder="API_KEY=secret&#10;DEBUG=true">{{ script.environment_vars if script else '' }}</textarea>
                     <label class="label">
-                        <span class="label-text-alt text-gray-500">KEY=VALUE format, one per line</span>
+                        <span class="label-text-alt text-base-content/50">KEY=VALUE format, one per line</span>
                     </label>
                 </div>
             </div>
@@ -301,7 +311,7 @@
                                required
                                {% if script %}readonly{% endif %}>
                         <label class="label">
-                            <span class="label-text-alt text-gray-500">Letters, numbers, underscores, hyphens only</span>
+                            <span class="label-text-alt text-base-content/50">Letters, numbers, underscores, hyphens only</span>
                         </label>
                     </div>
                     
@@ -314,7 +324,7 @@
                                   rows="2"
                                   placeholder="What does this script do? (general purpose, stays unchanged)">{{ script.description if script else '' }}</textarea>
                         <label class="label">
-                            <span class="label-text-alt text-gray-500">Permanent description of the script's purpose</span>
+                            <span class="label-text-alt text-base-content/50">Permanent description of the script's purpose</span>
                         </label>
                     </div>
                     
@@ -327,7 +337,7 @@
                                   class="textarea textarea-bordered w-full text-sm"
                                   placeholder="e.g., Fixed bug with data parsing, Updated dependencies, Added new feature..."></textarea>
                         <label class="label">
-                            <span class="label-text-alt text-gray-500">Describe what you changed in this save. Visible in version history.</span>
+                            <span class="label-text-alt text-base-content/50">Describe what you changed in this save. Visible in version history.</span>
                         </label>
                     </div>
                     {% endif %}
@@ -367,14 +377,14 @@
                             <div class="flex items-start gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 <div class="text-sm">
-                                    <div id="cron-description" class="font-semibold text-gray-900">Loading...</div>
-                                    <div id="cron-next-runs" class="text-xs text-gray-700 mt-1">Next runs: calculating...</div>
+                                    <div id="cron-description" class="font-semibold text-info-content">Loading...</div>
+                                    <div id="cron-next-runs" class="text-xs text-info-content/70 mt-1">Next runs: calculating...</div>
                                 </div>
                             </div>
                         </div>
                         
                         <label class="label">
-                            <span class="label-text-alt text-gray-700 font-medium">Format: minute hour day month weekday</span>
+                            <span class="label-text-alt text-info-content/70 font-medium">Format: minute hour day month weekday</span>
                             <a href="https://crontab.guru/" target="_blank" class="label-text-alt link link-primary font-medium">Cron helper</a>
                         </label>
                     </div>
@@ -415,7 +425,7 @@
                                min="0" max="3600"
                                class="input input-bordered w-full">
                         <label class="label">
-                            <span class="label-text-alt text-gray-500">Wait time for missed runs</span>
+                            <span class="label-text-alt text-base-content/50">Wait time for missed runs</span>
                         </label>
                     </div>
                     
@@ -427,7 +437,7 @@
                                    {% if not script or script.enabled %}checked{% endif %}>
                         </label>
                         <label class="label">
-                            <span class="label-text-alt text-gray-500">Enable automatic cron execution</span>
+                            <span class="label-text-alt text-base-content/50">Enable automatic cron execution</span>
                         </label>
                     </div>
                 </div>
@@ -445,7 +455,7 @@
                                    {% if not script or script.prevent_overlap %}checked{% endif %}>
                         </label>
                         <label class="label">
-                            <span class="label-text-alt text-gray-500">Skip execution if script is already running</span>
+                            <span class="label-text-alt text-base-content/50">Skip execution if script is already running</span>
                         </label>
                     </div>
 
@@ -458,7 +468,7 @@
                                min="0" max="10"
                                class="input input-bordered w-full">
                         <label class="label">
-                            <span class="label-text-alt text-gray-500">Number of retries on failure (0 = no retries)</span>
+                            <span class="label-text-alt text-base-content/50">Number of retries on failure (0 = no retries)</span>
                         </label>
                     </div>
 
@@ -472,7 +482,7 @@
                                    min="5" max="3600"
                                    class="input input-bordered w-full">
                             <label class="label">
-                                <span class="label-text-alt text-gray-500">Seconds to wait between retry attempts</span>
+                                <span class="label-text-alt text-base-content/50">Seconds to wait between retry attempts</span>
                             </label>
                         </div>
 
@@ -485,7 +495,7 @@
                                    min="60" max="86400"
                                    class="input input-bordered w-full">
                             <label class="label">
-                                <span class="label-text-alt text-gray-500">Stop retrying after this many seconds from first attempt</span>
+                                <span class="label-text-alt text-base-content/50">Stop retrying after this many seconds from first attempt</span>
                             </label>
                         </div>
                     </div>
@@ -505,7 +515,7 @@
                     <span id="version-count-badge" class="badge badge-info badge-sm">0</span>
                 </div>
                 <div id="versions-list" class="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
-                    <div class="text-sm text-gray-500 italic">Loading versions...</div>
+                    <div class="text-sm text-base-content/50 italic">Loading versions...</div>
                 </div>
             </div>
             {% endif %}
@@ -1905,7 +1915,7 @@ ${separator}
             versionBadge.textContent = data.total;
             
             if (data.total === 0) {
-                versionsList.innerHTML = '<div class="text-sm text-gray-500 italic p-3">No versions yet. Versions are created automatically when you save changes.</div>';
+                versionsList.innerHTML = '<div class="text-sm text-base-content/50 italic p-3">No versions yet. Versions are created automatically when you save changes.</div>';
                 return;
             }
             
@@ -1917,10 +1927,10 @@ ${separator}
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
                                 <span class="badge badge-sm badge-primary">v${v.version_number}</span>
-                                <span class="text-xs text-gray-500">${date}</span>
-                                <span class="text-xs text-gray-400">${sizeKB} KB</span>
+                                <span class="text-xs text-base-content/50">${date}</span>
+                                <span class="text-xs text-base-content/60">${sizeKB} KB</span>
                             </div>
-                            ${v.change_summary ? `<div class="text-sm mt-1 text-gray-700">${escapeHtml(v.change_summary)}</div>` : '<div class="text-xs mt-1 text-gray-400 italic">No description</div>'}
+                            ${v.change_summary ? `<div class="text-sm mt-1 text-info-content/70">${escapeHtml(v.change_summary)}</div>` : '<div class="text-xs mt-1 text-base-content/60 italic">No description</div>'}
                         </div>
                         <div class="flex gap-2 ml-4">
                             <a href="/scripts/${scriptId}/versions/${v.version_number}" class="btn btn-sm btn-outline btn-info" title="View version ${v.version_number} content">
@@ -2046,12 +2056,6 @@ ${separator}
                 triggerButton.innerHTML = originalButtonHtml;
             }
         }
-    }
-    
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
     
     // === CRON EXPRESSION HELPER ===
