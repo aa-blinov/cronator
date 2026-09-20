@@ -2,6 +2,7 @@
 {% import "icons.html" as icons %}
 
 {% block header_actions %}
+{% if is_admin %}
 <div class="flex items-center gap-2">
     <button id="run-now-btn" class="btn btn-primary btn-sm gap-2">
         {{ icons.play("w-4 h-4") }} Run Now
@@ -21,6 +22,7 @@
         {{ icons.trash("w-4 h-4") }} Delete
     </button>
 </div>
+{% endif %}
 
 <script>
 function deleteScript(scriptId) {
@@ -239,7 +241,7 @@ async function duplicateScript(scriptId) {
                     <td>
                         <div class="flex gap-1">
                             <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">View</a>
-                            {% if exec.status == 'running' %}
+                            {% if is_admin and exec.status == 'running' %}
                                 <button class="btn btn-error btn-xs cancel-execution-btn" data-execution-id="{{ exec.id }}">
                                     Cancel
                                 </button>
@@ -284,9 +286,11 @@ async function duplicateScript(scriptId) {
         {{ icons.inbox("w-20 h-20 mb-4 opacity-50 mx-auto") }}
         <h3 class="text-xl font-medium text-gray-400 mb-2">No executions yet</h3>
         <p class="text-gray-500 mb-6">Run the script to see execution history</p>
+        {% if is_admin %}
         <button id="run-now-empty-btn" class="btn btn-primary gap-2">
             {{ icons.play("w-4 h-4") }} Run Now
         </button>
+        {% endif %}
     </div>
     {% endif %}
     </div>

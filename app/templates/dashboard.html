@@ -120,11 +120,13 @@
                     </td>
                     <td>
                         <div class="flex items-center gap-2">
+                            {% if is_admin %}
                             <form action="/scripts/{{ item.script.id }}/run" method="POST" class="inline">
                                 <button type="submit" class="btn btn-ghost btn-xs" title="Run now">
                                     {{ icons.play("w-4 h-4") }}
                                 </button>
                             </form>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
@@ -149,9 +151,11 @@
                 autocomplete="off"
             />
             {% endif %}
+            {% if is_admin %}
             <a href="/scripts/new" class="btn btn-primary btn-sm gap-2">
                 {{ icons.sparkles("w-4 h-4") }} New Script
             </a>
+            {% endif %}
         </div>
     </div>
     
@@ -223,11 +227,14 @@
                     </td>
                     <td>
                         <div class="flex items-center gap-2">
+                            {% if is_admin %}
                             <form action="/scripts/{{ item.script.id }}/run" method="POST" class="inline">
                                 <button type="submit" class="btn btn-ghost btn-xs" title="Run now">
                                     {{ icons.play("w-4 h-4") }}
                                 </button>
                             </form>
+                            {% endif %}
+                            {% if is_admin %}
                             <a href="/scripts/{{ item.script.id }}/edit" class="btn btn-ghost btn-xs" title="Edit">
                                 {{ icons.pencil("w-4 h-4") }}
                             </a>
@@ -236,6 +243,7 @@
                                     {% if item.script.enabled %}{{ icons.pause("w-4 h-4") }}{% else %}{{ icons.play("w-4 h-4") }}{% endif %}
                                 </button>
                             </form>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
@@ -248,9 +256,11 @@
         {{ icons.inbox("w-20 h-20 mb-4 opacity-50 mx-auto") }}
         <h3 class="text-xl font-medium text-gray-400 mb-2">No scripts yet</h3>
         <p class="text-gray-500 mb-6">Create your first script to get started</p>
+        {% if is_admin %}
         <a href="/scripts/new" class="btn btn-primary gap-2">
             {{ icons.sparkles("w-5 h-5") }} Create Script
         </a>
+        {% endif %}
     </div>
     {% endif %}
 </div>

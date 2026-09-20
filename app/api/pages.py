@@ -34,6 +34,17 @@ async def _get_user_theme() -> str:
         return "dim"
 
 
+async def _is_admin(username: str) -> bool:
+    """Same rule as require_admin (app/api/dependencies.py), for templates:
+    a user with no matching User row is the legacy env-fallback admin.
+    Used to hide/disable action buttons a viewer would just get a 403 on —
+    the API-level require_admin gate is still the actual enforcement."""
+    from app.services.user_service import get_user
+
+    user = await get_user(username)
+    return user is None or user.role == "admin"
+
+
 settings = get_settings()
 security = HTTPBasic()
 
@@ -45,6 +56,8 @@ async def dashboard(
     db: AsyncSession = Depends(get_db),
 ):
     """Dashboard page showing all scripts."""
+    is_admin = await _is_admin(username)
+
     # Get scripts with their last execution
     result = await db.execute(select(Script).order_by(Script.name))
     scripts = result.scalars().all()
@@ -160,6 +173,7 @@ async def dashboard(
             "page_title": "Dashboard",
             "version": __version__,
             "theme": DEFAULT_THEME,
+            "is_admin": is_admin,
             "scripts": healthy_scripts,
             "attention_scripts": attention_scripts,
             "stats": {
@@ -186,6 +200,7 @@ async def scripts_list(
 ):
     """Q1: dedicated /scripts page — sortable list with search, status filter,
     pagination, and a bulk-action toolbar (enable / disable / delete)."""
+    is_admin = await _is_admin(username)
     like = f"%{search.strip()}%" if search and search.strip() else None
     base_query = select(Script)
     if like:
@@ -216,6 +231,7 @@ async def scripts_list(
             "request": request,
             "page_title": "Scripts",
             "theme": DEFAULT_THEME,
+            "is_admin": is_admin,
             "scripts": scripts,
             "filters": {
                 "search": search if search and search.strip() else None,
@@ -235,9 +251,9 @@ async def scripts_list(
 @router.get("/scripts/new", response_class=HTMLResponse)
 async def script_new(
     request: Request,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(require_admin),
 ):
-    """New script page."""
+    """New script page — editing-only, no reason for a viewer to land here."""
     return request.app.state.templates.TemplateResponse(
         "script_editor.html",
         {
@@ -273,6 +289,7 @@ async def script_detail(
     db: AsyncSession = Depends(get_db),
 ):
     """Script detail page with execution history."""
+    is_admin = await _is_admin(username)
     result = await db.execute(select(Script).where(Script.id == script_id))
     script = result.scalar_one_or_none()
 
@@ -318,6 +335,7 @@ async def script_detail(
             "page_title": script.name,
             "version": __version__,
             "theme": DEFAULT_THEME,
+            "is_admin": is_admin,
             "script": script,
             "executions": executions,
             "next_run": scheduler_service.get_next_run_time(script.id),
@@ -339,10 +357,10 @@ async def script_detail(
 async def script_edit(
     request: Request,
     script_id: int,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Script editor page."""
+    """Script editor page — editing-only, no reason for a viewer to land here."""
     result = await db.execute(select(Script).where(Script.id == script_id))
     script = result.scalar_one_or_none()
 
@@ -384,6 +402,7 @@ async def script_version_detail(
     db: AsyncSession = Depends(get_db),
 ):
     """Script version detail page."""
+    is_admin = await _is_admin(username)
     # Get script
     result = await db.execute(select(Script).where(Script.id == script_id))
     script = result.scalar_one_or_none()
@@ -408,6 +427,7 @@ async def script_version_detail(
         {
             "request": request,
             "page_title": f"{script.name} - Version {version_number}",
+            "is_admin": is_admin,
             "script": script,
             "version": version,
             "app_version": __version__,
@@ -426,6 +446,7 @@ async def executions_list(
     db: AsyncSession = Depends(get_db),
 ):
     """Executions list page."""
+    is_admin = await _is_admin(username)
     per_page = 50
 
     # Parse script_id if provided
@@ -475,6 +496,7 @@ async def executions_list(
             "page_title": "Executions",
             "version": __version__,
             "theme": DEFAULT_THEME,
+            "is_admin": is_admin,
             "executions": executions,
             "scripts": scripts,
             "filters": {
@@ -501,6 +523,7 @@ async def execution_detail(
     db: AsyncSession = Depends(get_db),
 ):
     """Execution detail page with full logs."""
+    is_admin = await _is_admin(username)
     result = await db.execute(
         select(Execution).options(joinedload(Execution.script)).where(Execution.id == execution_id)
     )
@@ -516,6 +539,7 @@ async def execution_detail(
             "page_title": f"Execution #{execution_id}",
             "version": __version__,
             "theme": DEFAULT_THEME,
+            "is_admin": is_admin,
             "execution": execution,
         },
     )
@@ -527,6 +551,7 @@ async def settings_page(
     username: str = Depends(verify_credentials),
 ):
     """Settings page."""
+    is_admin = await _is_admin(username)
     return request.app.state.templates.TemplateResponse(
         "settings.html",
         {
@@ -534,6 +559,7 @@ async def settings_page(
             "page_title": "Settings",
             "version": __version__,
             "theme": DEFAULT_THEME,
+            "is_admin": is_admin,
             "settings": settings,
             "scheduler_jobs": scheduler_service.get_all_jobs_info(),
         },

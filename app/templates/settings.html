@@ -2,12 +2,14 @@
 {% import "icons.html" as icons %}
 
 {% block header_actions %}
+{% if is_admin %}
 <button onclick="openEditModal()" class="btn btn-primary btn-sm gap-2">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
     </svg>
     Edit Settings
 </button>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -59,11 +61,13 @@
                 <span class="text-base-content/60">Alert Email</span>
                 <span>{{ settings.alert_email or 'Not configured' }}</span>
             </div>
+            {% if is_admin %}
             <div class="mt-4">
                 <button onclick="testEmail()" class="btn btn-sm btn-outline gap-2">
                     {{ icons.envelope("w-4 h-4") }} Send Test Email
                 </button>
             </div>
+            {% endif %}
             {% endif %}
         </div>
     </div>
@@ -77,7 +81,7 @@
                 <span class="text-base-content/60">Webhook URL</span>
                 <span>{{ settings.webhook_url or 'Not configured' }}</span>
             </div>
-            {% if settings.webhook_url %}
+            {% if is_admin and settings.webhook_url %}
             <div class="mt-4">
                 <button onclick="testWebhook()" class="btn btn-sm btn-outline gap-2">
                     {{ icons.bolt("w-4 h-4") }} Send Test Webhook
@@ -87,16 +91,17 @@
         </div>
     </div>
 
+    {% if is_admin %}
     <!-- Maintenance & Backups -->
     <div class="glass-card rounded-xl p-6">
         <h3 class="text-lg font-semibold mb-4">Backups & Maintenance</h3>
-        
+
         <div class="space-y-4">
             <p class="text-sm text-base-content/60">
-                All data is stored in the <code>/data</code> and <code>/scripts</code> volumes. 
+                All data is stored in the <code>/data</code> and <code>/scripts</code> volumes.
                 Regular backup of these directories is recommended.
             </p>
-            
+
             <div class="flex flex-col gap-2">
                 <a href="/api/settings/download-db" class="btn btn-sm btn-outline gap-2">
                     {{ icons.arrow_down_tray("w-4 h-4") }} Download DB Backup
@@ -107,6 +112,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
     
     <!-- Execution History -->
     <div class="glass-card rounded-xl p-6">
@@ -138,6 +144,7 @@
             500 failed, and 100 skipped / cancelled executions per script.
         </p>
 
+        {% if is_admin %}
         <div class="flex items-center gap-2">
             <input
                 type="number"
@@ -152,6 +159,7 @@
                 {{ icons.trash("w-4 h-4") }} Delete older than
             </button>
         </div>
+        {% endif %}
     </div>
 
     <!-- Artifacts Storage -->
@@ -180,11 +188,13 @@
                 </div>
             </div>
             
+            {% if is_admin %}
             <div class="mt-4">
                 <button onclick="clearAllArtifacts()" class="btn btn-sm btn-outline btn-error gap-2">
                     {{ icons.trash("w-4 h-4") }} Clear All Artifacts
                 </button>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>

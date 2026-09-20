@@ -131,6 +131,101 @@ class TestViewerIsReadOnly:
         assert resp.status_code == 403
 
 
+class TestForbiddenResponseShape:
+    async def test_api_403_is_json(self, test_client, real_auth_client, script_factory):
+        await create_user("viewer-api-403", "viewer-password-123", role="viewer")
+        script = await script_factory(name="api-403-target")
+
+        resp = await real_auth_client.post(
+            f"/api/scripts/{script.id}/run",
+            headers=_basic_auth_header("viewer-api-403", "viewer-password-123"),
+        )
+        assert resp.status_code == 403
+        assert resp.headers["content-type"].startswith("application/json")
+        assert resp.json()["detail"] == "Admin privileges required"
+
+    async def test_page_403_is_html_not_raw_json(
+        self, test_client, real_auth_client, script_factory
+    ):
+        """A viewer clicking an admin-only page action (e.g. the Toggle
+        button on /scripts/{id}) must land on a page, not a bare JSON blob —
+        this is exactly what the UI doesn't hide as of this test (the
+        button itself is now hidden too, but the route must degrade
+        gracefully regardless, e.g. for a stale cached page)."""
+        await create_user("viewer-page-403", "viewer-password-123", role="viewer")
+        script = await script_factory(name="page-403-target")
+
+        resp = await real_auth_client.post(
+            f"/scripts/{script.id}/toggle",
+            headers=_basic_auth_header("viewer-page-403", "viewer-password-123"),
+        )
+        assert resp.status_code == 403
+        assert resp.headers["content-type"].startswith("text/html")
+        assert "Access Denied" in resp.text
+
+
+class TestViewerUIHidesAdminActions:
+    async def test_dashboard_hides_run_and_new_script_for_viewer(
+        self, test_client, real_auth_client, script_factory
+    ):
+        await create_user("viewer-dashboard", "viewer-password-123", role="viewer")
+        await script_factory(name="viewer-dashboard-script")
+
+        resp = await real_auth_client.get(
+            "/", headers=_basic_auth_header("viewer-dashboard", "viewer-password-123")
+        )
+        assert resp.status_code == 200
+        assert "New Script" not in resp.text
+        assert 'action="/scripts/' not in resp.text
+
+    async def test_dashboard_shows_run_and_new_script_for_admin(
+        self, test_client, real_auth_client, script_factory
+    ):
+        await create_user("admin-dashboard", "admin-password-123", role="admin")
+        await script_factory(name="admin-dashboard-script")
+
+        resp = await real_auth_client.get(
+            "/", headers=_basic_auth_header("admin-dashboard", "admin-password-123")
+        )
+        assert resp.status_code == 200
+        assert "New Script" in resp.text
+
+    async def test_script_detail_hides_action_buttons_for_viewer(
+        self, test_client, real_auth_client, script_factory
+    ):
+        await create_user("viewer-detail", "viewer-password-123", role="viewer")
+        script = await script_factory(name="viewer-detail-script")
+
+        resp = await real_auth_client.get(
+            f"/scripts/{script.id}",
+            headers=_basic_auth_header("viewer-detail", "viewer-password-123"),
+        )
+        assert resp.status_code == 200
+        assert 'id="run-now-btn"' not in resp.text
+        assert ">Delete<" not in resp.text
+
+    async def test_script_edit_page_is_403_for_viewer(
+        self, test_client, real_auth_client, script_factory
+    ):
+        await create_user("viewer-edit-page", "viewer-password-123", role="viewer")
+        script = await script_factory(name="viewer-edit-page-script")
+
+        resp = await real_auth_client.get(
+            f"/scripts/{script.id}/edit",
+            headers=_basic_auth_header("viewer-edit-page", "viewer-password-123"),
+        )
+        assert resp.status_code == 403
+
+    async def test_new_script_page_is_403_for_viewer(self, test_client, real_auth_client):
+        await create_user("viewer-new-page", "viewer-password-123", role="viewer")
+
+        resp = await real_auth_client.get(
+            "/scripts/new",
+            headers=_basic_auth_header("viewer-new-page", "viewer-password-123"),
+        )
+        assert resp.status_code == 403
+
+
 class TestAdminStillWorks:
     async def test_db_admin_can_create_and_run_scripts(self, test_client, real_auth_client):
         await create_user("real-admin", "admin-password-123", role="admin")

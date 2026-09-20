@@ -108,7 +108,7 @@ function removeEmptyParams(event) {
                         <td>
                             <div class="flex items-center gap-2">
                                 <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">View Logs</a>
-                                {% if exec.status == 'running' %}
+                                {% if is_admin and exec.status == 'running' %}
                                 <button type="button"
                                         class="btn btn-error btn-xs"
                                         onclick="cancelExecution({{ exec.id }}, this)"

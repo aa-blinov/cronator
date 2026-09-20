@@ -2,11 +2,13 @@
 {% import "icons.html" as icons %}
 
 {% block header_actions %}
+{% if is_admin %}
 <div class="flex items-center gap-2">
     <a href="/scripts/new" class="btn btn-primary btn-sm gap-2">
         {{ icons.sparkles("w-4 h-4") }} New Script
     </a>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -38,6 +40,7 @@
     </form>
 </div>
 
+{% if is_admin %}
 <!-- Bulk-action toolbar (visible only when ≥1 row is selected) -->
 <div id="bulk-toolbar"
      data-testid="bulk-toolbar"
@@ -53,6 +56,7 @@
             onclick="bulkAction('delete')">Delete</button>
     <button class="btn btn-sm btn-ghost ml-auto" onclick="clearSelection()">Clear</button>
 </div>
+{% endif %}
 
 <!-- Scripts table -->
 <div class="glass-card rounded-xl overflow-hidden">
@@ -68,6 +72,7 @@
         <table class="table w-full" data-testid="scripts-table">
             <thead>
                 <tr class="border-b border-gray-700/50">
+                    {% if is_admin %}
                     <th class="bg-transparent w-10">
                         <input
                             type="checkbox"
@@ -77,6 +82,7 @@
                             aria-label="Select all scripts"
                         />
                     </th>
+                    {% endif %}
                     <th class="bg-transparent">Name</th>
                     <th class="bg-transparent">Schedule</th>
                     <th class="bg-transparent">Status</th>
@@ -89,6 +95,7 @@
                 <tr data-script-id="{{ script.id }}"
                     data-script-name="{{ script.name }}"
                     data-search="{{ (script.name ~ ' ' ~ (script.description or '') ~ ' ' ~ script.cron_expression)|lower }}">
+                    {% if is_admin %}
                     <td>
                         <input
                             type="checkbox"
@@ -98,6 +105,7 @@
                             onchange="onRowChange()"
                         />
                     </td>
+                    {% endif %}
                     <td class="font-medium">
                         <a href="/scripts/{{ script.id }}" class="link link-hover">{{ script.name }}</a>
                         {% if script.description %}
@@ -165,7 +173,9 @@
         <p class="text-base-content/60 mb-2">
             {% if filters.search or filters.status %}No scripts match your filters{% else %}No scripts yet{% endif %}
         </p>
+        {% if is_admin %}
         <a href="/scripts/new" class="btn btn-primary btn-sm mt-3">Create your first script</a>
+        {% endif %}
     </div>
     {% endif %}
 </div>
