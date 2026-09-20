@@ -125,6 +125,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path for Slack/Discord/Telegram webhooks. Added to `SENSITIVE_KEYS` so
   it's Fernet-encrypted at rest like every other credential.
 
+### Changed
+- **Script editor layout rebalanced.** The two-column layout (code+console
+  on the left, settings on the right) let the settings column run far
+  taller than the editor column, leaving several hundred pixels of empty
+  space under the Output Console and burying the "Create Script"/"Save
+  Changes" button at the bottom of whichever sidebar card was longest.
+  Moved Dependencies and Environment Variables into the left column below
+  the console (closer in height to the settings column now), and made
+  the submit/cancel row a sticky bar pinned to the bottom of the
+  viewport — it's now always reachable without scrolling to the very
+  end. (Rebuilt `app/static/output.css` — Tailwind's classes are compiled
+  at build time from the templates that reference them, so template-only
+  changes referencing new utility classes silently do nothing until the
+  CSS is rebuilt; `npm run build:css`.)
+
 ### Fixed
 - **"Run Test" in the script editor never showed the script's actual
   output.** `/api/executions/{id}/stream` sends *named* SSE events
