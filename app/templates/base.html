@@ -46,10 +46,12 @@
                     {{ icons.document("w-5 h-5") }}
                     <span>Executions</span>
                 </a>
+                {% if is_admin is not defined or is_admin %}
                 <a href="/scripts/new" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg {% if page_title == 'New Script' %}active{% endif %}">
                     {{ icons.sparkles("w-5 h-5") }}
                     <span>New Script</span>
                 </a>
+                {% endif %}
                 <a href="/settings" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg {% if page_title == 'Settings' %}active{% endif %}">
                     {{ icons.cog("w-5 h-5") }}
                     <span>Settings</span>

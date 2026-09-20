@@ -105,7 +105,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Settings UI for the field (it only existed via direct API calls before).
   5 tests; verified live against a real HTTP listener.
 
+### Security
+- **RBAC now actually restricts `viewer` accounts.** Previously only
+  `/api/users` was admin-gated — a `viewer` had the same access as `admin`
+  everywhere else. Added `require_admin` (`app/api/dependencies.py`,
+  wraps `verify_credentials` with a role check) to every mutating
+  endpoint across scripts, executions, settings, and the three HTML-page
+  action routes (`run`, `rerun`, `toggle`). The UI now hides admin-only
+  buttons/forms for a `viewer` session instead of rendering them and
+  letting them 403; a 403 on any remaining HTML page route now renders a
+  proper error page instead of a raw JSON blob (401 keeps its default
+  JSON handling — it carries the `WWW-Authenticate` header the browser
+  needs for its native Basic Auth prompt). Verified with real HTTP Basic
+  Auth against actual DB-backed viewer/admin accounts, not the test
+  suite's auth override (which always resolves as admin and couldn't
+  have caught this).
+- **`webhook_url` was stored in plaintext** in the `settings` table,
+  unlike `smtp_password` — despite carrying an auth token directly in the
+  path for Slack/Discord/Telegram webhooks. Added to `SENSITIVE_KEYS` so
+  it's Fernet-encrypted at rest like every other credential.
+
 ### Fixed
+- **`restore-backup` hung forever on any real PostgreSQL backup.**
+  `pg_dump`'s data section is `COPY ... FROM stdin`, not `INSERT`s — the
+  previous `;`-based statement splitter tore the COPY header away from
+  its data, and asyncpg sat waiting for COPY-protocol data that would
+  never arrive, holding a pooled DB connection hostage. Also fixed:
+  `pg_dump` always resets `search_path` to empty for the whole session
+  (not just its own transaction), which — left unreset — rode back to
+  the connection pool and broke the next unrelated request that reused
+  it. Verified end-to-end against a real production backup file before
+  writing the regression test.
+- **`_run_script`'s error-recovery path could hang an execution at
+  `RUNNING` forever.** If the retry inside the outer `except` block
+  itself failed (e.g. the original failure was a DB commit, leaving the
+  session needing a rollback before reuse), the second exception was
+  uncaught — it skipped `close_stream()` and escaped as an unhandled
+  exception in a fire-and-forget task. Since `cleanup_stale_executions`
+  only runs once, at startup, the execution stayed stuck until the next
+  restart.
+- **`revert_to_version` didn't reschedule the APScheduler job.** Reverting
+  a script to a version with a different `cron_expression` updated the
+  DB row but left the live scheduler job running on the old schedule
+  until some unrelated edit happened to touch it.
+- **Custom pydantic validators crashed the 422 handler into a 500.** Any
+  `field_validator` raising a plain `ValueError` (name length, cron
+  format) produced an error dict with `ctx={"error": ValueError(...)}` —
+  the raw exception object — which `JSONResponse` can't serialize.
+  Wrapped `exc.errors()`/`exc.body` in `jsonable_encoder`.
+- **`min_free_space_mb` was decorative** — shown in `/api/diagnostics`
+  but never checked before starting an execution. Now enforced in
+  `execute_script()`; a run below the threshold is refused with a
+  visible `FAILED` execution instead of failing unpredictably wherever
+  the next write happens to land. Fails open if free space can't be
+  determined.
+- **A success alert silently reset the failure-alert throttle window.**
+  Both alert paths wrote to the same `last_alert_at` column; an
+  unthrottled success alert could reset the 1-hour failure throttle,
+  suppressing a genuine failure notification for a script that also
+  happened to succeed once in between. Split into a dedicated
+  `last_failure_alert_at` column (new migration) for the throttle gate.
+- **HTTP access logs never reached `cronator.log` or the JSON format.**
+  uvicorn's CLI configures `uvicorn`/`uvicorn.error`/`uvicorn.access`
+  with their own handler and `propagate=False` before `app.main` is even
+  imported. Repointed all three at the app's own handlers.
+- **Docker container logs had no size cap.** None of the three services
+  in `docker-compose.yml` had a `logging` block, so the default
+  `json-file` driver kept every stdout line forever. Capped at 10MB×5
+  (cronator/db) / 5MB×3 (db-backup).
+- **`ScriptVersion.created_at` was missing `timezone=True`** — a
+  model/schema drift from the actual `TIMESTAMPTZ` column that
+  `alembic check` flags as a spurious pending migration. A stateless
+  test now asserts every `DateTime` column in `Base.metadata` declares
+  `timezone=True`.
+- **`TIMEOUT` executions were never cleaned up** by the daily retention
+  job — `RETENTION_BY_STATUS` was missing an entry for that status
+  entirely, so timed-out executions accumulated without bound.
+
 - **Race condition in `_running_scripts`** — `ExecutorService` now discards
   the script from `_running_scripts` immediately after `_finish_execution`
   commits, instead of after the inner finally's 100ms SSE-friendly delay.

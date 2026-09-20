@@ -3,12 +3,12 @@
 
 {% block header_actions %}
 <div class="flex items-center gap-2">
-    {% if execution.status == 'running' %}
+    {% if is_admin and execution.status == 'running' %}
     <button type="button" id="cancel-exec-btn" data-execution-id="{{ execution.id }}" class="btn btn-error btn-sm gap-2">
         {{ icons.x_mark("w-4 h-4") }} Cancel
     </button>
     {% endif %}
-    {% if execution.status not in ('running', 'pending') %}
+    {% if is_admin and execution.status not in ('running', 'pending') %}
     <form method="POST" action="/executions/{{ execution.id }}/rerun">
         <button type="submit" class="btn btn-sm btn-primary gap-2">
             {{ icons.arrow_path("w-4 h-4") }} Run again
@@ -291,6 +291,7 @@
 
     const execId = {{ execution.id }};
     const isRunning = '{{ execution.status }}' === 'running';
+    const isAdmin = {{ 'true' if is_admin else 'false' }};
     const LOG_RENDER_LINE_LIMIT = 2000;
     const LOG_AUTO_SCROLL_THRESHOLD_PX = 48;
     const logStates = {
@@ -638,15 +639,16 @@
                             <td class="text-sm">${date}</td>
                             <td class="text-right">
                                 <div class="flex gap-2 justify-end">
-                                    <a href="/api/executions/${execId}/artifacts/${artifact.id}" 
-                                       class="btn btn-ghost btn-xs" 
+                                    <a href="/api/executions/${execId}/artifacts/${artifact.id}"
+                                       class="btn btn-ghost btn-xs"
                                        download="${escapeHtml(artifact.original_filename)}">
                                         Download
                                     </a>
-                                    <button onclick="deleteArtifact(${artifact.id}, '${escapeHtml(artifact.original_filename)}')" 
+                                    ${isAdmin ? `
+                                    <button onclick="deleteArtifact(${artifact.id}, '${escapeHtml(artifact.original_filename)}')"
                                             class="btn btn-ghost btn-xs text-error">
                                         Delete
-                                    </button>
+                                    </button>` : ''}
                                 </div>
                             </td>
                         </tr>
