@@ -7,6 +7,7 @@ from app.models.script import Script
 from app.models.script_version import ScriptVersion
 from app.models.setting import Setting
 from app.models.user import User
+from app.models.user_audit_log import UserAuditLog
 
 __all__ = [
     "Script",
@@ -16,4 +17,5 @@ __all__ = [
     "Artifact",
     "ScriptAuditLog",
     "User",
+    "UserAuditLog",
 ]
