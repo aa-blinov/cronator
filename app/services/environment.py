@@ -629,6 +629,7 @@ class EnvironmentService:
                 await queue.put(("error", message))
 
         self._active_installs[script_id] = True
+        succeeded = False
 
         try:
             # Validate dependencies first
@@ -672,6 +673,7 @@ class EnvironmentService:
                 await send_log("✓ Dependencies installed successfully")
 
             await send_log("🎉 Environment setup complete!")
+            succeeded = True
             return True, "Environment setup complete"
 
         except Exception as e:
@@ -680,7 +682,7 @@ class EnvironmentService:
         finally:
             self._active_installs[script_id] = False
             if queue:
-                await queue.put(("done", ""))
+                await queue.put(("done", "true" if succeeded else "false"))
             # Don't leak the Queue if the client never opened the SSE stream
             # (closed tab, network error before connecting, etc.) — an
             # already-connected reader keeps its own reference to `queue`
