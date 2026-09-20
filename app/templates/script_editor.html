@@ -199,8 +199,90 @@
                 </div>
                 <pre id="output-console" class="bg-base-200 p-4 rounded-lg font-mono text-sm overflow-y-auto custom-scrollbar" style="resize: vertical; min-height: 200px; max-height: 600px; height: 300px;"></pre>
             </div>
+
+            <!-- Dependencies and Environment Variables live here (not in the
+                 settings sidebar) so the two columns end up roughly the same
+                 height instead of the sidebar running far past the editor,
+                 leaving a large empty gap under the Output Console. -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4">Dependencies</h3>
+                <div class="form-control">
+                    <textarea name="dependencies" id="dependencies-input"
+                              class="textarea textarea-bordered w-full font-mono text-sm"
+                              rows="6"
+                              placeholder="requests&#10;pandas&#10;numpy==1.24.0">{{ script.dependencies if script else '' }}</textarea>
+                    <label class="label">
+                        <span class="label-text-alt text-gray-500">One package per line (pip format)</span>
+                    </label>
+                </div>
+
+                <!-- Inline Diff Container -->
+                <div id="deps-diff-container" class="collapse collapse-arrow bg-base-200 rounded-lg mt-2" style="display: none;">
+                    <input type="checkbox" id="deps-diff-toggle" />
+                    <div class="collapse-title text-sm font-medium flex items-center justify-between pr-4">
+                        <span class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Pending Changes
+                        </span>
+                        <span id="deps-diff-badge" class="badge badge-warning badge-sm">0</span>
+                    </div>
+                    <div class="collapse-content text-xs font-mono">
+                        <div class="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+                            <div id="deps-diff-added" class="space-y-1"></div>
+                            <div id="deps-diff-removed" class="space-y-1"></div>
+                            <div id="deps-diff-modified" class="space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3 flex gap-2">
+                    <button type="button" id="validate-deps-btn" class="btn btn-sm btn-outline btn-info flex-1" title="Validate format and resolvability">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Validate
+                    </button>
+                    <button type="button" id="get-packages-btn" class="btn btn-sm btn-outline btn-warning flex-1" {% if not script %}disabled{% endif %} title="Get currently installed packages">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                        </svg>
+                        Packages
+                    </button>
+                    <button type="button" id="install-deps-btn" class="btn btn-sm btn-outline btn-success flex-1" {% if not script %}disabled{% endif %} title="{% if not script %}Save script first{% else %}Rebuild environment and reinstall all dependencies{% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                        Install
+                    </button>
+                    <button type="button" id="retry-install-btn" class="btn btn-sm btn-outline btn-warning" {% if not script %}disabled{% endif %} style="display: none;" title="Retry the last failed installation">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                    </button>
+                </div>
+                <!-- Validation results now go to Output Console below -->
+                <div class="alert alert-info mt-3 text-xs py-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>Dependencies install automatically when you save. Use "Install" to force rebuild.</span>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4">Environment Variables</h3>
+                <div class="form-control">
+                    <textarea name="environment_vars"
+                              class="textarea textarea-bordered w-full font-mono text-sm"
+                              rows="4"
+                              placeholder="API_KEY=secret&#10;DEBUG=true">{{ script.environment_vars if script else '' }}</textarea>
+                    <label class="label">
+                        <span class="label-text-alt text-gray-500">KEY=VALUE format, one per line</span>
+                    </label>
+                </div>
+            </div>
         </div>
-        
+
         <!-- Settings sidebar -->
         <div class="space-y-6">
             <div class="glass-card rounded-xl p-6">
@@ -410,71 +492,6 @@
                 </div>
             </div>
 
-            <div class="glass-card rounded-xl p-6">
-                <h3 class="text-lg font-semibold mb-4">Dependencies</h3>
-                <div class="form-control">
-                    <textarea name="dependencies" id="dependencies-input"
-                              class="textarea textarea-bordered w-full font-mono text-sm"
-                              rows="6"
-                              placeholder="requests&#10;pandas&#10;numpy==1.24.0">{{ script.dependencies if script else '' }}</textarea>
-                    <label class="label">
-                        <span class="label-text-alt text-gray-500">One package per line (pip format)</span>
-                    </label>
-                </div>
-                
-                <!-- Inline Diff Container -->
-                <div id="deps-diff-container" class="collapse collapse-arrow bg-base-200 rounded-lg mt-2" style="display: none;">
-                    <input type="checkbox" id="deps-diff-toggle" />
-                    <div class="collapse-title text-sm font-medium flex items-center justify-between pr-4">
-                        <span class="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Pending Changes
-                        </span>
-                        <span id="deps-diff-badge" class="badge badge-warning badge-sm">0</span>
-                    </div>
-                    <div class="collapse-content text-xs font-mono">
-                        <div class="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
-                            <div id="deps-diff-added" class="space-y-1"></div>
-                            <div id="deps-diff-removed" class="space-y-1"></div>
-                            <div id="deps-diff-modified" class="space-y-1"></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="mt-3 flex gap-2">
-                    <button type="button" id="validate-deps-btn" class="btn btn-sm btn-outline btn-info flex-1" title="Validate format and resolvability">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Validate
-                    </button>
-                    <button type="button" id="get-packages-btn" class="btn btn-sm btn-outline btn-warning flex-1" {% if not script %}disabled{% endif %} title="Get currently installed packages">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                        </svg>
-                        Packages
-                    </button>
-                    <button type="button" id="install-deps-btn" class="btn btn-sm btn-outline btn-success flex-1" {% if not script %}disabled{% endif %} title="{% if not script %}Save script first{% else %}Rebuild environment and reinstall all dependencies{% endif %}">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                        </svg>
-                        Install
-                    </button>
-                    <button type="button" id="retry-install-btn" class="btn btn-sm btn-outline btn-warning" {% if not script %}disabled{% endif %} style="display: none;" title="Retry the last failed installation">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                        </svg>
-                    </button>
-                </div>
-                <!-- Validation results now go to Output Console below -->
-                <div class="alert alert-info mt-3 text-xs py-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <span>Dependencies install automatically when you save. Use "Install" to force rebuild.</span>
-                </div>
-            </div>
-
             <!-- Version History -->
             {% if script %}
             <div class="glass-card rounded-xl p-6">
@@ -515,28 +532,19 @@
                 </div>
             </div>
             
-            <div class="glass-card rounded-xl p-6">
-                <h3 class="text-lg font-semibold mb-4">Environment Variables</h3>
-                <div class="form-control">
-                    <textarea name="environment_vars" 
-                              class="textarea textarea-bordered w-full font-mono text-sm"
-                              rows="4"
-                              placeholder="API_KEY=secret&#10;DEBUG=true">{{ script.environment_vars if script else '' }}</textarea>
-                    <label class="label">
-                        <span class="label-text-alt text-gray-500">KEY=VALUE format, one per line</span>
-                    </label>
-                </div>
-            </div>
-            
-            <div class="flex gap-3">
-                <button type="submit" class="btn btn-primary flex-1">
-                    {{ icons.check_circle("w-5 h-5") }} {% if script %}Save Changes{% else %}Create Script{% endif %}
-                </button>
-                <a href="{% if script %}/scripts/{{ script.id }}{% else %}/{% endif %}" class="btn btn-ghost">
-                    Cancel
-                </a>
-            </div>
         </div>
+    </div>
+
+    <!-- Sticky action bar: full-width regardless of which column is taller,
+         so Create Script/Save Changes never requires scrolling to the very
+         bottom of whichever sidebar card happens to be longest. -->
+    <div class="sticky bottom-0 mt-6 -mx-8 px-8 py-4 bg-base-100 border-t border-base-content/10 flex gap-3 z-10">
+        <button type="submit" class="btn btn-primary flex-1">
+            {{ icons.check_circle("w-5 h-5") }} {% if script %}Save Changes{% else %}Create Script{% endif %}
+        </button>
+        <a href="{% if script %}/scripts/{{ script.id }}{% else %}/{% endif %}" class="btn btn-ghost">
+            Cancel
+        </a>
     </div>
 </form>
 
