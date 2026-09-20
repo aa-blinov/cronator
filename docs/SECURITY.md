@@ -22,6 +22,22 @@ Passwords are hashed (`app/services/user_service.py`); the admin account is
 seeded from `ADMIN_USERNAME`/`ADMIN_PASSWORD` on first startup if the
 `users` table is empty.
 
+Failed login attempts are rate-limited per username: 10 failures within 5
+minutes locks that username out with `429` for the rest of the window,
+even against the correct password (`check_login_lockout` /
+`record_login_failure` in `app/api/rate_limit.py`, called from
+`verify_credentials`).
+
+**CSRF note for Basic Auth:** browsers auto-attach cached Basic Auth
+credentials to any request to this app's origin, regardless of which page
+triggered it — a form on an unrelated site could otherwise submit a
+state-changing request here and have it silently authenticated.
+`CsrfOriginGuardMiddleware` (`app/middleware/csrf_origin_guard.py`) blocks
+`POST`/`PUT`/`PATCH`/`DELETE` requests whose `Origin` header doesn't match
+this app's own origin. Requests with no `Origin` header at all (curl,
+server-to-server API clients using Basic Auth directly) are left alone —
+this targets the browser-credential-replay vector, not API automation.
+
 ## RBAC
 
 Two roles exist: `admin` and `viewer`. **Viewers get read-only access;
@@ -61,6 +77,26 @@ Tested with real HTTP Basic Auth against actual DB-backed viewer/admin
 accounts in `tests/stateful/test_rbac_enforcement.py` — the rest of the
 test suite uses a blanket auth override that always resolves as admin, so
 it wouldn't have caught a gap here.
+
+### User management
+
+An admin manages accounts from `/users`: create, delete, change role, and
+reset another user's password (`PATCH /api/users/{id}`). Deleting or
+demoting the last remaining admin is blocked, so it's not possible to
+lock every admin out of the instance through the UI. Any authenticated
+user (admin or viewer) can change their own password from the "Change
+password" link in the sidebar (`POST /api/users/me/password`), which
+requires the current password. The one account this doesn't cover is the
+legacy env-fallback admin (a username with no `User` row, authenticating
+purely via `ADMIN_USERNAME`/`ADMIN_PASSWORD`) — that one's password is
+only mutable by editing `.env` and restarting.
+
+Every create/delete/role-change/password-reset action, and every
+self-service password change, is recorded in `UserAuditLog` and readable
+at `GET /api/users/audit` (admin-only, optionally filtered by
+`target_username`, capped at 200 most recent entries by default) — who
+changed what, and when. Shown as a "Recent Activity" table on the `/users`
+page itself, refreshed after each action without a full page reload.
 
 ## Secrets at rest
 

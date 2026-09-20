@@ -79,13 +79,15 @@ in the audit log (`/api/scripts/{id}/audit`).
 | `GET /backups`                   | Lists `.sql.gz` files the `db-backup` service has produced |
 | `POST /restore-backup`           | See [Operations → Restore](OPERATIONS.md#restore--via-the-ui-postapisettingsrestore-backup) for what this actually does under the hood — worth reading before relying on it |
 
-## Users (`/api/users`) — admin only
+## Users (`/api/users`)
 
-| Method & Path | Purpose |
-| --------------- | --------- |
-| `GET /users`             | List, admin only |
-| `POST /users`            | Create; `409` if the username already exists, `422` if the password is under 8 characters |
-| `DELETE /users/{id}`     | Blocked with `400` if it would delete the last remaining admin |
+| Method & Path | Auth | Purpose |
+| --------------- | ------ | --------- |
+| `GET /users`             | admin | List |
+| `POST /users`            | admin | Create; `409` if the username already exists, `422` if the password is under 8 characters |
+| `PATCH /users/{id}`      | admin | Change `password` and/or `role`; `400` if it would demote the last remaining admin, `400` if neither field is given |
+| `DELETE /users/{id}`     | admin | Blocked with `400` if it would delete the last remaining admin |
+| `POST /users/me/password` | any authenticated user | Self-service password change; body is `current_password` + `new_password`, `401` if the current password is wrong, `400` for the env-fallback admin account (no DB row to update) |
 
 ## Diagnostics & locale
 
