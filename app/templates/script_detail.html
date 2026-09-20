@@ -59,28 +59,27 @@ async function duplicateScript(scriptId) {
     // On success we redirect to the new script's detail page so the user
     // can edit/enable it; on error we surface the message via showToast.
     const btn = document.getElementById('duplicate-btn');
-    if (btn) btn.disabled = true;
-    try {
-        const response = await fetch(`/api/scripts/${scriptId}/duplicate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        if (response.status === 201) {
-            const dup = await response.json();
-            window.showToast?.(`Duplicated as "${dup.name}" (disabled)`, 'success');
-            window.location.href = `/scripts/${dup.id}`;
-        } else {
-            const data = await response.json().catch(() => ({}));
-            window.showToast?.(
-                `Failed to duplicate: ${data.detail || response.statusText}`,
-                'error',
-            );
+    await window.withButtonLoading(btn, 'Duplicating...', async () => {
+        try {
+            const response = await fetch(`/api/scripts/${scriptId}/duplicate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (response.status === 201) {
+                const dup = await response.json();
+                window.showToast?.(`Duplicated as "${dup.name}" (disabled)`, 'success');
+                window.location.href = `/scripts/${dup.id}`;
+            } else {
+                const data = await response.json().catch(() => ({}));
+                window.showToast?.(
+                    `Failed to duplicate: ${data.detail || response.statusText}`,
+                    'error',
+                );
+            }
+        } catch (error) {
+            window.showToast?.(`Error duplicating script: ${error.message}`, 'error');
         }
-    } catch (error) {
-        window.showToast?.(`Error duplicating script: ${error.message}`, 'error');
-    } finally {
-        if (btn) btn.disabled = false;
-    }
+    });
 }
 </script>
 {% endblock %}
@@ -366,32 +365,34 @@ async function handleCancelExecution(executionId, buttonEl) {
         return;
     }
 
-    try {
-        const response = await fetch(`/api/executions/${executionId}/cancel`, {
-            method: 'POST',
-        });
+    await window.withButtonLoading(buttonEl, 'Cancelling...', async () => {
+        try {
+            const response = await fetch(`/api/executions/${executionId}/cancel`, {
+                method: 'POST',
+            });
 
-        if (response.ok) {
-            const row = buttonEl?.closest('tr');
-            const statusBadge = document.getElementById(`status-${executionId}`);
+            if (response.ok) {
+                const row = buttonEl?.closest('tr');
+                const statusBadge = document.getElementById(`status-${executionId}`);
 
-            if (statusBadge) {
-                statusBadge.className = 'status-badge cancelled';
-                statusBadge.innerHTML = 'cancelled';
+                if (statusBadge) {
+                    statusBadge.className = 'status-badge cancelled';
+                    statusBadge.innerHTML = 'cancelled';
+                }
+
+                row?.removeAttribute('data-status');
+                buttonEl?.remove();
+                window.showToast?.('Execution cancelled', 'success');
+                syncRunNowButtonState();
+                restartFastExecutionHistoryRefresh();
+            } else {
+                const error = await response.json();
+                window.showToast?.(error.detail || 'Failed to cancel execution', 'error');
             }
-
-            row?.removeAttribute('data-status');
-            buttonEl?.remove();
-            window.showToast?.('Execution cancelled', 'success');
-            syncRunNowButtonState();
-            restartFastExecutionHistoryRefresh();
-        } else {
-            const error = await response.json();
-            window.showToast?.(error.detail || 'Failed to cancel execution', 'error');
+        } catch (err) {
+            window.showToast?.(err.message || 'Failed to cancel execution', 'error');
         }
-    } catch (err) {
-        window.showToast?.(err.message || 'Failed to cancel execution', 'error');
-    }
+    });
 }
 
 function bindExecutionHistoryInteractions() {
