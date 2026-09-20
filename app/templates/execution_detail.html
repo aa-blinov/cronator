@@ -645,7 +645,7 @@
                                         Download
                                     </a>
                                     ${isAdmin ? `
-                                    <button onclick="deleteArtifact(${artifact.id}, '${escapeHtml(artifact.original_filename)}')"
+                                    <button onclick="deleteArtifact(${artifact.id}, '${escapeHtml(artifact.original_filename)}', this)"
                                             class="btn btn-ghost btn-xs text-error">
                                         Delete
                                     </button>` : ''}
@@ -666,25 +666,27 @@
         }
     }
     
-    async function deleteArtifact(artifactId, filename) {
+    async function deleteArtifact(artifactId, filename, btn) {
         if (!confirm(`Delete artifact "${filename}"?`)) {
             return;
         }
-        
-        try {
-            const response = await fetch(`/api/executions/${execId}/artifacts/${artifactId}`, {
-                method: 'DELETE'
-            });
-            
-            if (response.ok) {
-                window.showToast?.(`Deleted ${filename}`, 'success');
-                await loadArtifacts();
-            } else {
-                window.showToast?.('Failed to delete artifact', 'error');
+
+        await window.withButtonLoading(btn, 'Deleting...', async () => {
+            try {
+                const response = await fetch(`/api/executions/${execId}/artifacts/${artifactId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    window.showToast?.(`Deleted ${filename}`, 'success');
+                    await loadArtifacts();
+                } else {
+                    window.showToast?.('Failed to delete artifact', 'error');
+                }
+            } catch (err) {
+                window.showToast?.(err.message || 'Failed to delete artifact', 'error');
             }
-        } catch (err) {
-            window.showToast?.(err.message || 'Failed to delete artifact', 'error');
-        }
+        });
     }
     
     function formatFileSize(bytes) {

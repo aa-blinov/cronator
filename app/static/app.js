@@ -190,3 +190,23 @@ window.closeSidebar = function closeSidebar() {
     document.getElementById('sidebar')?.classList.add('-translate-x-full');
     document.getElementById('sidebar-backdrop')?.classList.add('hidden');
 };
+
+// Shared button-loading state for async actions — a handful of buttons
+// (Run Now, Cancel, Restore version) hand-rolled this same
+// disable+spinner+restore pattern already; most others (bulk actions,
+// user management, settings' test/cleanup buttons) had none at all, so
+// clicking them gave no feedback until the request resolved. One
+// implementation instead of copy-pasting a 5th/6th/7th slightly
+// different version.
+window.withButtonLoading = async function withButtonLoading(btn, label, fn) {
+    if (!btn) return fn();
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="loading loading-spinner loading-xs"></span> ${label}`;
+    try {
+        return await fn();
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+    }
+};
