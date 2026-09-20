@@ -171,7 +171,7 @@
         <div id="artifacts-list" class="hidden overflow-x-auto">
             <table class="table table-sm w-full">
                 <thead>
-                    <tr class="border-b border-gray-700/50">
+                    <tr class="border-b border-base-content/10">
                         <th class="bg-transparent">Original Name</th>
                         <th class="bg-transparent">Size</th>
                         <th class="bg-transparent">Created</th>
@@ -633,7 +633,7 @@
                     const date = new Date(artifact.created_at).toLocaleString();
                     
                     return `
-                        <tr class="border-b border-gray-700/30 hover:bg-white/5">
+                        <tr class="border-b border-base-content/5 hover:bg-white/5">
                             <td>${escapeHtml(artifact.original_filename)}</td>
                             <td class="text-sm">${size}</td>
                             <td class="text-sm">${date}</td>
@@ -695,12 +695,6 @@
         return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
     }
     
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
     function updateCharCountDisplay(counterId, value) {
         const counterEl = document.getElementById(counterId);
         if (!counterEl) return;
