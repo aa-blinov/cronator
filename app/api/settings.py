@@ -42,6 +42,9 @@ class SettingsResponse(BaseModel):
     # F17: Webhook URL for failure notifications
     webhook_url: str = ""
 
+    # P0: automated database backup toggle
+    auto_backup_enabled: bool = False
+
 
 class SchedulerStatus(BaseModel):
     """Scheduler status."""
@@ -64,6 +67,7 @@ async def get_settings_info() -> SettingsResponse:
     default_timeout = await settings_service.get("default_timeout", settings.default_timeout)
     theme = await settings_service.get("theme", "dim")
     webhook_url = await settings_service.get("webhook_url", "")
+    auto_backup_enabled = await settings_service.get("auto_backup_enabled", False)
 
     return SettingsResponse(
         app_name=settings.app_name,
@@ -78,6 +82,7 @@ async def get_settings_info() -> SettingsResponse:
         default_timeout=default_timeout,
         theme=theme,
         webhook_url=webhook_url,
+        auto_backup_enabled=auto_backup_enabled,
     )
 
 
@@ -163,6 +168,11 @@ class UpdateSettingsRequest(BaseModel):
     # F17: webhook URL for failure notifications
     webhook_url: str | None = None
 
+    # P0: automated database backup, off by default — an operator opts in
+    # once they've confirmed the backups directory is on persistent,
+    # backed-up storage (see docs/OPERATIONS.md).
+    auto_backup_enabled: bool | None = None
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -206,6 +216,8 @@ async def update_settings(request: UpdateSettingsRequest, username: str = Depend
         updates["theme"] = request.theme
     if request.webhook_url is not None:
         updates["webhook_url"] = request.webhook_url
+    if request.auto_backup_enabled is not None:
+        updates["auto_backup_enabled"] = request.auto_backup_enabled
 
     # Save to database
     await settings_service.bulk_set(updates)

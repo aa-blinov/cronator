@@ -14,11 +14,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.gzip import GZipMiddleware
 
 from app import __version__
 from app.api import api_router
 from app.config import get_settings
 from app.database import close_db
+from app.middleware.csrf_origin_guard import CsrfOriginGuardMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.services.metrics import init_app_info
 from app.services.scheduler import scheduler_service
@@ -237,6 +239,12 @@ app = FastAPI(
 # Register security headers middleware (must run before exception handlers
 # so error responses also carry the headers).
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(CsrfOriginGuardMiddleware)
+# Text-heavy pages (script editor's ~170KB HTML) and static assets
+# (CodeMirror ~170KB, Tailwind output.css ~105KB) were transferred
+# uncompressed — a real, noticeable slowdown for anyone not on the same
+# LAN as the server. 500 bytes is comfortably below any page/asset here.
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 
 @app.get("/metrics", include_in_schema=False)
@@ -400,10 +408,27 @@ def filesizeformat(value):
 
 app.state.templates.env.filters["filesizeformat"] = filesizeformat
 
+class CachedStaticFiles(StaticFiles):
+    """StaticFiles never sends Cache-Control — every page navigation
+    re-fetched the same ~170KB CodeMirror bundle and ~105KB CSS from
+    scratch. These paths aren't content-hashed, so a max-age would serve
+    stale assets for its whole duration after a deploy — caught this
+    live: an app.js fix made during this same change would have stayed
+    invisible for 24h to anyone who'd already loaded the page once.
+    `no-cache` still saves the transfer (browser revalidates via the
+    ETag StaticFiles already sets, gets a tiny 304 if unchanged) without
+    ever risking stale content."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers.setdefault("Cache-Control", "no-cache")
+        return response
+
+
 # Setup static files (if needed)
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    app.mount("/static", CachedStaticFiles(directory=str(static_dir)), name="static")
 
 # Include routers
 app.include_router(api_router)

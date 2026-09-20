@@ -137,6 +137,13 @@ class SchedulerService:
             name="Execution History Cleanup",
             replace_existing=True,
         )
+        self.scheduler.add_job(
+            self._run_auto_backup,
+            trigger=CronTrigger(hour=2, minute=0, timezone="UTC"),
+            id="internal_auto_backup",
+            name="Automated Database Backup",
+            replace_existing=True,
+        )
 
     async def _run_cleanup(self) -> None:
         """Run the daily status-aware execution history cleanup."""
@@ -146,6 +153,20 @@ class SchedulerService:
             await cleanup_service.cleanup_by_status()
         except Exception:
             logger.exception("Error during scheduled execution history cleanup")
+
+    async def _run_auto_backup(self) -> None:
+        """Run the daily automated database backup, if enabled (P0)."""
+        from app.services.backup_service import backup_service
+        from app.services.settings_service import settings_service
+
+        try:
+            enabled = await settings_service.get("auto_backup_enabled", False)
+            if not enabled:
+                return
+            path = await backup_service.create_backup()
+            logger.info(f"Automated backup created: {path}")
+        except Exception:
+            logger.exception("Error during scheduled automated backup")
 
     async def _execute_script(self, script_id: int) -> None:
         """Execute a script (called by scheduler)."""
