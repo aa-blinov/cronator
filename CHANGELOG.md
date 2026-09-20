@@ -126,6 +126,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it's Fernet-encrypted at rest like every other credential.
 
 ### Fixed
+- **"Run Test" on a brand-new script silently created and scheduled it.**
+  The script editor's Run Test button auto-saves before every test run —
+  necessary since a test execution needs a real script row — but for a
+  never-before-saved draft it sent the "Run on schedule" toggle's value
+  as-is, which defaults to checked. Clicking Run Test to try out a draft
+  therefore created a live, `enabled=true`, cron-scheduled script before
+  the user ever reviewed it or clicked the actual "Create Script" button;
+  closing the tab without saving left a real script running on schedule
+  with no explicit save action. Now every auto-save-before-test for a
+  script that hasn't been explicitly saved forces `enabled: false`
+  regardless of the toggle's visual state; the toggle's real value is
+  only applied on an explicit "Create Script"/"Save Changes" click.
+  Verified live end-to-end (test run → test run again → explicit save)
+  against a disposable local instance via browser automation.
 - **`restore-backup` hung forever on any real PostgreSQL backup.**
   `pg_dump`'s data section is `COPY ... FROM stdin`, not `INSERT`s — the
   previous `;`-based statement splitter tore the COPY header away from
