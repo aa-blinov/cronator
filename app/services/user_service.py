@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from app.database import async_session_maker
 from app.models.user import User
+from app.models.user_audit_log import UserAuditLog
 
 # PBKDF2-HMAC-SHA256 with 200_000 iterations and a 32-byte salt.
 ITERATIONS = 200_000
@@ -70,6 +71,25 @@ async def create_user(username: str, password: str, role: str = "viewer") -> Use
         return user
 
 
+async def update_user(
+    user_id: int, password: str | None = None, role: str | None = None
+) -> User | None:
+    if role is not None and role not in ("admin", "viewer"):
+        raise ValueError(f"invalid role {role!r}")
+    async with async_session_maker() as db:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            return None
+        if password is not None:
+            user.password_hash = hash_password(password)
+        if role is not None:
+            user.role = role
+        await db.commit()
+        await db.refresh(user)
+        return user
+
+
 async def delete_user(user_id: int) -> bool:
     async with async_session_maker() as db:
         result = await db.execute(select(User).where(User.id == user_id))
@@ -85,6 +105,35 @@ async def count_admins() -> int:
     async with async_session_maker() as db:
         result = await db.execute(select(User).where(User.role == "admin"))
         return len(list(result.scalars().all()))
+
+
+async def record_user_audit(
+    target_username: str, action: str, changed_by: str, detail: str | None = None
+) -> None:
+    entry = UserAuditLog(
+        target_username=target_username,
+        action=action,
+        detail=detail,
+        changed_by=changed_by,
+        changed_at=datetime.now(UTC),
+    )
+    async with async_session_maker() as db:
+        db.add(entry)
+        await db.commit()
+
+
+async def list_user_audit(
+    target_username: str | None = None, limit: int = 200
+) -> list[UserAuditLog]:
+    async with async_session_maker() as db:
+        stmt = select(UserAuditLog).order_by(
+            UserAuditLog.changed_at.desc(), UserAuditLog.id.desc()
+        )
+        if target_username is not None:
+            stmt = stmt.where(UserAuditLog.target_username == target_username)
+        stmt = stmt.limit(limit)
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
 
 async def ensure_admin_seeded() -> None:

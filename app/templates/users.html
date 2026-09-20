@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% import "icons.html" as icons %}
+
+{% block header_actions %}
+<button class="btn btn-primary btn-sm gap-2" onclick="openCreateModal()">
+    {{ icons.sparkles("w-4 h-4") }} New User
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="glass-card rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Users</h3>
+        <p class="text-sm text-base-content/60">{{ users|length }} user(s)</p>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="table w-full" data-testid="users-table">
+            <thead>
+                <tr class="border-b border-base-content/10">
+                    <th class="bg-transparent">Username</th>
+                    <th class="bg-transparent">Role</th>
+                    <th class="bg-transparent">Created</th>
+                    <th class="bg-transparent">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr data-testid="user-row" data-user-id="{{ user.id }}" data-username="{{ user.username }}">
+                    <td class="font-medium">{{ user.username }}</td>
+                    <td>
+                        <select class="select select-bordered select-xs" data-testid="role-select"
+                                onchange="changeRole({{ user.id }}, this.value, '{{ user.username }}')">
+                            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>admin</option>
+                            <option value="viewer" {% if user.role == 'viewer' %}selected{% endif %}>viewer</option>
+                        </select>
+                    </td>
+                    <td>
+                        <span class="text-xs text-base-content/60">
+                            {{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '—' }}
+                        </span>
+                    </td>
+                    <td class="flex gap-2">
+                        <button class="btn btn-xs btn-ghost" data-testid="reset-password-btn"
+                                onclick="openResetModal({{ user.id }}, '{{ user.username }}')">
+                            Reset password
+                        </button>
+                        <button class="btn btn-xs btn-error btn-outline" data-testid="delete-user-btn"
+                                onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="glass-card rounded-xl overflow-hidden mt-6">
+    <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Recent Activity</h3>
+        <p class="text-sm text-base-content/60" data-testid="audit-count"></p>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="table w-full" data-testid="audit-table">
+            <thead>
+                <tr class="border-b border-base-content/10">
+                    <th class="bg-transparent">When</th>
+                    <th class="bg-transparent">Action</th>
+                    <th class="bg-transparent">User</th>
+                    <th class="bg-transparent">Detail</th>
+                    <th class="bg-transparent">By</th>
+                </tr>
+            </thead>
+            <tbody id="audit-log-body" data-testid="audit-log-body">
+                <tr><td colspan="5" class="text-center text-base-content/50 py-6">Loading…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create User Modal -->
+<dialog id="create-user-modal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">New User</h3>
+        <form id="create-user-form" class="space-y-4">
+            <label class="form-control">
+                <span class="label-text">Username</span>
+                <input type="text" name="username" class="input input-bordered input-sm" required
+                       pattern="[a-zA-Z0-9_-]+" minlength="2" maxlength="64" data-testid="new-username-input">
+            </label>
+            <label class="form-control">
+                <span class="label-text">Password</span>
+                <input type="password" name="password" class="input input-bordered input-sm" required
+                       minlength="8" maxlength="128" data-testid="new-password-input">
+            </label>
+            <label class="form-control">
+                <span class="label-text">Role</span>
+                <select name="role" class="select select-bordered select-sm" data-testid="new-role-select">
+                    <option value="viewer" selected>viewer</option>
+                    <option value="admin">admin</option>
+                </select>
+            </label>
+        </form>
+        <div class="modal-action">
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('create-user-modal').close()">Cancel</button>
+            <button type="button" class="btn btn-primary" data-testid="create-user-submit" onclick="createUser()">Create</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Reset Password Modal -->
+<dialog id="reset-password-modal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">Reset password for <span id="reset-target-username"></span></h3>
+        <form id="reset-password-form">
+            <label class="form-control">
+                <span class="label-text">New password</span>
+                <input type="password" name="password" class="input input-bordered input-sm w-full" required
+                       minlength="8" maxlength="128" data-testid="reset-password-input">
+            </label>
+        </form>
+        <div class="modal-action">
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('reset-password-modal').close()">Cancel</button>
+            <button type="button" class="btn btn-primary" data-testid="reset-password-submit" onclick="submitResetPassword()">Reset</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let resetTargetId = null;
+
+function openCreateModal() {
+    document.getElementById('create-user-form').reset();
+    document.getElementById('create-user-modal').showModal();
+}
+
+function openResetModal(userId, username) {
+    resetTargetId = userId;
+    document.getElementById('reset-target-username').textContent = username;
+    document.getElementById('reset-password-form').reset();
+    document.getElementById('reset-password-modal').showModal();
+}
+
+async function createUser() {
+    const form = document.getElementById('create-user-form');
+    if (!form.reportValidity()) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    try {
+        const r = await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            window.showToast?.(err.detail || 'Failed to create user', 'error');
+            return;
+        }
+        window.showToast?.(`User ${data.username} created`, 'success');
+        window.location.reload();
+    } catch (err) {
+        window.showToast?.(`Error: ${err.message}`, 'error');
+    }
+}
+
+async function changeRole(userId, role, username) {
+    try {
+        const r = await fetch(`/api/users/${userId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role }),
+        });
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            window.showToast?.(err.detail || 'Failed to change role', 'error');
+            window.location.reload();
+            return;
+        }
+        window.showToast?.(`${username} is now ${role}`, 'success');
+        loadAuditLog();
+    } catch (err) {
+        window.showToast?.(`Error: ${err.message}`, 'error');
+    }
+}
+
+async function submitResetPassword() {
+    const form = document.getElementById('reset-password-form');
+    if (!form.reportValidity()) return;
+    const password = new FormData(form).get('password');
+    try {
+        const r = await fetch(`/api/users/${resetTargetId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+        });
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            window.showToast?.(err.detail || 'Failed to reset password', 'error');
+            return;
+        }
+        window.showToast?.('Password reset', 'success');
+        document.getElementById('reset-password-modal').close();
+        loadAuditLog();
+    } catch (err) {
+        window.showToast?.(`Error: ${err.message}`, 'error');
+    }
+}
+
+async function deleteUser(userId, username) {
+    if (!confirm(`Delete user ${username}? This cannot be undone.`)) return;
+    try {
+        const r = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            window.showToast?.(err.detail || 'Failed to delete user', 'error');
+            return;
+        }
+        window.showToast?.(`User ${username} deleted`, 'success');
+        window.location.reload();
+    } catch (err) {
+        window.showToast?.(`Error: ${err.message}`, 'error');
+    }
+}
+
+const AUDIT_ACTION_BADGE = {
+    create: 'badge-success',
+    delete: 'badge-error',
+    role_change: 'badge-warning',
+    password_reset: 'badge-info',
+    self_password_change: 'badge-info',
+};
+
+async function loadAuditLog() {
+    const body = document.getElementById('audit-log-body');
+    try {
+        const r = await fetch('/api/users/audit');
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+
+        document.querySelector('[data-testid="audit-count"]').textContent =
+            `${data.total} entr${data.total === 1 ? 'y' : 'ies'}`;
+
+        if (data.items.length === 0) {
+            body.innerHTML = '<tr><td colspan="5" class="text-center text-base-content/50 py-6">No activity yet</td></tr>';
+            return;
+        }
+
+        body.innerHTML = data.items.map(e => {
+            const badge = AUDIT_ACTION_BADGE[e.action] || 'badge-ghost';
+            const when = new Date(e.changed_at).toLocaleString();
+            return `
+                <tr data-testid="audit-row">
+                    <td class="text-xs text-base-content/60">${escapeHtml(when)}</td>
+                    <td><span class="badge badge-sm ${badge}">${escapeHtml(e.action)}</span></td>
+                    <td class="font-medium">${escapeHtml(e.target_username)}</td>
+                    <td class="text-xs text-base-content/70">${escapeHtml(e.detail || '—')}</td>
+                    <td class="text-xs">${escapeHtml(e.changed_by)}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        body.innerHTML = `<tr><td colspan="5" class="text-center text-error py-6">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadAuditLog);
+</script>
+{% endblock %}

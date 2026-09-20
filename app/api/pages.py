@@ -174,6 +174,7 @@ async def dashboard(
             "version": __version__,
             "theme": DEFAULT_THEME,
             "is_admin": is_admin,
+            "username": username,
             "scripts": healthy_scripts,
             "attention_scripts": attention_scripts,
             "stats": {
@@ -232,6 +233,7 @@ async def scripts_list(
             "page_title": "Scripts",
             "theme": DEFAULT_THEME,
             "is_admin": is_admin,
+            "username": username,
             "scripts": scripts,
             "filters": {
                 "search": search if search and search.strip() else None,
@@ -336,6 +338,7 @@ async def script_detail(
             "version": __version__,
             "theme": DEFAULT_THEME,
             "is_admin": is_admin,
+            "username": username,
             "script": script,
             "executions": executions,
             "next_run": scheduler_service.get_next_run_time(script.id),
@@ -428,6 +431,7 @@ async def script_version_detail(
             "request": request,
             "page_title": f"{script.name} - Version {version_number}",
             "is_admin": is_admin,
+            "username": username,
             "script": script,
             "version": version,
             "app_version": __version__,
@@ -497,6 +501,7 @@ async def executions_list(
             "version": __version__,
             "theme": DEFAULT_THEME,
             "is_admin": is_admin,
+            "username": username,
             "executions": executions,
             "scripts": scripts,
             "filters": {
@@ -540,6 +545,7 @@ async def execution_detail(
             "version": __version__,
             "theme": DEFAULT_THEME,
             "is_admin": is_admin,
+            "username": username,
             "execution": execution,
         },
     )
@@ -560,8 +566,32 @@ async def settings_page(
             "version": __version__,
             "theme": DEFAULT_THEME,
             "is_admin": is_admin,
+            "username": username,
             "settings": settings,
             "scheduler_jobs": scheduler_service.get_all_jobs_info(),
+        },
+    )
+
+
+@router.get("/users", response_class=HTMLResponse)
+async def users_page(
+    request: Request,
+    username: str = Depends(require_admin),
+):
+    """User management page. Admin-only."""
+    from app.services.user_service import list_users
+
+    users = await list_users()
+    return request.app.state.templates.TemplateResponse(
+        "users.html",
+        {
+            "request": request,
+            "page_title": "Users",
+            "version": __version__,
+            "theme": DEFAULT_THEME,
+            "is_admin": True,
+            "username": username,
+            "users": users,
         },
     )
 
@@ -671,20 +701,38 @@ async def changelog_page(
         f"""<!doctype html>
 <html lang="en" data-theme="dim">
 <head>
+  <!-- Same flash-prevention as base.html: apply the saved theme before
+       first paint. This page is a raw HTMLResponse, not a Jinja template
+       extending base.html, so it needs its own copy. -->
+  <script>
+    (function () {{
+      try {{
+        var t = localStorage.getItem('crinator-theme');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+      }} catch (e) {{}}
+    }})();
+  </script>
   <meta charset="utf-8">
   <title>Changelog - Cronator</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/vendor/fonts/fonts.css">
   <link rel="stylesheet" href="/static/output.css">
   <style>
-    body{{max-width:880px;margin:0 auto;padding:32px 24px;font-family:ui-sans-serif,system-ui,sans-serif;}}
-    h1,h2,h3{{color:#38bdf8;border-bottom:1px solid #1e293b;padding-bottom:8px;}}
+    /* This page is a raw HTMLResponse, not a Jinja template extending
+       base.html, so it can't use Tailwind utility classes that aren't
+       already generated elsewhere (app/api/pages.py isn't in Tailwind's
+       content scan) — reads the same DaisyUI theme CSS variables
+       base.html's classes resolve to instead of hardcoded hex, so
+       switching themes actually changes this page too. */
+    body{{max-width:880px;margin:0 auto;padding:32px 24px;font-family:'Inter',ui-sans-serif,system-ui,sans-serif;color:oklch(var(--bc));}}
+    h1,h2,h3{{color:oklch(var(--p));border-bottom:1px solid oklch(var(--bc)/0.15);padding-bottom:8px;}}
     h2{{margin-top:40px;}}
-    h3{{margin-top:24px;color:#94a3b8;}}
-    pre{{background:#020617;padding:14px 16px;border-radius:8px;overflow:auto;color:#e2e8f0;}}
-    code{{background:#1e293b;padding:2px 6px;border-radius:4px;font-size:0.9em;}}
-    a{{color:#60a5fa;}}
+    h3{{margin-top:24px;color:oklch(var(--bc)/0.6);}}
+    pre{{background:oklch(var(--b3));padding:14px 16px;border-radius:8px;overflow:auto;color:oklch(var(--bc));}}
+    code{{background:oklch(var(--b3));padding:2px 6px;border-radius:4px;font-size:0.9em;}}
+    a{{color:oklch(var(--p));}}
     ul li{{margin:4px 0;}}
-    .badge{{display:inline-block;background:#0ea5e9;color:white;padding:2px 8px;border-radius:6px;font-size:12px;margin-left:8px;}}
+    .badge{{display:inline-block;background:oklch(var(--p));color:oklch(var(--pc));padding:2px 8px;border-radius:6px;font-size:12px;margin-left:8px;}}
   </style>
 </head>
 <body>
