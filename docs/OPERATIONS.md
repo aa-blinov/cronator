@@ -16,6 +16,21 @@ The `db-backup` service (`docker-compose.yml`) runs a `pg_dump | gzip`
 daily at ~02:00 (host clock), writing to `./backups/cronator_<timestamp>.sql.gz`
 and deleting anything older than `BACKUP_RETENTION_DAYS` (default 7). This
 is a shell loop, not app code — restarting `cronator` doesn't affect it.
+This is the primary mechanism for anyone running the provided
+docker-compose stack, and it dumps schema **and** data via real `pg_dump`.
+
+### App-level automated backup (secondary, for non-compose deployments)
+
+If you're running the `cronator` container on its own against an
+external/managed Postgres — no `db-backup` sidecar to add — turn on
+"Automatic daily backup" in **Settings**. `BackupService`
+(`app/services/backup_service.py`) then writes a gzipped, **data-only**
+backup daily at 02:00 UTC to the same backups directory, keeping the 7
+most recent (never touches the `db-backup` sidecar's files, or anything
+you made by hand). Being data-only, it assumes the target already has
+migrations applied — it's not a substitute for `pg_dump`'s full
+schema+data dump if you're restoring onto a genuinely empty database.
+Off by default; if you're already running `db-backup`, leave it off.
 
 ### Manual backup
 

@@ -5,6 +5,7 @@ import secrets
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
+from app.api.rate_limit import check_login_lockout, record_login_failure
 from app.config import get_settings
 
 settings = get_settings()
@@ -19,9 +20,15 @@ async def verify_credentials(credentials: HTTPBasicCredentials = Depends(securit
        stored PBKDF2 hash.
     2. Otherwise fall back to the env-defined admin (legacy single-user
        auth) so deployments without a User table still work.
+
+    Failed attempts are rate-limited per username (P0: brute-force
+    protection) before any password check runs, so a locked-out username
+    can't be used to keep probing passwords.
     """
     username = credentials.username
     password = credentials.password
+
+    check_login_lockout(username)
 
     # Try DB-backed auth first (fast-fails: missing user → fall through)
     try:
@@ -32,6 +39,7 @@ async def verify_credentials(credentials: HTTPBasicCredentials = Depends(securit
             if verify_password(password, user.password_hash):
                 return username
             # User exists but password wrong → reject
+            record_login_failure(username)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials",
@@ -54,6 +62,7 @@ async def verify_credentials(credentials: HTTPBasicCredentials = Depends(securit
     )
 
     if not (correct_username and correct_password):
+        record_login_failure(username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
