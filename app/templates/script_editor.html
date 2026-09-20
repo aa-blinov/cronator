@@ -690,6 +690,15 @@
     
     // Store original script data for change detection
     let originalScriptData = null;
+
+    // True once the user has explicitly clicked "Create Script"/"Save
+    // Changes" at least once. Until then, "Run Test"'s auto-save must
+    // never send the real `enabled` toggle: clicking Run Test on a brand
+    // new script (enabled defaults to checked) used to silently create
+    // AND schedule a live cron job before the user ever reviewed or
+    // deliberately saved anything — closing the tab afterward left a
+    // real script running on schedule with no explicit save action.
+    let explicitlySaved = Boolean(scriptId);
     
     // Function to collect form data into an object
     function collectFormData() {
@@ -1343,7 +1352,8 @@ Packages: ${result.packages.join(', ')}`;
                 const result = await response.json();
                 console.log('Save result:', result);
                 console.log('needs_install:', result.needs_install);
-                
+                explicitlySaved = true;
+
                 // Check if installation is needed
                 if (result.needs_install) {
                     // Update button to show installing state
@@ -1650,37 +1660,45 @@ ${separator}
                     return;
                 }
                 
-                // Create new script first
+                // Create new script first — never with the real `enabled`
+                // toggle until the user explicitly hits Create/Save: a
+                // test run must not silently schedule a live cron job for
+                // a draft the user hasn't reviewed yet.
                 setConsoleStatus('Creating...', 'badge-info');
                 appendBlockToConsole('Auto-save', 'Creating script before test run...', 'info');
-                
+
+                const createPayload = explicitlySaved ? data : { ...data, enabled: false };
+
                 const createResponse = await fetch('/api/scripts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data),
+                    body: JSON.stringify(createPayload),
                 });
-                
+
                 if (!createResponse.ok) {
                     const error = await createResponse.json();
                     throw new Error(error.detail || 'Failed to create script');
                 }
-                
+
                 const createResult = await createResponse.json();
                 currentScriptId = createResult.id;
-                
+
                 // Update global scriptId so subsequent test runs know the script exists
                 scriptId = currentScriptId;
-                
+
                 // Update the form's data-script-id and action for future saves
                 form.dataset.scriptId = currentScriptId;
                 form.action = `/api/scripts/${currentScriptId}`;
-                
+
                 // Update URL without reload
                 window.history.replaceState({}, '', `/scripts/${currentScriptId}/edit`);
-                
-                // Save current data as original after creation
-                originalScriptData = collectFormData();
-                
+
+                // Save current data as original after creation — pinned to
+                // the payload actually persisted (enabled forced false),
+                // not the raw form, so the next test run's diff doesn't
+                // think "enabled" is unchanged and skip re-forcing it.
+                originalScriptData = { ...collectFormData(), enabled: createPayload.enabled };
+
                 appendBlockToConsole('Auto-save', `Script created with ID: ${currentScriptId}`, 'success');
                 
                 // Small delay to ensure file is synced to disk before test execution
@@ -1690,23 +1708,27 @@ ${separator}
                 const hasChanges = hasScriptChanged(data, originalScriptData);
                 
                 if (hasChanges) {
-                    // Save changes only if script has changed
+                    // Save changes only if script has changed. Same rule as
+                    // creation: don't let an auto-save-before-test flip a
+                    // never-explicitly-saved draft to enabled.
                     setConsoleStatus('Saving...', 'badge-info');
                     appendBlockToConsole('Auto-save', 'Saving changes before test run...', 'info');
-                    
+
+                    const savePayload = explicitlySaved ? data : { ...data, enabled: false };
+
                     const saveResponse = await fetch(`/api/scripts/${currentScriptId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data),
+                        body: JSON.stringify(savePayload),
                     });
-                    
+
                     if (!saveResponse.ok) {
                         const error = await saveResponse.json();
                         throw new Error(error.detail || 'Failed to save script');
                     }
-                    
+
                     // Update original data after successful save
-                    originalScriptData = collectFormData();
+                    originalScriptData = { ...collectFormData(), enabled: savePayload.enabled };
                     appendBlockToConsole('Auto-save', 'Changes saved', 'success');
                 } else {
                     // No changes - skip saving
