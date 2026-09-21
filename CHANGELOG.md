@@ -225,6 +225,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CSS is rebuilt; `npm run build:css`.)
 
 ### Fixed
+- **Re-audited mobile layout with real Playwright screenshots at 390px
+  width and found what the earlier pass missed: header action buttons
+  clipped past the viewport edge with no way to reach them.** The
+  page-header row (`base.html`) and per-page action rows
+  (`script_detail.html`, `execution_detail.html`, `script_version.html`)
+  laid buttons out with `justify-between`/no wrap, so once the page
+  title plus 3-5 buttons exceeded the viewport width, the overflow was
+  simply invisible and unscrollable — on the script editor specifically,
+  "Run Test" sat entirely off-screen (`getBoundingClientRect().right`
+  past `window.innerWidth`), meaning no way to test a script before
+  saving on a phone. Added `flex-wrap` throughout so buttons drop to
+  additional rows instead of clipping. Also: the raw-HTML `/changelog`
+  page's inline `<code>` spans had no `overflow-wrap`, so a long
+  identifier like `record_login_failure` inside backticks ran off the
+  edge instead of breaking. Verified page-by-page afterward: every page
+  now has `document.documentElement.scrollWidth ===
+  document.documentElement.clientWidth` at 390px (no page-level
+  horizontal overflow; tables still scroll horizontally within their
+  own container, which is correct).
 - **Most async buttons gave zero feedback while their request was in
   flight.** A handful (Run Now, Cancel execution, Restore version) had
   hand-rolled a disable+spinner+restore pattern; bulk enable/disable/

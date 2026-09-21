@@ -107,12 +107,18 @@
         <!-- Main content -->
         <main class="flex-1 overflow-auto min-w-0">
             <header class="glass-card border-b border-base-content/10 px-4 lg:px-8 py-4 lg:py-6 sticky top-0 z-10">
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 flex-wrap">
                     <button type="button" class="lg:hidden btn btn-ghost btn-sm btn-square" aria-label="Toggle menu" onclick="openSidebar()">
                         {{ icons.bars_3("w-5 h-5") }}
                     </button>
-                    <h2 class="text-xl font-semibold flex-1">{{ page_title }}</h2>
-                    <div class="flex items-center gap-4">
+                    <h2 class="text-xl font-semibold flex-1 min-w-0 truncate">{{ page_title }}</h2>
+                    <!-- flex-basis:100% on mobile pushes this onto its own row
+                         instead of clipping past the viewport edge once the
+                         title + hamburger already used up the width; the
+                         buttons inside it (each page's own header_actions
+                         markup) also need flex-wrap for the same reason when
+                         there are several of them. -->
+                    <div class="flex items-center gap-2 flex-wrap basis-full lg:basis-auto lg:w-auto">
                         {% block header_actions %}{% endblock %}
                     </div>
                 </div>

@@ -29,7 +29,7 @@
 
 {% block header_actions %}
 {% if is_admin %}
-<div class="flex items-center gap-2">
+<div class="flex items-center gap-2 flex-wrap">
     <a href="/scripts/{{ script.id }}/edit" class="btn btn-ghost btn-sm gap-2">
         {{ icons.arrow_left("w-4 h-4") }} Back to Editor
     </a>

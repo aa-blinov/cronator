@@ -729,7 +729,7 @@ async def changelog_page(
     h2{{margin-top:40px;}}
     h3{{margin-top:24px;color:oklch(var(--bc)/0.6);}}
     pre{{background:oklch(var(--b3));padding:14px 16px;border-radius:8px;overflow:auto;color:oklch(var(--bc));}}
-    code{{background:oklch(var(--b3));padding:2px 6px;border-radius:4px;font-size:0.9em;}}
+    code{{background:oklch(var(--b3));padding:2px 6px;border-radius:4px;font-size:0.9em;overflow-wrap:break-word;}}
     a{{color:oklch(var(--p));}}
     ul li{{margin:4px 0;}}
     .badge{{display:inline-block;background:oklch(var(--p));color:oklch(var(--pc));padding:2px 8px;border-radius:6px;font-size:12px;margin-left:8px;}}
