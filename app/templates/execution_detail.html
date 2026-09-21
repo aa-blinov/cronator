@@ -2,7 +2,7 @@
 {% import "icons.html" as icons %}
 
 {% block header_actions %}
-<div class="flex items-center gap-2">
+<div class="flex items-center gap-2 flex-wrap">
     {% if is_admin and execution.status == 'running' %}
     <button type="button" id="cancel-exec-btn" data-execution-id="{{ execution.id }}" class="btn btn-error btn-sm gap-2">
         {{ icons.x_mark("w-4 h-4") }} Cancel
