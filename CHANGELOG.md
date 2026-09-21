@@ -225,6 +225,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CSS is rebuilt; `npm run build:css`.)
 
 ### Fixed
+- **Hamburger and sidebar-close buttons were 32×32px** (`btn-sm`),
+  below the ~44px minimum recommended touch target size. Bumped both
+  to `btn-md` (48×48px, `base.html`).
 - **Re-audited mobile layout with real Playwright screenshots at 390px
   width and found what the earlier pass missed: header action buttons
   clipped past the viewport edge with no way to reach them.** The
