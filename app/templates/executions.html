@@ -78,10 +78,10 @@ function removeEmptyParams(event) {
                     {% for exec in executions %}
                     <tr class="border-b border-base-content/5 hover:bg-white/5" {% if exec.status == 'running' %}data-status="running"{% endif %}>
                         <td>
-                            <a href="/executions/{{ exec.id }}" class="text-indigo-400 hover:underline">#{{ exec.id }}</a>
+                            <a href="/executions/{{ exec.id }}" class="text-primary hover:underline">#{{ exec.id }}</a>
                         </td>
                         <td>
-                            <a href="/scripts/{{ exec.script_id }}" class="hover:text-indigo-400">
+                            <a href="/scripts/{{ exec.script_id }}" class="hover:text-primary">
                                 {{ exec.script.name if exec.script else 'Unknown' }}
                             </a>
                         </td>
