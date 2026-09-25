@@ -211,7 +211,7 @@ async function duplicateScript(scriptId) {
                 <tr class="border-b border-base-content/5 hover:bg-white/5 {% if exec.is_test %}test-run{% endif %}" {% if exec.status == 'running' %}data-status="running" data-execution-id="{{ exec.id }}"{% endif %}>
                     <td>
                         <div class="flex items-center gap-2">
-                            <a href="/executions/{{ exec.id }}" class="text-indigo-400 hover:underline">#{{ exec.id }}</a>
+                            <a href="/executions/{{ exec.id }}" class="text-primary hover:underline">#{{ exec.id }}</a>
                             {% if exec.is_test %}
                                 <span class="badge badge-info badge-xs">Test</span>
                             {% endif %}
