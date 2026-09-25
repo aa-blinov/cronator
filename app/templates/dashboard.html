@@ -100,7 +100,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        <a href="/scripts/{{ item.script.id }}" class="font-medium hover:text-indigo-400 transition-colors">
+                        <a href="/scripts/{{ item.script.id }}" class="font-medium hover:text-primary transition-colors">
                             <div class="font-bold">{{ item.script.name }}</div>
                         </a>
                         {% if item.script.description %}
@@ -122,7 +122,7 @@
                         <div class="flex items-center gap-2">
                             {% if is_admin %}
                             <form action="/scripts/{{ item.script.id }}/run" method="POST" class="inline">
-                                <button type="submit" class="btn btn-ghost btn-xs" title="Run now">
+                                <button type="submit" class="btn btn-ghost btn-xs" title="Run now" aria-label="Run {{ item.script.name }} now">
                                     {{ icons.play("w-4 h-4") }}
                                 </button>
                             </form>
@@ -195,7 +195,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        <a href="/scripts/{{ item.script.id }}" class="font-medium hover:text-indigo-400 transition-colors">
+                        <a href="/scripts/{{ item.script.id }}" class="font-medium hover:text-primary transition-colors">
                             <div class="font-bold">{{ item.script.name }}</div>
                         </a>
                         {% if item.script.description %}
@@ -229,17 +229,17 @@
                         <div class="flex items-center gap-2">
                             {% if is_admin %}
                             <form action="/scripts/{{ item.script.id }}/run" method="POST" class="inline">
-                                <button type="submit" class="btn btn-ghost btn-xs" title="Run now">
+                                <button type="submit" class="btn btn-ghost btn-xs" title="Run now" aria-label="Run {{ item.script.name }} now">
                                     {{ icons.play("w-4 h-4") }}
                                 </button>
                             </form>
                             {% endif %}
                             {% if is_admin %}
-                            <a href="/scripts/{{ item.script.id }}/edit" class="btn btn-ghost btn-xs" title="Edit">
+                            <a href="/scripts/{{ item.script.id }}/edit" class="btn btn-ghost btn-xs" title="Edit" aria-label="Edit {{ item.script.name }}">
                                 {{ icons.pencil("w-4 h-4") }}
                             </a>
                             <form action="/scripts/{{ item.script.id }}/toggle" method="POST" class="inline">
-                                <button type="submit" class="btn btn-ghost btn-xs" title="Toggle">
+                                <button type="submit" class="btn btn-ghost btn-xs" title="Toggle" aria-label="{% if item.script.enabled %}Disable{% else %}Enable{% endif %} {{ item.script.name }}">
                                     {% if item.script.enabled %}{{ icons.pause("w-4 h-4") }}{% else %}{{ icons.play("w-4 h-4") }}{% endif %}
                                 </button>
                             </form>
