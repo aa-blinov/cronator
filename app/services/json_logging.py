@@ -5,8 +5,8 @@ Two formatters implementing logging.Formatter:
 - HumanFormatter (default): traditional human-readable format.
 - JsonFormatter: one JSON object per log line, suitable for log aggregators.
 
-Selection happens at logging configuration time based on the CRONATOR_LOG_FORMAT
-environment variable (or settings.log_format).
+Selection happens at logging configuration time based on the LOG_FORMAT
+environment variable (settings.log_format).
 """
 
 from __future__ import annotations

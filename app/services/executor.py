@@ -718,6 +718,13 @@ class ExecutorService:
                             ):
                                 script_obj.last_failure_at = now
                                 script_obj.consecutive_failures += 1
+                                if script_obj.consecutive_failures >= 3:
+                                    logger.warning(
+                                        "Script %s (id=%s) has failed %d times in a row",
+                                        script_obj.name,
+                                        script_obj.id,
+                                        script_obj.consecutive_failures,
+                                    )
                             await stats_db.commit()
 
                     # Schedule retry if applicable
@@ -909,10 +916,25 @@ class ExecutorService:
 
         await db.commit()
 
-        logger.info(
-            f"Execution {execution.id} finished: status={status.value}, "
-            f"exit_code={exit_code}, duration={execution.duration_ms}ms, "
-            f"artifacts={execution.artifacts_count}"
+        # Failed/timeout executions are logged at ERROR so log-based alerting
+        # (and `grep ERROR`) actually catches them — previously every outcome
+        # was INFO, so a script could fail for weeks without a single ERROR line.
+        finish_level = (
+            logging.ERROR
+            if status in (ExecutionStatus.FAILED, ExecutionStatus.TIMEOUT)
+            else logging.INFO
+        )
+        logger.log(
+            finish_level,
+            "Execution %s finished: status=%s, script_id=%s, exit_code=%s, "
+            "duration=%sms, artifacts=%s%s",
+            execution.id,
+            status.value,
+            execution.script_id,
+            exit_code,
+            execution.duration_ms,
+            execution.artifacts_count,
+            f", error={execution.error_message}" if execution.error_message else "",
         )
 
         # Trigger alerting if needed
