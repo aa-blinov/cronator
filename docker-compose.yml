@@ -45,6 +45,9 @@ services:
       - ./envs:/app/envs
       # Logs
       - ./logs:/app/logs
+      # Backups directory - shared with the db-backup sidecar; the in-app
+      # automated backup writes auto_*.sql.gz here (BackupService).
+      - ./backups:/app/backups
     depends_on:
       db:
         condition: service_healthy
