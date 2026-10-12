@@ -6,13 +6,13 @@ any Prometheus-compatible scraper (Prometheus, VictoriaMetrics, Grafana Agent,
 OpenTelemetry collector) can consume it.
 
 Metrics exposed:
-- crinator_app_info{version="..."}  — constant 1, identifies the running version
-- crinator_uptime_seconds           — seconds since the app started
-- crinator_scripts_total             — total number of scripts registered
-- crinator_executions_total{status}  — counter of historical executions by status
-- crinator_executions_running        — gauge of currently-running executions
-- crinator_scheduler_jobs            — gauge of registered scheduler jobs
-- crinator_artifacts_total           — gauge of artifact rows
+- cronator_app_info{version="..."}  — constant 1, identifies the running version
+- cronator_uptime_seconds           — seconds since the app started
+- cronator_scripts_total             — total number of scripts registered
+- cronator_executions_total{status}  — counter of historical executions by status
+- cronator_executions_running        — gauge of currently-running executions
+- cronator_scheduler_jobs            — gauge of registered scheduler jobs
+- cronator_artifacts_total           — gauge of artifact rows
 """
 
 from __future__ import annotations
@@ -99,31 +99,31 @@ metrics_registry = MetricsRegistry()
 
 # Register metrics with help text
 metrics_registry.register_counter(
-    "crinator_executions_total",
+    "cronator_executions_total",
     "Total number of executions since process start, labeled by status.",
 )
 metrics_registry.register_gauge(
-    "crinator_app_info",
+    "cronator_app_info",
     "Constant 1; labels carry identifying metadata (version).",
 )
 metrics_registry.register_gauge(
-    "crinator_uptime_seconds",
+    "cronator_uptime_seconds",
     "Seconds elapsed since the app started.",
 )
 metrics_registry.register_gauge(
-    "crinator_scripts_total",
+    "cronator_scripts_total",
     "Total number of scripts registered in the database.",
 )
 metrics_registry.register_gauge(
-    "crinator_executions_running",
+    "cronator_executions_running",
     "Number of executions currently in RUNNING state.",
 )
 metrics_registry.register_gauge(
-    "crinator_scheduler_jobs",
+    "cronator_scheduler_jobs",
     "Number of jobs currently registered with the scheduler.",
 )
 metrics_registry.register_gauge(
-    "crinator_artifacts_total",
+    "cronator_artifacts_total",
     "Total number of artifact rows across all executions.",
 )
 
@@ -140,8 +140,8 @@ def record_execution_status(status: str, triggered_by: str | None = None) -> Non
     labels = {"status": status}
     if triggered_by:
         labels["triggered_by"] = triggered_by
-    metrics_registry.counter_inc("crinator_executions_total", labels=labels)
+    metrics_registry.counter_inc("cronator_executions_total", labels=labels)
 
 
 def init_app_info(version: str | None = None) -> None:
-    metrics_registry.gauge_set("crinator_app_info", 1.0, labels={"version": version or __version__})
+    metrics_registry.gauge_set("cronator_app_info", 1.0, labels={"version": version or __version__})

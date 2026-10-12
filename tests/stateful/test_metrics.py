@@ -3,12 +3,12 @@
 Expose Prometheus-format metrics so operators can scrape Cronator like any
 other service. Counters and gauges are the primary use cases:
 
-- cronitor_scripts_total (gauge) — total number of scripts
-- cronitor_executions_total{status,triggered_by} (counter) — execution count
-- cronitor_executions_running (gauge) — currently running
-- crinator_scheduler_jobs (gauge) — registered scheduler jobs
-- crinator_app_info{version="0.1.0"} (gauge, constant 1)
-- crinator_uptime_seconds (gauge)
+- cronator_scripts_total (gauge) — total number of scripts
+- cronator_executions_total{status,triggered_by} (counter) — execution count
+- cronator_executions_running (gauge) — currently running
+- cronator_scheduler_jobs (gauge) — registered scheduler jobs
+- cronator_app_info{version="0.1.0"} (gauge, constant 1)
+- cronator_uptime_seconds (gauge)
 """
 
 import re
@@ -36,7 +36,7 @@ async def test_metrics_contains_help_and_type_comments(test_client):
     r = await test_client.get("/metrics")
     body = r.text
     # Every metric we expose should have a HELP line and a TYPE line
-    assert "# HELP crinator_" in body or "# HELP cronitor_" in body, body[:500]
+    assert "# HELP cronator_" in body, body[:500]
 
 
 @pytest.mark.asyncio
@@ -44,10 +44,8 @@ async def test_metrics_app_info_present(test_client):
     """A constant `1` gauge labeled with the app version."""
     r = await test_client.get("/metrics")
     body = r.text
-    match = re.search(r'crinator_app_info\{version="[^"]+"\}\s+1\.0', body) or re.search(
-        r'cronitor_app_info\{version="[^"]+"\}\s+1\.0', body
-    )
-    assert match, f"cronitor_app_info gauge not found in:\n{body[:500]}"
+    match = re.search(r'cronator_app_info\{version="[^"]+"\}\s+1\.0', body)
+    assert match, f"cronator_app_info gauge not found in:\n{body[:500]}"
 
 
 @pytest.mark.asyncio
@@ -65,3 +63,12 @@ async def test_metrics_no_secrets(test_client):
     body = r.text.lower()
     for needle in ("secret_key", "admin_password", "postgresql://", "smtp_password"):
         assert needle not in body, f"sensitive token {needle!r} in /metrics output"
+
+
+@pytest.mark.asyncio
+async def test_metrics_namespace_is_cronator_not_crinator(test_client):
+    """Regression: the metric namespace was misspelled `crinator_` instead of `cronator_`."""
+    r = await test_client.get("/metrics")
+    assert "crinator_" not in r.text, (
+        "misspelled `crinator_` metric namespace still present in /metrics output"
+    )

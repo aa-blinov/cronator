@@ -136,6 +136,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8080 \
+    UV_PYTHON_INSTALL_DIR=/app/envs/.python \
     ORACLE_BASE=/usr/lib/instantclient \
     LD_LIBRARY_PATH=/usr/lib/instantclient \
     TNS_ADMIN=/usr/lib/instantclient \

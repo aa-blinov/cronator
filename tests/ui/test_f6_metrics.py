@@ -36,17 +36,17 @@ def test_f6_metrics_endpoint_returns_text(page: Page, base_url: str) -> None:
 def test_f6_metrics_has_app_info(page: Page, base_url: str) -> None:
     body = _render_metrics_in_browser(page, base_url)
     screenshot(page, "f6_02_metrics_app_info")
-    assert "crinator_app_info" in body, body[:300]
+    assert "cronator_app_info" in body, body[:300]
     assert "version=" in body, body[:300]
 
 
 def test_f6_metrics_has_running_gauge(page: Page, base_url: str) -> None:
     body = _render_metrics_in_browser(page, base_url)
-    assert "crinator_executions_running" in body, body[:300]
+    assert "cronator_executions_running" in body, body[:300]
     screenshot(page, "f6_03_metrics_running_gauge")
 
 
 def test_f6_metrics_has_uptime(page: Page, base_url: str) -> None:
     body = _render_metrics_in_browser(page, base_url)
-    assert "crinator_uptime_seconds" in body, body[:300]
+    assert "cronator_uptime_seconds" in body, body[:300]
     screenshot(page, "f6_04_metrics_uptime")
