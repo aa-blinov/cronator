@@ -373,11 +373,17 @@ async def list_available_backups():
         for p in sorted(backups_dir.glob("*.sql.gz"), reverse=True):
             try:
                 stat = p.stat()
+                # `auto_*` archives are the data-only format this endpoint can
+                # apply. The db-backup sidecar's `cronator_*` files are full
+                # pg_dump (schema + data) and must be restored with psql.
+                is_data_only = p.name.startswith("auto_")
                 files.append(
                     {
                         "filename": p.name,
                         "size_bytes": stat.st_size,
                         "created_at": stat.st_mtime,
+                        "kind": "data-only" if is_data_only else "full-or-unknown",
+                        "restorable_via_ui": is_data_only,
                     }
                 )
             except OSError:
@@ -445,6 +451,26 @@ async def restore_backup(file: UploadFile = File(...), username: str = Depends(r
                 detail=(
                     "Backup contains destructive statements that would target "
                     "system catalogs: " + ", ".join(sorted(set(dangerous)))
+                ),
+            )
+
+        # This endpoint applies a *data-only* archive (the format BackupService
+        # writes): COPY ... FROM stdin blocks, no schema statements. A full
+        # `pg_dump` (e.g. the db-backup sidecar's cronator_*.sql.gz) also
+        # contains CREATE/ALTER TABLE, which would fail against an existing
+        # schema and leave the restore half-applied while still reporting a
+        # row/statement count. Reject it with a clear message instead.
+        if re.search(
+            r"^\s*(CREATE|ALTER)\s+(TABLE|INDEX|SEQUENCE|TYPE|VIEW)\b",
+            sql_text,
+            flags=re.IGNORECASE | re.MULTILINE,
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "This looks like a full pg_dump (contains schema DDL). The "
+                    "UI restore accepts data-only backups (auto_*.sql.gz). "
+                    "Restore full dumps with psql/pg_restore instead."
                 ),
             )
 

@@ -1,6 +1,7 @@
 """Execution history cleanup service."""
 
 import logging
+import os
 import shutil
 from datetime import UTC, datetime, timedelta
 
@@ -24,6 +25,40 @@ RETENTION_BY_STATUS: dict[str, int] = {
     ExecutionStatus.CANCELLED.value: 100,
 }
 
+# Warn when a single cleanup run deletes at least this many rows. A first run
+# against a long-neglected DB can legitimately purge tens of thousands — but
+# that should be visible in the logs, not silent.
+MASS_DELETE_WARNING_THRESHOLD = 1000
+
+# Environment overrides so an operator can keep more history without a code
+# change, e.g. EXECUTION_RETENTION_SUCCESS=2000.
+_RETENTION_ENV = {
+    ExecutionStatus.SUCCESS.value: "EXECUTION_RETENTION_SUCCESS",
+    ExecutionStatus.FAILED.value: "EXECUTION_RETENTION_FAILED",
+    ExecutionStatus.TIMEOUT.value: "EXECUTION_RETENTION_TIMEOUT",
+    ExecutionStatus.SKIPPED.value: "EXECUTION_RETENTION_SKIPPED",
+    ExecutionStatus.CANCELLED.value: "EXECUTION_RETENTION_CANCELLED",
+}
+
+
+def get_retention_limits() -> dict[str, int]:
+    """Effective per-status retention, with env overrides applied."""
+    limits = dict(RETENTION_BY_STATUS)
+    for status, env_name in _RETENTION_ENV.items():
+        raw = os.getenv(env_name)
+        if not raw:
+            continue
+        try:
+            value = int(raw)
+        except ValueError:
+            logger.warning("Ignoring non-integer %s=%r", env_name, raw)
+            continue
+        if value < 1:
+            logger.warning("Ignoring non-positive %s=%r", env_name, raw)
+            continue
+        limits[status] = value
+    return limits
+
 
 class CleanupService:
     """Handles automatic and manual cleanup of execution history."""
@@ -37,6 +72,7 @@ class CleanupService:
         their artifact directories.
         """
         cfg = get_settings()
+        retention = get_retention_limits()
         deleted_executions = 0
         deleted_artifact_dirs = 0
 
@@ -47,7 +83,7 @@ class CleanupService:
             script_ids = [row[0] for row in script_result.all()]
 
             for script_id in script_ids:
-                for status, keep_count in RETENTION_BY_STATUS.items():
+                for status, keep_count in retention.items():
                     # IDs of the N most recent executions to keep
                     keep_result = await db.execute(
                         select(Execution.id)
@@ -95,9 +131,17 @@ class CleanupService:
             deleted_executions,
             deleted_artifact_dirs,
         )
+        if deleted_executions >= MASS_DELETE_WARNING_THRESHOLD:
+            logger.warning(
+                "Status-aware cleanup deleted %d executions in a single run "
+                "(>= %d) — check retention limits if this is unexpected",
+                deleted_executions,
+                MASS_DELETE_WARNING_THRESHOLD,
+            )
         return {
             "deleted_executions": deleted_executions,
             "deleted_artifact_dirs": deleted_artifact_dirs,
+            "retention": retention,
         }
 
     async def cleanup_older_than_days(self, days: int) -> dict:
