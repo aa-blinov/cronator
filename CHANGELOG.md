@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Prometheus metrics were named `crinator_*`** (typo) instead of
+  `cronator_*` — every metric plus its `HELP`/`TYPE` line. Any scraper or
+  dashboard keyed on the old names must be updated.
+- **`/health` reported `components.migrations` as `unavailable`** because
+  the check derived a sync SQLAlchemy URL and called `create_engine()`,
+  which needs psycopg2 (not installed in the runtime image). It now reads
+  the current Alembic revision over the async engine via `run_sync`, so
+  drift (`pending: true`) is actually detected, and the app logs a startup
+  warning when the schema is behind head.
+- **Failed/timed-out executions were only logged at INFO.** They are now
+  logged at ERROR (so `grep ERROR` / log-based alerting catches them), and
+  a WARNING is emitted once a script reaches 3 consecutive failures.
+- **Automated backups were written to a non-mounted `/app/backups`** inside
+  the `cronator` container (ephemeral, invisible to the host and the
+  `db-backup` sidecar). The compose stack now mounts `./backups` there. The
+  service also verifies the archive it just wrote (non-empty, valid gzip)
+  and records the last outcome, surfaced as `backups` in `/api/diagnostics`.
+- **`POST /api/settings/restore-backup` silently half-applied full
+  `pg_dump` files** (the sidecar's `cronator_*.sql.gz`), whose
+  `CREATE/ALTER TABLE` statements fail against an existing schema. Full
+  dumps are now rejected with a clear 400; the listing marks each file as
+  `data-only` vs `full-or-unknown` and `restorable_via_ui`.
+- **`json_logging` docstring referenced a non-existent `CRONATOR_LOG_FORMAT`**
+  env var; the real knob is `LOG_FORMAT`.
+
+### Changed
+- **Execution-history retention is now configurable** via
+  `EXECUTION_RETENTION_SUCCESS|FAILED|TIMEOUT|SKIPPED|CANCELLED` env vars
+  (defaults unchanged). A cleanup run deleting >= 1000 rows now logs a
+  WARNING instead of doing so silently.
+- **`Dockerfile` sets `UV_PYTHON_INSTALL_DIR=/app/envs/.python`** so
+  uv-managed Python interpreters (3.9/3.11, …) live on the persisted
+  `./envs` volume and survive container rebuilds.
+- **Startup waits for the database** with retry/backoff before running
+  migrations, absorbing the cold-start DNS race that previously surfaced as
+  unhandled 500s on the first requests.
+
 ### Added
 - **P0 production-readiness batch: login lockout, CSRF-via-Basic-Auth
   guard, user-management audit log, automated backups.**

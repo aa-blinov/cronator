@@ -73,3 +73,19 @@ async def test_list_backups_endpoint(test_client):
     body = r.json()
     assert "backups" in body
     assert isinstance(body["backups"], list)
+
+
+@pytest.mark.asyncio
+async def test_restore_backup_rejects_full_pg_dump(test_client):
+    """A full pg_dump (schema DDL) must be rejected with a clear 400 rather
+    than half-applied against an existing schema and reported as success."""
+    full_dump = (
+        b"CREATE TABLE public.scripts (id integer);\n"
+        b"COPY public.scripts (id) FROM stdin;\n1\n\\.\n"
+    )
+    gz = gzip.compress(full_dump)
+    files = {"file": ("cronator_20260101_020000.sql.gz", io.BytesIO(gz), "application/gzip")}
+    r = await test_client.post("/api/settings/restore-backup", files=files)
+    assert r.status_code == 400, r.text
+    body = r.text.lower()
+    assert "pg_dump" in body or "data-only" in body, body

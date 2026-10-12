@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy import text
 
 from app.database import Base
-from app.services.backup_service import backup_service
+from app.services.backup_service import backup_service, get_last_backup_status
 from app.services.settings_service import settings_service
 
 pytestmark = pytest.mark.asyncio
@@ -42,6 +42,13 @@ class TestAutoBackupRoundTrip:
         assert backup_path.exists()
         assert backup_path.name.startswith("auto_")
         assert backup_path.suffix == ".gz"
+
+        # The outcome is recorded for /api/diagnostics, and the archive passed
+        # verification (non-empty + valid gzip).
+        status = get_last_backup_status()
+        assert status["status"] == "ok", status
+        assert status["path"] == str(backup_path), status
+        assert status["size_bytes"] and status["size_bytes"] > 0, status
 
         with open(backup_path, "rb") as f:
             backup_bytes = f.read()

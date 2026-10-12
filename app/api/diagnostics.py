@@ -13,6 +13,7 @@ Sections:
 - executor: running executions + total subprocesses
 - config: sanitized settings snapshot (sensitive fields masked)
 - logs: log file path + size + rotation count
+- backups: outcome of the most recent automated backup (status/path/size/at)
 """
 
 from __future__ import annotations
@@ -166,6 +167,11 @@ async def get_diagnostics(username: str = Depends(verify_credentials)):
         ),
     }
 
+    # --- Backups (last automated backup outcome) ---
+    from app.services.backup_service import get_last_backup_status
+
+    backups_info = get_last_backup_status()
+
     return {
         "version": __version__,
         "python_version": platform.python_version(),
@@ -177,6 +183,7 @@ async def get_diagnostics(username: str = Depends(verify_credentials)):
         "executor": exec_info,
         "config": config_snapshot,
         "logs": logs_info,
+        "backups": backups_info,
         "as_of": time.time(),
     }
 

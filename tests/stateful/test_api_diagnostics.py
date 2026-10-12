@@ -86,3 +86,14 @@ async def test_diagnostics_has_logs_info(test_client):
     logs = body["logs"]
     assert "log_file" in logs
     assert "size_bytes" in logs
+
+
+@pytest.mark.asyncio
+async def test_diagnostics_has_backups_info(test_client):
+    """The last automated backup outcome is surfaced for incident triage."""
+    body = (await test_client.get("/api/diagnostics")).json()
+    assert "backups" in body, body.keys()
+    backups = body["backups"]
+    assert "status" in backups, backups
+    assert "path" in backups, backups
+    assert "size_bytes" in backups, backups

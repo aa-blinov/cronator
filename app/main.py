@@ -102,6 +102,12 @@ async def lifespan(app: FastAPI):
     # Ensure directories exist
     settings.ensure_directories()
 
+    # Wait for the database to become reachable before migrating. On a cold
+    # container start the DB hostname may not resolve yet ("Temporary failure
+    # in name resolution"), which used to surface as unhandled 500s on the
+    # first requests instead of a clean, retried startup.
+    await wait_for_database()
+
     # Run database migrations with Alembic (skip in tests)
     if not os.getenv("SKIP_ALEMBIC_MIGRATIONS"):
         logger.info("Running database migrations...")
@@ -124,6 +130,15 @@ async def lifespan(app: FastAPI):
         logger.info("Skipping database migrations (SKIP_ALEMBIC_MIGRATIONS is set)")
 
     logger.info("Database initialized")
+
+    # Drift detection: warn (don't fail) if the schema is behind Alembic head.
+    migration_status = await get_migration_status()
+    if migration_status.get("pending"):
+        logger.warning(
+            "Database schema is behind Alembic head "
+            f"(current={migration_status.get('current')!r}, "
+            f"head={migration_status.get('head')!r}) — run `alembic upgrade head`"
+        )
 
     # Initialize settings service and migrate from .env if needed
     from app.services.settings_service import settings_service
@@ -173,6 +188,44 @@ async def lifespan(app: FastAPI):
     #      rather than being SIGKILL'd by the OS and stuck in RUNNING forever
     #   3. Close the database engine to release connections
     await graceful_shutdown(scheduler_service, executor_service, close_db)
+
+
+async def wait_for_database(attempts: int = 10, delay: float = 2.0) -> None:
+    """Best-effort wait until the database answers ``SELECT 1``.
+
+    Retries with a fixed delay and gives up after ``attempts`` — the app still
+    starts (``/health`` will report the database as unhealthy) rather than
+    crash-looping, but this absorbs the transient DNS/network race on cold
+    container starts.
+    """
+    import asyncio
+
+    from sqlalchemy import text
+
+    from app.database import async_session_maker
+
+    for attempt in range(1, attempts + 1):
+        try:
+            async with async_session_maker() as db:
+                await db.execute(text("SELECT 1"))
+            return
+        except Exception as e:
+            if attempt == attempts:
+                logger.warning(
+                    "Database not reachable after %d attempts (%s) — continuing; "
+                    "/health will report it",
+                    attempts,
+                    e,
+                )
+                return
+            logger.warning(
+                "Database not reachable yet (attempt %d/%d): %s — retrying in %.1fs",
+                attempt,
+                attempts,
+                e,
+                delay,
+            )
+            await asyncio.sleep(delay)
 
 
 async def graceful_shutdown(scheduler, executor, close_db_fn):
@@ -278,9 +331,9 @@ async def metrics_endpoint():
                 or 0
             )
             artifacts_total = await db.scalar(select(func.count()).select_from(Artifact)) or 0
-        metrics_registry.gauge_set("crinator_scripts_total", float(script_total))
-        metrics_registry.gauge_set("crinator_executions_running", float(running))
-        metrics_registry.gauge_set("crinator_artifacts_total", float(artifacts_total))
+        metrics_registry.gauge_set("cronator_scripts_total", float(script_total))
+        metrics_registry.gauge_set("cronator_executions_running", float(running))
+        metrics_registry.gauge_set("cronator_artifacts_total", float(artifacts_total))
     except Exception:
         # Don't fail metrics scrape because of a DB hiccup
         pass
@@ -290,11 +343,11 @@ async def metrics_endpoint():
         from app.services.scheduler import scheduler_service
 
         job_count = len(scheduler_service.scheduler.get_jobs())
-        metrics_registry.gauge_set("crinator_scheduler_jobs", float(job_count))
+        metrics_registry.gauge_set("cronator_scheduler_jobs", float(job_count))
     except Exception:
         pass
 
-    metrics_registry.gauge_set("crinator_uptime_seconds", get_uptime_seconds())
+    metrics_registry.gauge_set("cronator_uptime_seconds", get_uptime_seconds())
     init_app_info()
 
     body = metrics_registry.render()
@@ -434,6 +487,49 @@ if static_dir.exists():
 app.include_router(api_router)
 
 
+async def get_migration_status() -> dict:
+    """Best-effort Alembic drift snapshot: current revision vs head.
+
+    Reads the current revision over the app's *async* engine, so it works
+    with asyncpg — the previous implementation derived a sync URL and called
+    ``create_engine()``, which required a sync driver (psycopg2) that isn't
+    installed in the runtime image, so it always reported ``unavailable``.
+    ``run_sync`` gives Alembic a sync-style Connection while staying on the
+    already-installed async driver.
+    """
+    import os
+
+    if os.getenv("SKIP_ALEMBIC_MIGRATIONS"):
+        return {"status": "skipped", "reason": "SKIP_ALEMBIC_MIGRATIONS=1"}
+
+    try:
+        from alembic.config import Config
+        from alembic.runtime.migration import MigrationContext
+        from alembic.script import ScriptDirectory
+
+        from app.database import async_session_maker
+
+        script_dir = ScriptDirectory.from_config(Config("alembic.ini"))
+        head_rev = script_dir.get_current_head()
+
+        def _current_revision(sync_conn) -> str | None:
+            return MigrationContext.configure(sync_conn).get_current_revision()
+
+        async with async_session_maker() as db:
+            conn = await db.connection()
+            current_rev = await conn.run_sync(_current_revision)
+
+        pending = current_rev != head_rev
+        return {
+            "status": "ok" if not pending else "pending",
+            "current": current_rev,
+            "head": head_rev,
+            "pending": pending,
+        }
+    except Exception as e:
+        return {"status": "error", "error": f"{type(e).__name__}: {e}"}
+
+
 @app.get("/health")
 async def health_check():
     """Enhanced health check endpoint with detailed status.
@@ -526,62 +622,9 @@ async def health_check():
         checks["components"]["disk"] = {"error": f"{type(e).__name__}: {e}"}
 
     # Migrations status (best-effort; tests skip alembic and don't have the table)
-    try:
-        import os
-
-        if os.getenv("SKIP_ALEMBIC_MIGRATIONS"):
-            checks["components"]["migrations"] = {
-                "status": "skipped",
-                "reason": "SKIP_ALEMBIC_MIGRATIONS=1",
-            }
-        else:
-            from alembic.config import Config
-            from alembic.runtime.migration import MigrationContext
-            from alembic.script import ScriptDirectory
-            from sqlalchemy import create_engine
-
-            cfg = Config("alembic.ini")
-            script_dir = ScriptDirectory.from_config(cfg)
-            head_rev = script_dir.get_current_head()
-
-            # Alembic's MigrationContext needs a sync Connection.
-            # Use a sync engine derived from the async one to inspect migrations.
-            from app.database import engine as _async_engine
-
-            sync_url = _async_engine.url.render_as_string(hide_password=False)
-            # Strip async driver suffix to get sync URL
-            sync_url = sync_url.replace("+asyncpg", "").replace("+aiosqlite", "")
-            try:
-                sync_engine = create_engine(sync_url)
-            except ModuleNotFoundError as exc:
-                # e.g. psycopg2 not installed for PostgreSQL sync URL — skip silently
-                checks["components"]["migrations"] = {
-                    "status": "unavailable",
-                    "reason": f"sync driver not installed ({exc.name})",
-                    "head": head_rev,
-                }
-            else:
-                try:
-                    with sync_engine.connect() as conn:
-                        ctx = MigrationContext.configure(conn)
-                        current_rev = ctx.get_current_revision()
-                finally:
-                    sync_engine.dispose()
-
-                pending = current_rev != head_rev
-                checks["components"]["migrations"] = {
-                    "status": "ok" if not pending else "pending",
-                    "current": current_rev,
-                    "head": head_rev,
-                    "pending": pending,
-                }
-                if pending:
-                    checks["status"] = "degraded"
-    except Exception as e:
-        checks["components"]["migrations"] = {
-            "status": "error",
-            "error": f"{type(e).__name__}: {e}",
-        }  # noqa: E501
+    checks["components"]["migrations"] = await get_migration_status()
+    if checks["components"]["migrations"].get("pending"):
+        checks["status"] = "degraded"
 
     # Return 503 if any component is degraded
     status_code = 200 if checks["status"] == "healthy" else 503
