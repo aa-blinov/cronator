@@ -134,7 +134,7 @@ alembic/versions/     # migrations, one linear chain (check with `alembic heads`
                       # — more than one means a branch that needs merging)
 ```
 
-See [Architecture](ARCHITECTURE.md) for how these pieces fit together at
+See [Architecture](architecture.md) for how these pieces fit together at
 runtime.
 
 ## Conventions

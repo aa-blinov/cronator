@@ -7,7 +7,7 @@ or extend it.
 
 | Document                              | What's in it                                                                              |
 | -------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [Architecture](ARCHITECTURE.md)        | Components, request flow, the execution engine, data model, background jobs                |
+| [Architecture](architecture.md)        | Components, request flow, the execution engine, data model, background jobs                |
 | [Configuration](CONFIGURATION.md)      | Every environment variable, what's env-only vs. DB-backed, precedence rules                |
 | [Deployment](DEPLOYMENT.md)            | Docker Compose production setup, reverse proxy, log rotation, resource sizing, upgrades     |
 | [Operations](OPERATIONS.md)            | Backups & restore, disk space, alerting behavior, health/diagnostics endpoints, runbooks    |
