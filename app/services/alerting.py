@@ -111,7 +111,7 @@ class AlertingService:
         <html>
         <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #dc2626;">Script Execution Failed</h2>
-            
+
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                 <tr>
                     <td style="padding: 8px; border: 1px solid #e5e7eb;
@@ -144,7 +144,7 @@ class AlertingService:
                         {execution.duration_formatted}</td>
                 </tr>
             </table>
-            
+
             {
             f'''
             <h3>Error Message</h3>
@@ -154,7 +154,7 @@ border-radius: 4px; overflow-x: auto;">{execution.error_message}</pre>
             if execution.error_message
             else ""
         }
-            
+
             {
             f'''
             <h3>Stderr Output</h3>
@@ -166,7 +166,7 @@ border-radius: 4px; overflow-x: auto; max-height: 300px;">
             if execution.stderr
             else ""
         }
-            
+
             <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">
                 This alert was sent by Cronator.
             </p>
@@ -201,7 +201,7 @@ Stderr:
         <html>
         <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #16a34a;">Script Execution Succeeded</h2>
-            
+
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                 <tr>
                     <td style="padding: 8px; border: 1px solid #e5e7eb;
@@ -228,7 +228,7 @@ Stderr:
                         {execution.duration_formatted}</td>
                 </tr>
             </table>
-            
+
             <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">
                 This alert was sent by Cronator.
             </p>

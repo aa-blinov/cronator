@@ -30,32 +30,32 @@
         font-size: 14px;
         border-radius: 0.5rem;
     }
-    
+
     /* Custom scrollbar styling */
     .custom-scrollbar::-webkit-scrollbar {
         width: 8px;
     }
-    
+
     .custom-scrollbar::-webkit-scrollbar-track {
         background: rgba(0, 0, 0, 0.1);
         border-radius: 4px;
     }
-    
+
     .custom-scrollbar::-webkit-scrollbar-thumb {
         background: rgba(0, 0, 0, 0.3);
         border-radius: 4px;
     }
-    
+
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
         background: rgba(0, 0, 0, 0.5);
     }
-    
+
     /* For Firefox */
     .custom-scrollbar {
         scrollbar-width: thin;
         scrollbar-color: rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0.1);
     }
-    
+
     /* Dependency diff styles */
     .diff-line-added {
         background-color: rgba(34, 197, 94, 0.1);
@@ -65,7 +65,7 @@
         padding-top: 0.25rem;
         padding-bottom: 0.25rem;
     }
-    
+
     .diff-line-removed {
         background-color: rgba(239, 68, 68, 0.1);
         color: rgb(239, 68, 68);
@@ -74,7 +74,7 @@
         padding-top: 0.25rem;
         padding-bottom: 0.25rem;
     }
-    
+
     .diff-line-modified {
         background-color: rgba(251, 191, 36, 0.1);
         color: rgb(251, 191, 36);
@@ -83,22 +83,22 @@
         padding-top: 0.25rem;
         padding-bottom: 0.25rem;
     }
-    
+
     .diff-line-added::before {
         content: '+ ';
         font-weight: bold;
     }
-    
+
     .diff-line-removed::before {
         content: '- ';
         font-weight: bold;
     }
-    
+
     .diff-line-modified::before {
         content: '~ ';
         font-weight: bold;
     }
-    
+
     /* Hide collapse checkbox */
     #deps-diff-container input[type="checkbox"] {
         display: none;
@@ -180,7 +180,7 @@
                 </div>
                 <textarea id="code-editor" name="content">{{ content }}</textarea>
             </div>
-            
+
             <!-- Output Console -->
             <div class="glass-card rounded-xl p-6">
                 <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -297,13 +297,13 @@
         <div class="space-y-6">
             <div class="glass-card rounded-xl p-6">
                 <h3 class="text-lg font-semibold mb-4">Settings</h3>
-                
+
                 <div class="space-y-4">
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Script Name</span>
                         </label>
-                        <input type="text" name="name" 
+                        <input type="text" name="name"
                                value="{{ script.name if script else '' }}"
                                placeholder="my-script"
                                class="input input-bordered w-full"
@@ -314,12 +314,12 @@
                             <span class="label-text-alt text-base-content/50">Letters, numbers, underscores, hyphens only</span>
                         </label>
                     </div>
-                    
+
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Script Description</span>
                         </label>
-                        <textarea name="description" 
+                        <textarea name="description"
                                   class="textarea textarea-bordered w-full"
                                   rows="2"
                                   placeholder="What does this script do? (general purpose, stays unchanged)">{{ script.description if script else '' }}</textarea>
@@ -327,13 +327,13 @@
                             <span class="label-text-alt text-base-content/50">Permanent description of the script's purpose</span>
                         </label>
                     </div>
-                    
+
                     {% if script %}
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Version Notes (optional)</span>
                         </label>
-                        <textarea name="change_summary" id="change-summary" rows="2" 
+                        <textarea name="change_summary" id="change-summary" rows="2"
                                   class="textarea textarea-bordered w-full text-sm"
                                   placeholder="e.g., Fixed bug with data parsing, Updated dependencies, Added new feature..."></textarea>
                         <label class="label">
@@ -341,12 +341,12 @@
                         </label>
                     </div>
                     {% endif %}
-                    
+
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Schedule (Cron Expression)</span>
                         </label>
-                        
+
                         <!-- Preset buttons -->
                         <div class="flex flex-wrap gap-2 mb-3">
                             <button type="button" class="btn btn-xs btn-outline" onclick="setCron('* * * * *')">Every minute</button>
@@ -365,13 +365,13 @@
                             <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 0 * * 0')">Weekly Sunday</button>
                             <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 0 1 * *')">Monthly 1st</button>
                         </div>
-                        
+
                         <input type="text" name="cron_expression" id="cron-input"
                                value="{{ script.cron_expression if script else '0 * * * *' }}"
                                placeholder="0 * * * *"
                                class="input input-bordered w-full font-mono mb-2"
                                required>
-                        
+
                         <!-- Human-readable description -->
                         <div class="alert alert-info mb-2" style="padding: 0.75rem;">
                             <div class="flex items-start gap-2">
@@ -382,13 +382,13 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <label class="label">
                             <span class="label-text-alt text-base-content/60 font-medium">Format: minute hour day month weekday</span>
                             <a href="https://crontab.guru/" target="_blank" class="label-text-alt link link-primary font-medium">Cron helper</a>
                         </label>
                     </div>
-                    
+
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Python Version</span>
@@ -401,7 +401,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    
+
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Timeout (seconds)</span>
@@ -415,12 +415,12 @@
                             Use a longer timeout only for known long jobs (migrations, big exports).
                         </p>
                     </div>
-                    
+
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Misfire Grace Time (seconds)</span>
                         </label>
-                        <input type="number" name="misfire_grace_time" 
+                        <input type="number" name="misfire_grace_time"
                                value="{{ script.misfire_grace_time if script else 60 }}"
                                min="0" max="3600"
                                class="input input-bordered w-full">
@@ -428,7 +428,7 @@
                             <span class="label-text-alt text-base-content/50">Wait time for missed runs</span>
                         </label>
                     </div>
-                    
+
                     <div class="form-control">
                         <label class="label cursor-pointer">
                             <span class="label-text">Run on schedule</span>
@@ -519,7 +519,7 @@
                 </div>
             </div>
             {% endif %}
-            
+
             <div class="glass-card rounded-xl p-6">
                 <h3 class="text-lg font-semibold mb-4">Alerts</h3>
                 <div class="space-y-2">
@@ -541,7 +541,7 @@
                     </div>
                 </div>
             </div>
-            
+
         </div>
     </div>
 
@@ -705,7 +705,7 @@
             alignWithWord: true,
         });
     });
-    
+
     // Store original script data for change detection
     let originalScriptData = null;
 
@@ -717,7 +717,7 @@
     // deliberately saved anything — closing the tab afterward left a
     // real script running on schedule with no explicit save action.
     let explicitlySaved = Boolean(scriptId);
-    
+
     // Function to collect form data into an object
     function collectFormData() {
         const form = document.getElementById('script-form');
@@ -737,7 +737,7 @@
             environment_vars: formData.get('environment_vars') || '',
         };
     }
-    
+
     // Initialize original script data if script exists
     if (scriptId) {
         // Wait for editor to be ready, then save original data
@@ -746,14 +746,14 @@
             originalScriptData = collectFormData();
         }, 100);
     }
-    
+
     // Function to check if script data has changed
     function hasScriptChanged(currentData, originalData) {
         if (!originalData) {
             // No original data means it's a new script, so it's always "changed"
             return true;
         }
-        
+
         // Compare all fields
         const fieldsToCompare = [
             'name',
@@ -769,11 +769,11 @@
             'alert_on_success',
             'environment_vars'
         ];
-        
+
         for (const field of fieldsToCompare) {
             const currentValue = String(currentData[field] || '').trim();
             const originalValue = String(originalData[field] || '').trim();
-            
+
             // Special handling for numeric fields
             if (field === 'timeout' || field === 'misfire_grace_time') {
                 if (parseInt(currentValue) !== parseInt(originalValue)) {
@@ -791,7 +791,7 @@
                 return true;
             }
         }
-        
+
         return false;
     }
 
@@ -820,7 +820,7 @@
         }
         window.location.assign(`/scripts/${targetScriptId}`);
     }
-    
+
     // === INLINE DIFF LOGIC ===
     let originalDeps = {{ (script.dependencies if script else "") | tojson }};
     let diffTimeout = null;
@@ -844,10 +844,10 @@
                 // Match package name and optional version specifier
                 const match = line.match(/^([a-zA-Z0-9_.-]+)([>=<~!].*)?$/);
                 if (!match) return { name: line, version: '', raw: line, invalid: true };
-                return { 
+                return {
                     name: match[1].toLowerCase().replace(/_/g, '-'),
-                    version: match[2] || '', 
-                    raw: line 
+                    version: match[2] || '',
+                    raw: line
                 };
             });
     }
@@ -856,14 +856,14 @@
     function computeDiff(oldText, newText) {
         const oldDeps = parseDependencies(oldText);
         const newDeps = parseDependencies(newText);
-        
+
         const oldMap = new Map(oldDeps.map(d => [d.name, d]));
         const newMap = new Map(newDeps.map(d => [d.name, d]));
-        
+
         const added = [];
         const removed = [];
         const modified = [];
-        
+
         // Check for added and modified
         for (const [name, newDep] of newMap) {
             if (!oldMap.has(name)) {
@@ -876,35 +876,35 @@
                 });
             }
         }
-        
+
         // Check for removed
         for (const [name, oldDep] of oldMap) {
             if (!newMap.has(name)) {
                 removed.push(oldDep.raw);
             }
         }
-        
+
         return { added, removed, modified };
     }
 
     // Render diff in UI
     function renderDiff(diff) {
         const totalChanges = diff.added.length + diff.removed.length + diff.modified.length;
-        
+
         if (totalChanges === 0) {
             diffContainer.style.display = 'none';
             return;
         }
-        
+
         // Show container
         diffContainer.style.display = 'block';
         diffBadge.textContent = totalChanges;
-        
+
         // Clear previous diff
         diffAdded.innerHTML = '';
         diffRemoved.innerHTML = '';
         diffModified.innerHTML = '';
-        
+
         // Render added
         if (diff.added.length > 0) {
             diff.added.forEach(pkg => {
@@ -914,7 +914,7 @@
                 diffAdded.appendChild(div);
             });
         }
-        
+
         // Render removed
         if (diff.removed.length > 0) {
             diff.removed.forEach(pkg => {
@@ -924,7 +924,7 @@
                 diffRemoved.appendChild(div);
             });
         }
-        
+
         // Render modified (show old → new)
         if (diff.modified.length > 0) {
             diff.modified.forEach(change => {
@@ -939,7 +939,7 @@
                 diffModified.appendChild(div);
             });
         }
-        
+
         // Auto-expand on first change
         if (!diffToggle.checked && totalChanges > 0) {
             diffToggle.checked = true;
@@ -955,7 +955,7 @@
             renderDiff(diff);
         }, 500);
     });
-    
+
     // Make collapse title clickable
     const diffCollapseTitle = diffContainer?.querySelector('.collapse-title');
     if (diffCollapseTitle) {
@@ -974,7 +974,7 @@
             document.getElementById('install-deps-btn').click();
         }
     });
-    
+
     // Update dependency buttons state based on input
     function updateDependencyButtonsState() {
         const depsInput = document.getElementById('dependencies-input');
@@ -982,9 +982,9 @@
         const installBtn = document.getElementById('install-deps-btn');
         const getPackagesBtn = document.getElementById('get-packages-btn');
         const hasDeps = depsInput.value.trim().length > 0;
-        
+
         validateBtn.disabled = !hasDeps;
-        
+
         // Install and Packages buttons are disabled if no script exists OR no dependencies
         if (installBtn) {
             installBtn.disabled = !scriptId || !hasDeps;
@@ -993,32 +993,32 @@
             getPackagesBtn.disabled = !scriptId;
         }
     }
-    
+
     // Initialize button states and add input listener
     document.addEventListener('DOMContentLoaded', () => {
         updateDependencyButtonsState();
         document.getElementById('dependencies-input').addEventListener('input', updateDependencyButtonsState);
     });
-    
+
     // Validate dependencies
     document.getElementById('validate-deps-btn').addEventListener('click', async () => {
         const depsInput = document.getElementById('dependencies-input');
         const validateBtn = document.getElementById('validate-deps-btn');
-        
+
         const dependencies = depsInput.value;
-        
+
         if (!dependencies.trim()) {
             appendBlockToConsole('Validation', 'No dependencies to validate', 'info');
             return;
         }
-        
+
         // Show loading state
         validateBtn.disabled = true;
         validateBtn.innerHTML = `
             <span class="loading loading-spinner loading-xs"></span>
             Validating...
         `;
-        
+
         try {
             const response = await fetch('/api/scripts/validate-dependencies', {
                 method: 'POST',
@@ -1027,9 +1027,9 @@
                 },
                 body: JSON.stringify({ dependencies }),
             });
-            
+
             const result = await response.json();
-            
+
             if (result.valid) {
                 const content = `Dependencies are valid!
 Message: ${result.message}
@@ -1038,7 +1038,7 @@ Packages: ${result.packages.join(', ')}`;
             } else {
                 appendBlockToConsole('Validation Error', result.message, 'error');
             }
-            
+
         } catch (err) {
             appendBlockToConsole('Validation Error', `Failed to validate: ${err.message}`, 'error');
         } finally {
@@ -1059,17 +1059,17 @@ Packages: ${result.packages.join(', ')}`;
         getPackagesBtn.addEventListener('click', async () => {
         const btn = document.getElementById('get-packages-btn');
         const originalHtml = btn.innerHTML;
-        
+
         btn.disabled = true;
         btn.innerHTML = `
             <span class="loading loading-spinner loading-xs"></span>
             Loading...
         `;
-        
+
         try {
             const response = await fetch(`/api/scripts/${scriptId}/packages`);
             const result = await response.json();
-            
+
             if (response.ok) {
                 if (result.packages && result.packages.length > 0) {
                     const content = result.packages.join('\n');
@@ -1089,7 +1089,7 @@ Packages: ${result.packages.join(', ')}`;
         }
         });
     }
-    
+
     // Install dependencies
     const installDepsBtn = document.getElementById('install-deps-btn');
     if (installDepsBtn) {
@@ -1097,7 +1097,7 @@ Packages: ${result.packages.join(', ')}`;
         const installBtn = document.getElementById('install-deps-btn');
         const depsInput = document.getElementById('dependencies-input');
         const dependencies = depsInput.value.trim();
-        
+
         // Step 1: Validate dependencies first
         if (dependencies) {
             installBtn.disabled = true;
@@ -1105,29 +1105,29 @@ Packages: ${result.packages.join(', ')}`;
                 <span class="loading loading-spinner loading-xs"></span>
                 Validating...
             `;
-            
+
             try {
                 const validateResponse = await fetch('/api/scripts/validate-dependencies', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ dependencies }),
                 });
-                
+
                 const validateResult = await validateResponse.json();
-                
+
                 if (!validateResult.valid) {
                     // Show validation error in console
                     appendBlockToConsole('Validation Error', validateResult.message, 'error');
                     setConsoleStatus('Error', 'badge-error');
                     // Scroll to console
                     document.getElementById('output-console')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    
+
                     // Highlight dependencies input
                     depsInput.classList.add('textarea-error');
                     depsInput.addEventListener('input', () => {
                         depsInput.classList.remove('textarea-error');
                     }, { once: true });
-                    
+
                     // Reset button
                     installBtn.disabled = false;
                     installBtn.innerHTML = `
@@ -1152,7 +1152,7 @@ Packages: ${result.packages.join(', ')}`;
                 return;
             }
         }
-        
+
         if (!confirm('This will rebuild the virtual environment and install all dependencies. This may take a few minutes. Continue?')) {
             installBtn.disabled = false;
             installBtn.innerHTML = `
@@ -1163,13 +1163,13 @@ Packages: ${result.packages.join(', ')}`;
             `;
             return;
         }
-        
+
         // Step 2: Save script first to use current dependencies
         installBtn.innerHTML = `
             <span class="loading loading-spinner loading-xs"></span>
             Saving...
         `;
-        
+
         try {
             editor.save();
             const form = document.getElementById('script-form');
@@ -1188,13 +1188,13 @@ Packages: ${result.packages.join(', ')}`;
                 alert_on_success: formData.get('alert_on_success') === 'true',
                 environment_vars: formData.get('environment_vars'),
             };
-            
+
             const saveResponse = await fetch(`/api/scripts/${scriptId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-            
+
             if (!saveResponse.ok) {
                 const error = await saveResponse.json();
                 throw new Error(error.detail || 'Failed to save script');
@@ -1212,25 +1212,25 @@ Packages: ${result.packages.join(', ')}`;
             `;
             return;
         }
-        
+
         // Step 3: Now rebuild environment (using SSE)
         installBtn.innerHTML = `
             <span class="loading loading-spinner loading-xs"></span>
             Preparing...
         `;
-        
+
         // Use Output Console for full progress
         outputConsole.innerHTML = '';
         logBuffer = [];
         setConsoleStatus('Installing', 'badge-info');
         appendBlockToConsole('Environment Setup', 'Starting environment rebuild and dependency installation...', 'info');
-        
+
         try {
             // Start installation
             const installResponse = await fetch(`/api/scripts/${scriptId}/install`, {
                 method: 'POST',
             });
-            
+
             if (!installResponse.ok) {
                 const err = await installResponse.json();
                 if (installResponse.status === 409) {
@@ -1238,14 +1238,14 @@ Packages: ${result.packages.join(', ')}`;
                 }
                 throw new Error(err.detail || 'Failed to start installation');
             }
-            
+
             // Connect to SSE stream
             const eventSource = new EventSource(`/api/scripts/${scriptId}/install-stream`);
-            
+
             eventSource.onmessage = (event) => {
                 appendToConsole(event.data, true);
             };
-            
+
             eventSource.addEventListener('done', (event) => {
                 eventSource.close();
                 const data = JSON.parse(event.data);
@@ -1262,7 +1262,7 @@ Packages: ${result.packages.join(', ')}`;
                     lastInstallFailed = true;
                     retryBtn.style.display = 'inline-flex';
                 }
-                
+
                 installBtn.disabled = false;
                 installBtn.innerHTML = `
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
@@ -1271,7 +1271,7 @@ Packages: ${result.packages.join(', ')}`;
                     Install
                 `;
             });
-            
+
             eventSource.addEventListener('error', (event) => {
                 setConsoleStatus('Error', 'badge-error');
                 appendBlockToConsole('Connection Error', 'SSE stream disconnected prematurely', 'error');
@@ -1286,7 +1286,7 @@ Packages: ${result.packages.join(', ')}`;
                     Install
                 `;
             });
-            
+
             eventSource.onerror = (error) => {
                 if (eventSource.readyState === EventSource.CLOSED) return;
                 setConsoleStatus('Error', 'badge-error');
@@ -1302,7 +1302,7 @@ Packages: ${result.packages.join(', ')}`;
                     Install
                 `;
             };
-            
+
         } catch (err) {
             setConsoleStatus('Error', 'badge-error');
             appendBlockToConsole('Setup Error', err.message, 'error');
@@ -1316,27 +1316,27 @@ Packages: ${result.packages.join(', ')}`;
         }
     });
     }
-    
+
     // Handle form submission
     document.getElementById('script-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         // Update textarea with editor content
         editor.save();
-        
+
         const form = e.target;
         const formData = new FormData(form);
         const submitBtn = form.querySelector('button[type="submit"]');
         const originalBtnHtml = submitBtn.innerHTML;
         const hasDeps = formData.get('dependencies')?.trim();
-        
+
         // Show loading state on button
         submitBtn.disabled = true;
         submitBtn.innerHTML = `
             <span class="loading loading-spinner loading-sm"></span>
             ${hasDeps ? 'Saving & Installing dependencies...' : 'Saving...'}
         `;
-        
+
         // Convert form data to JSON
         const data = {
             name: formData.get('name'),
@@ -1352,12 +1352,12 @@ Packages: ${result.packages.join(', ')}`;
             alert_on_success: formData.get('alert_on_success') === 'true',
             environment_vars: formData.get('environment_vars'),
         };
-        
+
         try {
             const isNew = !form.action.includes('/api/scripts/');
             const url = isNew ? '/api/scripts' : form.action;
             const method = isNew ? 'POST' : 'PUT';
-            
+
             const response = await fetch(url, {
                 method: method,
                 headers: {
@@ -1365,7 +1365,7 @@ Packages: ${result.packages.join(', ')}`;
                 },
                 body: JSON.stringify(data),
             });
-            
+
             if (response.ok) {
                 const result = await response.json();
                 console.log('Save result:', result);
@@ -1379,30 +1379,30 @@ Packages: ${result.packages.join(', ')}`;
                         <span class="loading loading-spinner loading-sm"></span>
                         Installing dependencies...
                     `;
-                    
+
                     // Clear and prepare console
                     outputConsole.innerHTML = '';
                     logBuffer = [];
                     setConsoleStatus('Installing', 'badge-info');
                     appendBlockToConsole('Environment Setup', 'Starting environment rebuild and dependency installation after save...', 'info');
-                    
+
                     // Start installation
                     const installResponse = await fetch(`/api/scripts/${result.id}/install`, {
                         method: 'POST',
                     });
-                    
+
                     if (!installResponse.ok) {
                         const err = await installResponse.json();
                         throw new Error(err.detail || 'Failed to start installation');
                     }
-                    
+
                     // Connect to SSE stream
                     const eventSource = new EventSource(`/api/scripts/${result.id}/install-stream`);
-                    
+
                     eventSource.onmessage = (event) => {
                         appendToConsole(event.data, true);
                     };
-                    
+
                     eventSource.addEventListener('done', (event) => {
                         eventSource.close();
                         const data = JSON.parse(event.data);
@@ -1430,7 +1430,7 @@ Packages: ${result.packages.join(', ')}`;
                             submitBtn.innerHTML = originalBtnHtml;
                         }
                     });
-                    
+
                     eventSource.addEventListener('error', (event) => {
                         setConsoleStatus('Error', 'badge-error');
                         appendBlockToConsole('Connection Error', 'SSE stream disconnected prematurely', 'error');
@@ -1440,7 +1440,7 @@ Packages: ${result.packages.join(', ')}`;
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = originalBtnHtml;
                     });
-                    
+
                     eventSource.onerror = (error) => {
                         // Connection closed normally after 'done' event is fine
                         if (eventSource.readyState === EventSource.CLOSED) {
@@ -1477,7 +1477,7 @@ Packages: ${result.packages.join(', ')}`;
             submitBtn.innerHTML = originalBtnHtml;
         }
     });
-    
+
     // Output console management. Unlike the execution detail page's
     // windowed live log (LOG_RENDER_LINE_LIMIT there), this console had no
     // cap at all — a genuinely chatty test script would keep appending
@@ -1496,7 +1496,7 @@ Packages: ${result.packages.join(', ')}`;
     const reconnectBtn = document.getElementById('reconnect-btn');
     const autoScrollToggle = document.getElementById('auto-scroll-toggle');
 
-    
+
     let currentEventSource = null;
     let currentExecutionId = null;
     let autoScrollEnabled = true;
@@ -1513,7 +1513,7 @@ Packages: ${result.packages.join(', ')}`;
         try { localStorage.setItem('consoleAutoScroll', String(autoScrollEnabled)); } catch (err) {}
     });
 
-    
+
     function appendToConsole(text, animate = true) {
         // Format and render
         const formatted = formatLogData(text);
@@ -1524,7 +1524,7 @@ Packages: ${result.packages.join(', ')}`;
         const timestamp = new Date().toLocaleTimeString();
         const separator = '—'.repeat(20);
         const icon = type === 'success' ? '✅' : (type === 'error' ? '❌' : 'ℹ️');
-        
+
         const block = `
 ${separator}
 ${icon} ${title.toUpperCase()} [${timestamp}]
@@ -1533,18 +1533,18 @@ ${content}
 ${separator}
 `;
         appendToConsole(block, true);
-        
+
         // Auto-scroll and focus
         outputConsole.parentElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
-    
+
     function renderLogLine(text, animate = true) {
         // Split by newlines and create separate divs
         const lines = text.split('\n');
         lines.forEach((lineText, index) => {
             // Skip empty lines except the last one
             if (!lineText && index < lines.length - 1) return;
-            
+
             const line = document.createElement('div');
             line.textContent = lineText || ' '; // Use space for empty lines
             if (animate) {
@@ -1566,9 +1566,9 @@ ${separator}
             outputConsole.scrollTop = outputConsole.scrollHeight;
         }
     }
-    
 
-    
+
+
     function formatLogData(data) {
         // Try to parse as JSON (cronator_lib logs)
         try {
@@ -1582,12 +1582,12 @@ ${separator}
         }
         return data;
     }
-    
+
     function setConsoleStatus(status, badgeClass = 'badge-ghost') {
         consoleStatus.textContent = status;
         consoleStatus.className = `badge ${badgeClass}`;
     }
-    
+
     clearOutputBtn.addEventListener('click', () => {
         outputConsole.innerHTML = '';
         logBuffer = []; // Clear buffer too
@@ -1616,25 +1616,25 @@ ${separator}
         URL.revokeObjectURL(url);
         window.showToast?.('Download started', 'info');
     });
-    
+
     // Validate script
     validateBtn.addEventListener('click', async () => {
         editor.save();
         const code = document.getElementById('code-editor').value;
-        
+
         validateBtn.disabled = true;
         validateBtn.textContent = 'Validating...';
         setConsoleStatus('Validating...', 'badge-info');
-        
+
         try {
             const response = await fetch('/api/scripts/validate-script', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code }),
             });
-            
+
             const result = await response.json();
-            
+
             if (result.valid) {
                 appendToConsole(result.message, true);
                 setConsoleStatus('Idle', 'badge-success');
@@ -1653,24 +1653,24 @@ ${separator}
             validateBtn.innerHTML = `{{ icons.check_circle("w-4 h-4") | safe }} Validate`;
         }
     });
-    
+
     // Run test
     runTestBtn.addEventListener('click', async () => {
         editor.save();
-        
+
         // Collect form data
         const form = document.getElementById('script-form');
         const data = collectFormData();
-        
+
         // Update scriptId from form (in case it was updated elsewhere)
         scriptId = form ? (form.dataset.scriptId || null) : null;
-        
+
         // For new scripts, require a name
         let currentScriptId = scriptId;
-        
+
         try {
             runTestBtn.disabled = true;
-            
+
             if (!currentScriptId) {
                 // New script - check if name is provided
                 if (!data.name || !data.name.trim()) {
@@ -1688,7 +1688,7 @@ ${separator}
                     }
                     return;
                 }
-                
+
                 // Create new script first — never with the real `enabled`
                 // toggle until the user explicitly hits Create/Save: a
                 // test run must not silently schedule a live cron job for
@@ -1729,13 +1729,13 @@ ${separator}
                 originalScriptData = { ...collectFormData(), enabled: createPayload.enabled };
 
                 appendBlockToConsole('Auto-save', `Script created with ID: ${currentScriptId}`, 'success');
-                
+
                 // Small delay to ensure file is synced to disk before test execution
                 await new Promise(resolve => setTimeout(resolve, 100));
             } else {
                 // Existing script - check if there are changes
                 const hasChanges = hasScriptChanged(data, originalScriptData);
-                
+
                 if (hasChanges) {
                     // Save changes only if script has changed. Same rule as
                     // creation: don't let an auto-save-before-test flip a
@@ -1764,27 +1764,27 @@ ${separator}
                     appendBlockToConsole('Auto-save', 'No changes detected, skipping save', 'info');
                 }
             }
-            
+
             // Start test
             appendToConsole('\n--- Test Started ---', false);
             setConsoleStatus('Running...', 'badge-warning');
-            
+
             const testResponse = await fetch(`/api/scripts/${currentScriptId}/test`, {
                 method: 'POST',
             });
-            
+
             if (!testResponse.ok) {
                 const error = await testResponse.json();
                 throw new Error(error.detail || 'Failed to start test');
             }
-            
+
             const testResult = await testResponse.json();
             currentExecutionId = testResult.execution_id;
-            
+
             // Show stop button
             runTestBtn.style.display = 'none';
             stopTestBtn.style.display = 'inline-flex';
-            
+
             // Connect to SSE stream. /api/executions/{id}/stream always
             // sends *named* events (event: stdout / stderr / done) — unlike
             // /api/scripts/{id}/install-stream below, which sends plain
@@ -1806,7 +1806,7 @@ ${separator}
             currentEventSource.addEventListener('done', (event) => {
                 const data = JSON.parse(event.data);
                 appendToConsole(`\n--- Test Finished: ${data.status} (exit code: ${data.exit_code}) ---`, false);
-                
+
                 if (data.status === 'success') {
                     setConsoleStatus('Success', 'badge-success');
                 } else if (data.status === 'cancelled') {
@@ -1814,7 +1814,7 @@ ${separator}
                 } else {
                     setConsoleStatus('Failed', 'badge-error');
                 }
-                
+
                 currentEventSource.close();
                 currentEventSource = null;
                 currentExecutionId = null;
@@ -1822,13 +1822,13 @@ ${separator}
                 stopTestBtn.style.display = 'none';
                 runTestBtn.disabled = false;
             });
-            
+
             currentEventSource.onerror = (error) => {
                 console.error('SSE Error:', error);
                 appendToConsole('\\n[Connection lost]', false);
                 setConsoleStatus('Disconnected', 'badge-error');
                 reconnectBtn.style.display = 'inline-flex';
-                
+
                 if (currentEventSource) {
                     currentEventSource.close();
                     currentEventSource = null;
@@ -1837,7 +1837,7 @@ ${separator}
                 stopTestBtn.style.display = 'none';
                 runTestBtn.disabled = false;
             };
-            
+
         } catch (err) {
             appendToConsole(`Error: ${err.message}`, false);
             setConsoleStatus('Error', 'badge-error');
@@ -1847,41 +1847,41 @@ ${separator}
             stopTestBtn.style.display = 'none';
         }
     });
-    
+
     // Stop test
     stopTestBtn.addEventListener('click', async () => {
         if (!currentExecutionId) return;
-        
+
         try {
             const response = await fetch(`/api/executions/${currentExecutionId}/cancel`, {
                 method: 'POST',
             });
-            
+
             if (response.ok) {
                 appendToConsole('\\n[Test stopped by user]', false);
             }
         } catch (err) {
             console.error('Failed to stop test:', err);
         }
-        
+
         if (currentEventSource) {
             currentEventSource.close();
             currentEventSource = null;
         }
-        
+
         currentExecutionId = null;
         stopTestBtn.style.display = 'none';
         runTestBtn.style.display = 'inline-flex';
         runTestBtn.disabled = false;
         setConsoleStatus('Stopped', 'badge-warning');
     });
-    
+
     // Reconnect
     reconnectBtn.addEventListener('click', () => {
         reconnectBtn.style.display = 'none';
         runTestBtn.click();
     });
-    
+
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
         if (currentEventSource) {
@@ -1894,31 +1894,31 @@ ${separator}
     });
 
     // ==================== Version History ====================
-    
+
     async function loadVersionHistory() {
         console.log('[Version History] Loading versions for script:', scriptId);
         const versionsList = document.getElementById('versions-list');
         const versionBadge = document.getElementById('version-count-badge');
-        
+
         if (!scriptId) {
             console.log('[Version History] No scriptId, skipping load');
             return;
         }
-        
+
         try {
             console.log('[Version History] Fetching from:', `/api/scripts/${scriptId}/versions`);
             const response = await fetch(`/api/scripts/${scriptId}/versions`);
             if (!response.ok) throw new Error('Failed to load versions');
-            
+
             const data = await response.json();
             console.log('[Version History] Loaded', data.total, 'versions:', data);
             versionBadge.textContent = data.total;
-            
+
             if (data.total === 0) {
                 versionsList.innerHTML = '<div class="text-sm text-base-content/50 italic p-3">No versions yet. Versions are created automatically when you save changes.</div>';
                 return;
             }
-            
+
             versionsList.innerHTML = data.items.map(v => {
                 const date = new Date(v.created_at).toLocaleString();
                 const sizeKB = (v.content_size / 1024).toFixed(1);
@@ -1950,7 +1950,7 @@ ${separator}
                     </div>
                 `;
             }).join('');
-            
+
             // Add event listeners for restore buttons
             document.querySelectorAll('#versions-list button[data-action="restore"]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -1960,13 +1960,13 @@ ${separator}
                     revertToVersion(version, btn);
                 });
             });
-            
+
         } catch (err) {
             console.error('Failed to load versions:', err);
             versionsList.innerHTML = '<div class="text-sm text-error p-3">Failed to load versions</div>';
         }
     }
-    
+
     async function fetchVersionDetails(versionNumber) {
         const response = await fetch(`/api/scripts/${scriptId}/versions/${versionNumber}`);
         if (!response.ok) {
@@ -2057,7 +2057,7 @@ ${separator}
             }
         }
     }
-    
+
     // === CRON EXPRESSION HELPER ===
     function setCron(expression) {
         const cronInput = document.getElementById('cron-input');
@@ -2066,18 +2066,18 @@ ${separator}
             updateCronDescription(expression);
         }
     }
-    
+
     function updateCronDescription(expression) {
         const descEl = document.getElementById('cron-description');
         const nextRunsEl = document.getElementById('cron-next-runs');
-        
+
         if (!descEl || !nextRunsEl) return;
-        
+
         try {
             const description = parseCronExpression(expression);
             descEl.textContent = description;
             descEl.classList.remove('!text-red-900');
-            
+
             // Calculate next 3 runs
             const nextRuns = calculateNextRuns(expression, 3);
             if (nextRuns.length > 0) {
@@ -2091,15 +2091,15 @@ ${separator}
             nextRunsEl.textContent = '';
         }
     }
-    
+
     function parseCronExpression(expression) {
         const parts = expression.trim().split(/\s+/);
         if (parts.length !== 5) {
             throw new Error('Invalid cron expression');
         }
-        
+
         const [minute, hour, day, month, weekday] = parts;
-        
+
         // Common patterns
         const patterns = [
             { regex: /^\* \* \* \* \*$/, desc: 'Every minute' },
@@ -2116,18 +2116,18 @@ ${separator}
             { regex: /^0 0 1 \* \*$/, desc: 'Monthly on the 1st at midnight' },
             { regex: /^0 0 (\d+) \* \*$/, desc: m => `Monthly on the ${m[1]}${getOrdinalSuffix(m[1])} at midnight` },
         ];
-        
+
         for (const pattern of patterns) {
             const match = expression.match(pattern.regex);
             if (match) {
                 return typeof pattern.desc === 'function' ? pattern.desc(match) : pattern.desc;
             }
         }
-        
+
         // Generic description
         return `At minute ${minute}, hour ${hour}, day ${day}, month ${month}, weekday ${weekday}`;
     }
-    
+
     function getOrdinalSuffix(num) {
         const j = num % 10, k = num % 100;
         if (j === 1 && k !== 11) return 'st';
@@ -2135,52 +2135,52 @@ ${separator}
         if (j === 3 && k !== 13) return 'rd';
         return 'th';
     }
-    
+
     function calculateNextRuns(expression, count = 3) {
         const parts = expression.trim().split(/\s+/);
         if (parts.length !== 5) return [];
-        
+
         const [minute, hour, day, month, weekday] = parts;
         const now = new Date();
         const nextRuns = [];
-        
+
         // Simple calculation for common patterns
         let current = new Date(now);
         current.setSeconds(0);
         current.setMilliseconds(0);
-        
+
         // Check up to 10 days ahead to handle weekly schedules
         for (let i = 0; i < 14400 && nextRuns.length < count; i++) {
             current = new Date(current.getTime() + 60000); // Add 1 minute
-            
+
             const m = current.getMinutes();
             const h = current.getHours();
             const d = current.getDate();
             const mo = current.getMonth() + 1;
             const wd = current.getDay();
-            
-            if (matchesCronPart(minute, m) && 
+
+            if (matchesCronPart(minute, m) &&
                 matchesCronPart(hour, h) &&
                 matchesCronPart(day, d) &&
                 matchesCronPart(month, mo) &&
                 matchesCronPart(weekday, wd)) {
-                
-                const timeStr = current.toLocaleString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: '2-digit', 
+
+                const timeStr = current.toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
                     minute: '2-digit'
                 });
                 nextRuns.push(timeStr);
             }
         }
-        
+
         return nextRuns;
     }
-    
+
     function matchesCronPart(cronPart, value) {
         if (cronPart === '*') return true;
-        
+
         // Handle step values (*/5)
         if (cronPart.includes('/')) {
             const [range, step] = cronPart.split('/');
@@ -2188,22 +2188,22 @@ ${separator}
                 return value % parseInt(step) === 0;
             }
         }
-        
+
         // Handle ranges (1-5)
         if (cronPart.includes('-')) {
             const [start, end] = cronPart.split('-').map(Number);
             return value >= start && value <= end;
         }
-        
+
         // Handle lists (1,3,5)
         if (cronPart.includes(',')) {
             return cronPart.split(',').map(Number).includes(value);
         }
-        
+
         // Exact match
         return parseInt(cronPart) === value;
     }
-    
+
     // Initialize cron description on page load
     document.addEventListener('DOMContentLoaded', () => {
         const cronInput = document.getElementById('cron-input');
@@ -2216,7 +2216,7 @@ ${separator}
 
         consumeRestoredVersionToast();
     });
-    
+
     // Load versions on page load for editing
     {% if script %}
     document.addEventListener('DOMContentLoaded', () => {

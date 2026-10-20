@@ -1,362 +1,211 @@
 # Cronator
 
-**The home for your recurring Python automations.**
+Run your recurring Python scripts on a schedule and watch what they do. Each
+script gets its own virtual environment, its own cron schedule, and a stored
+history of every run: status, output, exit code, duration.
 
-Run, isolate, monitor, and fix scheduled scripts — without crontab hell, broken venvs, or silent failures at 3 AM.
+![The dashboard](docs/screenshots/dashboard.png)
+
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![CI](https://github.com/aa-blinov/cronator/actions/workflows/ci.yml/badge.svg)](https://github.com/aa-blinov/cronator/actions/workflows/ci.yml)
 
 ---
 
-Cronator is not an alternative to Airflow or Prefect. It fills the gap between bare `cron` and heavy orchestrators: you have a handful of Python scripts that need to run on a schedule, you want them isolated, observable, and resilient — and you don't want to set up a data platform to get there.
+## Quick start
 
-## Screenshots
-
-### Dashboard
-
-![Dashboard](docs/screenshots/dashboard.png)
-_Last executions at a glance — status, duration, output_
-
-### Executions
-
-![Executions](docs/screenshots/executions.png)
-_Full execution history with filtering and live log streaming_
-
-### Script Editor
-
-![New Script Editor](docs/screenshots/editor.png)
-_Write, schedule, and configure each script in one place_
-
-### Settings
-
-![Settings](docs/screenshots/settings.png)
-_SMTP alerts, timeouts, and app-wide configuration_
-
-## Features
-
-- **Python-first** — write a plain Python script, Cronator handles the rest
-- **Isolated environments** — every script gets its own `uv` virtualenv; Python version is selectable per script
-- **19 built-in templates** — HTTP health checks, database maintenance, backups, notifications, and more
-- **Execution history** — every run is stored with stdout, stderr, exit code, duration, and trigger source
-- **Live log streaming** — watch output appear in real time over SSE
-- **Reliability controls** — per-script retries, retry delay, max retry window, overlap prevention
-- **Alerting** — email (SMTP) and webhook notifications on failure or success, configurable per script
-- **`/scripts` management page** — search, filter by status, bulk enable/disable/delete, duplicate
-- **Dashboard triage** — scripts that failed today or haven't run in 7 days surface in a dedicated section instead of being buried in the full list
-- **"Run again" button** — re-run any past execution instantly from the history view
-- **Script versioning** — full content stored per execution for reproducibility
-- **REST API** — every action available via API with Basic Auth
-- **Security headers + CSP** — restrictive `Content-Security-Policy`, HSTS, and the other OWASP baseline headers on every response
-- **Docker-first** — one `docker compose up` to production; PostgreSQL + daily backups included
-- **SQLite for dev** — no database setup needed for local development
-
-## Quick Start
-
-### Production (Docker + PostgreSQL)
+Docker, with PostgreSQL:
 
 ```bash
 git clone https://github.com/aa-blinov/cronator.git
 cd cronator
-
 cp .env.example .env
-# Set POSTGRES_PASSWORD, ADMIN_PASSWORD, SECRET_KEY in .env
-
-docker compose up -d
-
-# Open in browser
-open http://localhost:8080
 ```
 
-Default credentials: `admin` / `admin` — change them in `.env` before going live.
-
-**Included out of the box:**
-
-- PostgreSQL 16 with automatic Alembic migrations on startup
-- Daily database backups at 2 AM, retained for 7 days
-- Persistent volumes for scripts, environments, logs, and data
-- Health checks on all services
-
-### Local Development (SQLite)
+Set three values in `.env` before the first start: `ADMIN_PASSWORD`,
+`SECRET_KEY` and `POSTGRES_PASSWORD`. The app refuses to start while
+`ADMIN_PASSWORD` or `SECRET_KEY` still holds the placeholder value from
+`.env.example`: `SECRET_KEY` derives the encryption key for the secrets
+stored in the database, and a placeholder key is a published key.
 
 ```bash
-# Install uv if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
+docker compose up -d
+```
 
-uv sync
+Then open http://localhost:8080. The first start applies the Alembic
+migrations, creates the admin account from `ADMIN_USERNAME` (default `admin`)
+and the password you set, and starts the scheduler.
+
+| Service | What it is |
+| --- | --- |
+| `cronator` | The application: web interface, REST API and scheduler in one process. |
+| `db` | PostgreSQL 16, with a health check the app waits for on startup. |
+| `db-backup` | A shell loop that dumps the database at 02:00 and prunes archives older than `BACKUP_RETENTION_DAYS`. |
+
+Without Docker, on SQLite:
+
+```bash
+uv sync --all-extras
 uv run alembic upgrade head
 uv run python -m uvicorn app.main:app --reload --port 8080
 ```
 
-## Writing Scripts
+`./start.sh` does the same thing and creates `.env` from `.env.example` when
+it is missing. `start.ps1` and `start.bat` are the Windows equivalents.
 
-### Via the UI
+## What it does
 
-1. Open `http://localhost:8080`
-2. Click **New Script** (or pick one of the 19 templates)
-3. Write your code, set a cron schedule, list any pip dependencies
-4. Save — it's live immediately
+- **Schedule a Python script.** A five-field cron expression, one APScheduler
+  job per script, evaluated in UTC.
+- **Give each script its own environment.** One `uv` virtualenv per script,
+  with its own Python version and its own dependency list, so two scripts can
+  pin different versions of the same package.
+- **Keep the history.** Every run is stored with its status, stdout, stderr,
+  exit code, duration and the trigger that started it.
+- **Watch a run as it happens.** Output is streamed over Server-Sent Events,
+  and a reconnecting browser replays what it missed.
+- **Retry a failure.** Retry count, delay and maximum window are set per
+  script, and every attempt is recorded with its number.
+- **Skip a run that would overlap.** With `prevent_overlap` on, a second run
+  of a script that is still going is stored as a `skipped` execution instead
+  of starting.
+- **Alert on failure or on success.** Email over SMTP or a webhook POST, both
+  switchable per script, with the failure alert throttled to one per hour.
+- **Save files from a run.** `cronator_lib.save_artifact()` writes a file into
+  the run's artifact directory; the interface lists it and serves it for
+  download.
+- **Keep the earlier versions.** Every save that changes the script stores a
+  numbered snapshot, and any snapshot can be restored.
+- **Work on several scripts at once.** Enable, disable or delete in bulk, with
+  a result per script so one failure does not hide the rest.
+- **See what needs attention.** The dashboard lists the scripts that failed
+  today and the enabled scripts with no successful run in seven days.
+- **Drive everything over HTTP.** A REST API with Basic Auth covers the same
+  actions as the interface, and `/health`, `/metrics` and `/api/diagnostics`
+  are there for monitoring.
 
-### Script structure
+## Screenshots
 
-Each script is a plain Python file with a `main()` function:
+| Dashboard | Executions |
+| :---: | :---: |
+| ![The dashboard](docs/screenshots/dashboard.png) | ![The execution history](docs/screenshots/executions.png) |
 
-```python
-from cronator_lib import get_logger
+| Script editor | Settings |
+| :---: | :---: |
+| ![The script editor](docs/screenshots/editor.png) | ![The settings page](docs/screenshots/settings.png) |
 
-log = get_logger()
+## How it works
 
-
-def main():
-    log.info("Starting...")
-    # your code here
-    log.success("Done!")
-
-
-if __name__ == "__main__":
-    main()
+```
+browser or curl
+  -> SecurityHeadersMiddleware, CsrfOriginGuardMiddleware
+  -> verify_credentials  (HTTP Basic, users table, environment fallback)
+  -> app/api/scripts.py, app/api/executions.py   (JSON)
+     app/api/pages.py                            (Jinja2 HTML)
+  -> scheduler_service   (APScheduler, UTC)
+  -> executor_service
+  -> one OS process per run, in the script's own uv virtualenv
 ```
 
-## cronator_lib
+`app/main.py` builds the application, configures logging and runs the
+lifespan: it waits for the database, runs the migrations, loads the settings
+from the database, seeds the admin account, starts the scheduler, and marks
+executions that were still running when the process last stopped as failed.
 
-Every script has access to `cronator_lib` — a lightweight logging and utility library that works the same locally and inside Cronator.
+A run starts in `app/services/executor.py`. The request creates the
+`executions` row with the status `running` and returns its id; the work
+happens in a background task. The executor builds a minimal environment for
+the child process (nothing of Cronator's own environment is inherited), runs
+the script with `asyncio.create_subprocess_exec`, and reads stdout and
+stderr line by line. Each line goes into the database and into an in-memory
+replay buffer that serves the SSE stream. The timeout is enforced around the
+read, so a script that hangs without printing anything is still stopped.
 
-```python
-from cronator_lib import get_logger, save_artifact, notify, timer
+When the run ends, the row is updated, `last_success_at`, `last_failure_at`
+and `consecutive_failures` are updated on the script, an alert is sent if the
+script asked for one, a retry is scheduled if the failure counts allow it,
+and the metrics counter moves.
 
-log = get_logger()
+`app/services/environment.py` owns the virtualenvs. It creates one with
+`uv venv --python <version>`, resolves the requested packages with `uv pip
+compile` before writing anything, installs `cronator_lib` in editable mode,
+and then installs the script's own dependencies. The install streams its own
+log lines to the browser over SSE.
 
-# Log levels — DEBUG/INFO/WARNING go to stdout, ERROR/CRITICAL to stderr
-log.info("Fetching data...")
-log.warning("Rate limit approaching")
-log.error("Connection failed", exc_info=True)
-log.success("All records processed!")
-
-# Structured log entry with extra fields
-log.with_data("Batch complete", count=1500, duration_ms=823)
-
-# Progress tracking
-for i, item in enumerate(items):
-    log.progress(i + 1, len(items), "Processing")
-
-# Task lifecycle markers
-log.task_start("export")
-# ... do work ...
-log.task_end("export", success=True)
-
-# Time a code block (logs elapsed time automatically)
-with timer("db query"):
-    results = db.execute(query)
-
-# Send a manual notification (triggers the same alert channel as failures)
-notify("Export complete: 1 500 rows", title="Daily Export")
-
-# Save a file as an execution artifact (appears in the UI)
-save_artifact("report.csv", csv_bytes)
-```
-
-When running inside Cronator, logs are emitted as structured JSON (one object per line) so the UI can parse and display them. Outside Cronator — in your local terminal — the same calls produce human-readable colored output.
-
-## Templates
-
-Cronator ships with 19 ready-to-use templates:
-
-| Template           | Category     | Description                                               |
-| ------------------ | ------------ | --------------------------------------------------------- |
-| `api-health-check` | monitoring   | Ping HTTP endpoints, alert on errors or timeouts          |
-| `disk-monitor`     | monitoring   | Check disk usage, alert on threshold breach               |
-| `ssl-cert-check`   | monitoring   | Alert before SSL certificates expire                      |
-| `port-check`       | monitoring   | TCP reachability check (Redis, MySQL, any service)        |
-| `dns-check`        | monitoring   | Verify DNS resolution, alert on IP changes                |
-| `heartbeat`        | monitoring   | Run job logic and ping a watchdog URL on result           |
-| `file-cleanup`     | maintenance  | Delete files older than N days (supports dry-run)         |
-| `db-vacuum`        | maintenance  | PostgreSQL VACUUM ANALYZE                                 |
-| `pg-backup`        | data         | pg_dump a PostgreSQL database, save as artifact           |
-| `mysql-backup`     | data         | mysqldump a MySQL/MariaDB database, save as artifact      |
-| `s3-upload`        | data         | Fetch data from a URL and upload to S3-compatible storage |
-| `csv-export`       | data         | Fetch JSON from an API and export as a CSV artifact       |
-| `http-data-sync`   | data         | Fetch records from a source API and push to a target      |
-| `db-query-report`  | data         | Run a SQL query, export results as CSV artifact           |
-| `email-report`     | notification | Send an HTML report email via SMTP                        |
-| `slack-notify`     | notification | Post to Slack / Discord / Teams via webhook               |
-| `telegram-notify`  | notification | Send a Telegram message via Bot API                       |
-| `ntfy-notify`      | notification | Push notification via ntfy.sh                             |
-| `pushover-notify`  | notification | Push notification via Pushover API                        |
-
-Each template includes inline comments, a working `main()` function, and a `__name__ == "__main__"` guard so it can be tested locally before scheduling.
-
-## Reliability
-
-Each script has individual reliability controls:
-
-| Setting            | Default | Description                                            |
-| ------------------ | ------- | ------------------------------------------------------ |
-| `retry_count`      | 0       | Number of retry attempts after a failure (0–10)        |
-| `retry_delay`      | 60 s    | Seconds to wait between retry attempts                 |
-| `max_retry_window` | 3600 s  | Maximum time window within which retries are allowed   |
-| `prevent_overlap`  | true    | Skip the run if a previous instance is still executing |
-
-When `prevent_overlap` is enabled and a script is already running, the scheduler creates a `SKIPPED` execution record (with full context) instead of starting a second instance. Skipped executions appear in the history so you can see when and why they were skipped.
-
-Retry state is tracked per execution chain: `attempt`, `first_attempt_at`, and `retries_left` are recorded so you can see exactly what happened in the execution history.
-
-Script-level statistics are updated after every run:
-
-| Field                  | Description                                           |
-| ---------------------- | ----------------------------------------------------- |
-| `last_success_at`      | Timestamp of the most recent successful execution     |
-| `last_failure_at`      | Timestamp of the most recent failed execution         |
-| `consecutive_failures` | Counter reset to 0 on success, incremented on failure |
+The data model has eight tables: `scripts`, `executions`, `artifacts`,
+`script_versions`, `script_audit_log`, `settings`, `users` and
+`user_audit_log`. Every timestamp column is timezone-aware and the code works
+in UTC throughout.
 
 ## Configuration
 
-### First run
+The environment is read once at startup by `app/config.py`. A subset of it is
+copied into the `settings` table on first run and can then be changed from
+the settings page without a restart.
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `ADMIN_USERNAME` | `admin` | Name of the admin account created on first start. |
+| `ADMIN_PASSWORD` | none | Required. The app refuses to start while it holds the `.env.example` placeholder. |
+| `SECRET_KEY` | none | Required. Derives the key that encrypts the SMTP password and the webhook URL at rest. |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./data/cronator.db` | The connection string. `docker-compose.yml` overrides it to point at the `db` service. |
+| `PORT` | `8080` | Read by the container command, the health check and the port mapping. |
+| `DEFAULT_TIMEOUT` | `3600` | Seconds a script may run before it is killed. A per-script timeout overrides it. |
+| `MAX_LOG_SIZE` | `1000000` | Bytes of stdout and stderr kept per execution. The rest is truncated. |
+| `MAX_ARTIFACT_SIZE_MB` | `10` | Largest file `save_artifact()` will write. |
+| `MIN_FREE_SPACE_MB` | `100` | Below this much free space on the artifact volume, a run is refused with a failed execution. |
+| `LOG_FORMAT` | `human` | `json` writes one JSON object per log line. |
+| `LOG_LEVEL` | `INFO` | Level for the application logger. |
+| `SMTP_ENABLED` | `false` | Turns the email alerts on. |
+| `SMTP_PORT` | `587` | `465` uses direct SSL, any other port uses STARTTLS. |
+| `ALERT_EMAIL` | none | Recipient of the failure and success alerts. |
+| `BACKUP_RETENTION_DAYS` | `7` | Days of database dumps the `db-backup` service keeps. Docker only. |
+
+`ADMIN_PASSWORD` and `SECRET_KEY` are environment-only on purpose: rotating
+the secret key makes the stored secrets unreadable, so it is not a button in
+the settings page. The full list is in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+## Development
 
 ```bash
-cp .env.example .env
-# Edit .env: set ADMIN_PASSWORD and SECRET_KEY at minimum
-```
-
-`.env` seeds the initial values. After the first start, all settings are stored in the database and can be changed through **Settings → Edit Settings** without restarting the container.
-
-### Environment variables
-
-| Variable                | Default                               | Description                            |
-| ----------------------- | ------------------------------------- | -------------------------------------- |
-| `ADMIN_USERNAME`        | `admin`                               | Admin login                            |
-| `ADMIN_PASSWORD`        | `admin`                               | Admin password — **change this**       |
-| `SECRET_KEY`            | `change-me`                           | Encryption key for sensitive settings  |
-| `DATABASE_URL`          | SQLite locally / PostgreSQL in Docker | Database connection string             |
-| `POSTGRES_PASSWORD`     | `cronator_dev_password`               | PostgreSQL password (Docker only)      |
-| `BACKUP_RETENTION_DAYS` | `7`                                   | How many days to keep database backups |
-| `SMTP_ENABLED`          | `false`                               | Enable email alerts                    |
-| `DEFAULT_TIMEOUT`       | `3600`                                | Default script timeout in seconds      |
-
-See `.env.example` for the full list.
-
-## API
-
-All actions are available via REST API with Basic Auth:
-
-```bash
-# List scripts
-curl -u admin:password http://localhost:8080/api/scripts
-
-# Create a script
-curl -u admin:password -X POST http://localhost:8080/api/scripts \
-  -H "Content-Type: application/json" \
-  -d '{"name":"my-script","content":"print(1)","cron_expression":"0 * * * *"}'
-
-# Run a script immediately
-curl -u admin:password -X POST http://localhost:8080/api/scripts/1/run
-
-# Re-run a specific past execution
-curl -u admin:password -X POST http://localhost:8080/api/scripts/1/rerun
-
-# Get execution history
-curl -u admin:password http://localhost:8080/api/executions?script_id=1
-
-# Get available templates
-curl -u admin:password http://localhost:8080/api/scripts/templates
-```
-
-## Database
-
-### PostgreSQL (production)
-
-Alembic migrations run automatically on container start:
-
-```bash
-# Check current migration version
-docker compose exec cronator uv run alembic current
-
-# View migration history
-docker compose exec cronator uv run alembic history
-```
-
-### SQLite (development)
-
-```bash
-uv run alembic upgrade head    # apply migrations
-uv run alembic downgrade -1    # roll back one migration
-uv run alembic revision --autogenerate -m "describe change"
-```
-
-### Backups
-
-Automated daily backups via the `db-backup` service:
-
-- **Schedule:** every day at 2:00 AM
-- **Retention:** 7 days (set via `BACKUP_RETENTION_DAYS`)
-- **Format:** `backups/cronator_YYYYMMDD_HHMMSS.sql.gz`
-
-Manual backup:
-
-```bash
-docker compose exec db pg_dump -U cronator cronator | gzip > backups/manual_$(date +%Y%m%d).sql.gz
-```
-
-Restore:
-
-```bash
-docker compose stop cronator
-gunzip < backups/cronator_20260125_020000.sql.gz | docker compose exec -T db psql -U cronator cronator
-docker compose start cronator
-```
-
-## Testing
-
-### Run locally (SQLite)
-
-```bash
-uv sync --all-extras
-uv run pytest tests/ -v
-```
-
-### Run in Docker (PostgreSQL) — recommended
-
-```bash
+uv sync --all-extras                                   # install
+uv run alembic upgrade head                             # migrate
+uv run python -m uvicorn app.main:app --reload --port 8080   # run
+uv run pytest tests/stateless tests/stateful -v         # fast path, SQLite
 docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
+uv run pytest tests/pg/ -v                             # against PostgreSQL 16
+uv run pytest tests/ui/ -v                             # Playwright, needs a running app
+uv run ruff check .                                    # lint
+npm run build:css                                      # rebuild the Tailwind bundle
 ```
 
-### Test structure
+The Docker command is what CI runs: it builds the `tests` service against a
+PostgreSQL 16 container and runs the whole suite inside it. The Playwright
+tests in `tests/ui/` run on the host against a live stack and are excluded
+from the default `testpaths`.
 
-```
-tests/
-├── conftest.py         # env vars + event loop only, shared by both dirs below
-├── stateless/          # pure unit tests: no DB, no test_client — models, cronator_lib,
-│   └── services/       # script templates, ExecutorService, scheduler, alerting, retries
-├── stateful/           # conftest.py has the DB fixtures (test_engine, db_session,
-│                       # test_client, factories); full API surface: scripts, executions,
-│                       # settings, RBAC, streaming, versioning, artifacts, security headers
-├── ui/                 # Playwright end-to-end flows with baseline screenshots
-└── pg/                 # a subset of the above re-run against a real PostgreSQL 16
-                        # container via testcontainers, to catch SQLite-only assumptions
-```
+| Path | What it holds |
+| --- | --- |
+| `app/api/` | The routers: scripts, executions, settings, users, diagnostics, pages, locale. |
+| `app/services/` | The execution engine, the scheduler, the virtualenv manager, alerting, backups, cleanup, metrics, settings. |
+| `app/models/` | The SQLAlchemy models, one module per table. |
+| `app/schemas/` | The Pydantic request and response models. |
+| `app/templates/` | The Jinja2 pages. |
+| `app/static/` | The Tailwind input, the compiled output, the front-end script, the favicon. |
+| `app/script_templates.py` | The 19 built-in script templates. |
+| `cronator_lib/` | The library every script imports: logging, artifacts, notifications, timing. |
+| `alembic/versions/` | The migrations, one linear chain. |
+| `tests/` | The suite, split into `stateless`, `stateful`, `pg` and `ui`. |
 
-800+ tests as of this writing (`pytest --collect-only -q` for the exact count). Tests use
-SQLite in-memory by default; `tests/pg/` and the `test-postgres` CI job use a real
-PostgreSQL container. In both cases `SKIP_ALEMBIC_MIGRATIONS=1` is set and the schema is
-created directly from SQLAlchemy models.
-
-## Documentation
-
-This README covers the quickstart. For deeper reference, see [`docs/`](docs/README.md):
-
-- [Architecture](docs/ARCHITECTURE.md) — components, the execution engine, data model
-- [Configuration](docs/CONFIGURATION.md) — every environment variable, env vs. DB precedence
-- [Deployment](docs/DEPLOYMENT.md) — production Docker Compose, reverse proxy, log rotation, scaling limits
-- [Operations](docs/OPERATIONS.md) — backups/restore, disk space, alerting, health checks, troubleshooting
-- [Security](docs/SECURITY.md) — auth, RBAC scope, secrets at rest, the script execution trust model
-- [API Reference](docs/API.md) — every endpoint, grouped by resource
-- [Development](docs/DEVELOPMENT.md) — running tests, migrations, project layout
-
-## Security
-
-Before going to production:
-
-- Set strong values for `ADMIN_PASSWORD`, `POSTGRES_PASSWORD`, and `SECRET_KEY` in `.env`
-- Never commit `.env` to git (it is in `.gitignore`)
-- Put Cronator behind a TLS-terminating reverse proxy (nginx, Caddy, Traefik)
-- Sensitive settings (SMTP password, API keys) are encrypted at rest with Fernet
+The longer reference is in [docs/](docs/README.md):
+[architecture](docs/ARCHITECTURE.md),
+[configuration](docs/CONFIGURATION.md),
+[deployment](docs/DEPLOYMENT.md),
+[operations](docs/OPERATIONS.md),
+[security](docs/SECURITY.md),
+[API](docs/API.md) and
+[development](docs/DEVELOPMENT.md).
 
 ## License
 
-[MIT](LICENSE) — see the [LICENSE](LICENSE) file for details.
+MIT, © 2026 aa-blinov. See [LICENSE](LICENSE).

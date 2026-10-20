@@ -46,42 +46,42 @@
                 {{ icons.clock("w-5 h-5 text-info") }}
                 Version {{ version.version_number }}
             </h3>
-            
+
             <div class="space-y-4">
                 <div>
                     <p class="text-base-content/60 text-sm">Created</p>
                     <p class="font-medium">{{ version.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
                 </div>
-                
+
                 <div>
                     <p class="text-base-content/60 text-sm">Created By</p>
                     <p class="font-medium">{{ version.created_by or 'Unknown' }}</p>
                 </div>
-                
+
                 {% if version.change_summary %}
                 <div>
                     <p class="text-base-content/60 text-sm">Description</p>
                     <p class="font-medium">{{ version.change_summary }}</p>
                 </div>
                 {% endif %}
-                
+
                 <div class="divider my-2"></div>
-                
+
                 <div>
                     <p class="text-base-content/60 text-sm">Python Version</p>
                     <code class="text-sm bg-base-200 px-2 py-1 rounded">{{ version.python_version }}</code>
                 </div>
-                
+
                 <div>
                     <p class="text-base-content/60 text-sm">Schedule</p>
                     <code class="text-sm bg-base-200 px-2 py-1 rounded">{{ version.cron_expression }}</code>
                 </div>
-                
+
                 <div>
                     <p class="text-base-content/60 text-sm">Timeout</p>
                     <p class="font-medium">{{ version.timeout }}s</p>
                 </div>
-                
+
                 {% if version.dependencies %}
                 <div>
                     <p class="text-base-content/60 text-sm mb-2">Dependencies</p>
@@ -90,7 +90,7 @@
                 {% endif %}
             </div>
         </div>
-        
+
         {% if is_admin %}
         <!-- Restore Action -->
         <div class="glass-card rounded-xl p-6">
@@ -107,7 +107,7 @@
         </div>
         {% endif %}
     </div>
-    
+
     <!-- Code Preview -->
     <div class="lg:col-span-2">
         <div class="glass-card rounded-xl p-6">
@@ -118,10 +118,10 @@
                 </h3>
                 <span class="badge badge-ghost">{{ version.content|length }} bytes</span>
             </div>
-            
+
             <textarea id="code-viewer">{{ version.content }}</textarea>
         </div>
-        
+
         {% if version.environment_vars %}
         <div class="glass-card rounded-xl p-6 mt-6">
             <h3 class="text-lg font-semibold mb-4">Environment Variables</h3>
@@ -152,29 +152,29 @@ document.getElementById('restore-btn').addEventListener('click', async () => {
     if (!confirm(`Restore script to version ${versionNumber}?\n\nThis will:\n- Replace current content with version ${versionNumber}\n- Create a new version with current state\n- Trigger dependency reinstall if needed`)) {
         return;
     }
-    
+
     const btn = document.getElementById('restore-btn');
     const originalHTML = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Restoring...';
-    
+
     try {
         const response = await fetch(`/api/scripts/${scriptId}/revert/${versionNumber}`, {
             method: 'POST'
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || 'Failed to restore version');
         }
-        
+
         const result = await response.json();
         sessionStorage.setItem(restoredVersionToastKey, JSON.stringify({
             version_number: versionNumber,
             needs_install: Boolean(result.needs_install),
         }));
         window.location.assign(`/scripts/${scriptId}/edit`);
-        
+
     } catch (err) {
         window.showToast?.('Failed to restore: ' + err.message, 'error');
         btn.disabled = false;
