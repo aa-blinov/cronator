@@ -89,7 +89,7 @@ async function duplicateScript(scriptId) {
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
     <div class="lg:col-span-2 glass-card rounded-xl p-6">
         <h3 class="text-lg font-semibold mb-4">Script Information</h3>
-        
+
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <p class="text-base-content/60 text-sm">Name</p>
@@ -132,7 +132,7 @@ async function duplicateScript(scriptId) {
             </div>
             {% endif %}
         </div>
-        
+
         {% if script.dependencies %}
         <div class="mt-6">
             <p class="text-base-content/60 text-sm mb-2">Dependencies</p>
@@ -140,10 +140,10 @@ async function duplicateScript(scriptId) {
         </div>
         {% endif %}
     </div>
-    
+
     <div class="glass-card rounded-xl p-6">
         <h3 class="text-lg font-semibold mb-4">Statistics</h3>
-        
+
         <div class="space-y-4">
             <div>
                 <p class="text-base-content/60 text-sm">Total Executions</p>
@@ -190,7 +190,7 @@ async function duplicateScript(scriptId) {
             </label>
         </div>
     </div>
-    
+
     <div id="execution-history-content">
     {% if executions %}
     <div class="overflow-x-auto">
@@ -252,7 +252,7 @@ async function duplicateScript(scriptId) {
             </tbody>
         </table>
     </div>
-    
+
     <!-- Pagination -->
     {% if pagination.pages > 1 %}
     <div class="px-6 py-4 border-t border-base-content/10 flex items-center justify-between">
@@ -263,7 +263,7 @@ async function duplicateScript(scriptId) {
             {% if pagination.page > 1 %}
             <a href="?page={{ pagination.page - 1 }}" class="join-item btn btn-sm">«</a>
             {% endif %}
-            
+
             {% for p in range(1, pagination.pages + 1) %}
                 {% if p == pagination.page %}
                     <button class="join-item btn btn-sm btn-active">{{ p }}</button>
@@ -273,7 +273,7 @@ async function duplicateScript(scriptId) {
                     <button class="join-item btn btn-sm btn-disabled">...</button>
                 {% endif %}
             {% endfor %}
-            
+
             {% if pagination.page < pagination.pages %}
             <a href="?page={{ pagination.page + 1 }}" class="join-item btn btn-sm">»</a>
             {% endif %}
@@ -453,10 +453,10 @@ async function handleRunNow(buttonId) {
     const originalHTML = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Running...';
-    
+
     try {
         const response = await fetch(`/api/scripts/${scriptId}/run`, { method: 'POST' });
-        
+
         if (response.ok) {
             const result = await response.json();
             if (!result.execution_id) {
@@ -491,10 +491,10 @@ document.getElementById('run-now-btn')?.addEventListener('click', async () => {
 document.getElementById('toggle-btn')?.addEventListener('click', async () => {
     const btn = document.getElementById('toggle-btn');
     btn.disabled = true;
-    
+
     try {
         const response = await fetch(`/api/scripts/${scriptId}/toggle`, { method: 'POST' });
-        
+
         if (response.ok) {
             const result = await response.json();
             await refreshScriptState();
@@ -526,16 +526,16 @@ async function refreshExecutionHistory() {
         const response = await fetch(`/scripts/${scriptId}`, {
             headers: { 'X-Refresh-Only': 'true' }
         });
-        
+
         if (!response.ok) return;
-        
+
         const html = await response.text();
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-        
+
         const newHistoryContent = doc.getElementById('execution-history-content');
         const currentHistoryContent = document.getElementById('execution-history-content');
-        
+
         if (newHistoryContent && currentHistoryContent) {
             if (currentHistoryContent.innerHTML !== newHistoryContent.innerHTML) {
                 currentHistoryContent.innerHTML = newHistoryContent.innerHTML;

@@ -128,7 +128,7 @@ function removeEmptyParams(event) {
                 </tbody>
             </table>
         </div>
-        
+
         <!-- Pagination -->
         {% if pagination.pages > 1 %}
         <div class="px-6 py-4 border-t border-base-content/10 flex items-center justify-between">
@@ -141,11 +141,11 @@ function removeEmptyParams(event) {
                 {% if filters.status %}{% set _ = filter_params.append('status=' ~ filters.status) %}{% endif %}
                 {% if filters.search %}{% set _ = filter_params.append('search=' ~ filters.search|urlencode) %}{% endif %}
                 {% set filter_query = '&' ~ filter_params|join('&') if filter_params else '' %}
-                
+
                 {% if pagination.page > 1 %}
                 <a href="?page={{ pagination.page - 1 }}{{ filter_query }}" class="join-item btn btn-sm">«</a>
                 {% endif %}
-                
+
                 {% for p in range(1, pagination.pages + 1) %}
                     {% if p == pagination.page %}
                         <button class="join-item btn btn-sm btn-active">{{ p }}</button>
@@ -155,7 +155,7 @@ function removeEmptyParams(event) {
                         <button class="join-item btn btn-sm btn-disabled">...</button>
                     {% endif %}
                 {% endfor %}
-                
+
                 {% if pagination.page < pagination.pages %}
                 <a href="?page={{ pagination.page + 1 }}{{ filter_query }}" class="join-item btn btn-sm">»</a>
                 {% endif %}

@@ -24,4 +24,3 @@ async def test_done_event_reflects_real_failure():
 
     done_events = [e for e in events if e[0] == "done"]
     assert done_events == [("done", "false")]
-
