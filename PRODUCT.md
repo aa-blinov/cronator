@@ -59,10 +59,10 @@ Against an orchestrator: there is no DAG, no worker, no broker and no plugin
 system. One process holds the scheduler, the API and the pages.
 
 What a neighbour could not copy is a constraint rather than a mechanism. The
-value of the product comes from having no platform at all: no DAG, no worker,
-no broker. A change that adds one of those pieces has to argue against the
-README's own framing first. No measured comparison with Airflow or Prefect
-exists in the repository, and none should be claimed.
+value of the product comes from the absence of a platform, and a change that
+adds a piece of one has to argue against the README's own framing first. No
+measured comparison with Airflow or Prefect exists in the repository, and none
+should be claimed.
 
 ## Operating Context
 
@@ -190,8 +190,8 @@ line are the only written commitments.
 - `app/services/executor.py` is the execution engine, and
   `tests/stateless/services/test_executor.py` covers it.
 - `alembic/versions/` holds nine migrations in one chain.
-- The test suite is 86 test files: 688 test functions counted by name
-  (306 stateless, 332 stateful, 6 against PostgreSQL, 44 Playwright), before
+- The suite is 86 test files and 688 test functions counted by name (306
+  stateless, 332 stateful, 6 against PostgreSQL, 44 Playwright), before
   pytest's parametrization expands the count at collection time.
 - `CHANGELOG.md` has one released version, 0.1.0 dated 2026-09-06, and an
   Unreleased section.
@@ -232,8 +232,10 @@ What the code shows:
   the stored preference does not change the words on the page.
 
 What has not been decided: the repository holds no accessibility statement,
-no conformance target, and no record of screen-reader testing. The Playwright
-suite compares screenshots, which catches a layout change and says nothing
-about semantics. A keyboard-only path through the script editor is not
-documented and has not been tested. A person who cannot read the coloured
-status of a run has no stated alternative.
+no conformance target, and no record of screen-reader testing. The run status
+is written out as text beside its colour, but the live log has no live
+region for a screen reader to announce, and the status dot animates with no
+`prefers-reduced-motion` guard. The Playwright suite compares screenshots,
+which catches a layout change and says nothing about semantics. A
+keyboard-only path through the script editor is not documented and has not
+been tested.

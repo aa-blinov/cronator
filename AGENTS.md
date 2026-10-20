@@ -39,7 +39,7 @@ run inside the Docker test container.
 | `app/main.py` | The app, the lifespan, the logging setup, the exception handlers, `/health` and `/metrics`. |
 | `app/api/` | One router per resource. `scripts.py` is the largest; `pages.py` renders the HTML. |
 | `app/services/executor.py` | The execution engine. Read this before touching anything that runs a script. |
-| `app/services/scheduler.py` | The APScheduler wrapper, plus the two internal jobs (cleanup at 03:00, backup at 02:00). |
+| `app/services/scheduler.py` | The APScheduler wrapper, plus the two internal jobs (cleanup at 03:00 UTC, backup at 02:00 UTC). |
 | `app/services/environment.py` | The `uv` virtualenvs: creation, dependency resolution, installation, streaming. |
 | `app/services/settings_service.py` | The settings table, the environment fallback, and the Fernet encryption of the sensitive keys. |
 | `app/services/backup_service.py` | The in-app backup, in the COPY-block format the restore endpoint understands. |
@@ -106,19 +106,21 @@ run inside the Docker test container.
 - **The compose validation job stubs `.env` from `.env.example`.**
   `docker compose config` exits 1 when `env_file: .env` points at a missing
   file, so that step in `.github/workflows/ci.yml` has to stay.
-- **The hadolint action is pinned to a commit SHA.** The `hadolint/hadolint-action`
-  tags are not guaranteed to exist, and a floating tag fails the build for a
-  reason that has nothing to do with the code.
+- **The hadolint job only fails on ERROR-level findings.**
+  `failure-threshold: error` in `.github/workflows/ci.yml` means a warning
+  such as SC2086 or DL3008 will not stop the build. The action itself is
+  referenced by the tag `hadolint/hadolint-action@v3.1.0`, so the job can
+  also break for reasons that have nothing to do with the Dockerfile.
 
 ## Style / safety rails
 
 - **Comments explain why, never what.** The codebase holds to this, and the
   comments are usually about a failure mode that has already happened. Keep
   it that way.
-- **Every new mutating endpoint takes `require_admin`,** including the HTML
-  action routes in `app/api/pages.py`. The whole router is authenticated at
-  the include in `app/api/__init__.py`; do not add an endpoint that escapes
-  it, and do not add a second router without the dependency.
+- **Every endpoint that changes state takes `require_admin`,** including the
+  HTML action routes in `app/api/pages.py`. The whole router is authenticated
+  at the include in `app/api/__init__.py`; do not add an endpoint that
+  escapes it, and do not add a second router without the dependency.
 - **A new secret goes into `SENSITIVE_KEYS`** in
   `app/services/settings_service.py`, or it sits in the database in
   plaintext.
