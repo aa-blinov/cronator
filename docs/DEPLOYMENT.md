@@ -112,5 +112,5 @@ you ran two instances against the same database:
 
 If you need more throughput than one instance provides, the honest answer
 today is a bigger single instance, not horizontal scaling — see
-[Architecture](ARCHITECTURE.md) for why (no queue/broker, no distributed
+[Architecture](architecture.md) for why (no queue/broker, no distributed
 state by design).
