@@ -1,143 +1,138 @@
-# Agent Instructions
+# AGENTS.md — agent context for `cronator`
 
-## Required Validation After Changes
+Cronator is a self-hosted scheduler for Python scripts: FastAPI serves a web
+interface and a REST API, APScheduler fires the cron jobs, and every script
+runs as its own OS process in its own `uv` virtualenv. The whole thing runs
+in one process, with PostgreSQL in the Docker stack and SQLite for local
+development.
 
-After making code changes in this repository, always do all applicable steps below before wrapping up:
+This file is what you need to work on the project without reading all of it.
 
-1. Run relevant tests.
-2. Rebuild and restart Docker services when the change can affect the running app.
-3. Check container status after restart.
-4. If a container is not healthy, inspect logs before reporting completion.
-5. **Run `uv run ruff check app/ tests/` and confirm "All checks passed!" before claiming done.** CI's `Lint (ruff)` job runs ruff on every push and will block the merge if there are F401/F841/E501/E402 errors. Fix the lint errors in the same commit as the code change — do not leave them for the next agent.
-6. **Verify the live app responds** to any changed endpoint via `curl -u admin:admin http://localhost:8080/<path>`. A passing pytest doesn't prove the FastAPI app actually serves the new route without an `UnboundLocalError` or a missing import.
-7. **Check `git status` is clean** before reporting completion. Unstaged changes mean half-finished work.
-8. **Run `gh run list --limit 5` after `git push`** to confirm CI passed on the actual remote — local green does not equal remote green (CI uses different actions, secrets, OS).
-
-## Test Commands
-
-Use Docker-based tests by default.
-
-Primary test command:
-
-```powershell
-npm run test:docker
-```
-
-Equivalent explicit command:
-
-```powershell
-docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
-```
-
-This test flow uses:
-
-- `docker-compose.test.yml`
-- PostgreSQL test container `db-test`
-- `tests` service built from Docker `target: builder` with `INSTALL_DEV=true`
-
-Do not use the local `C:\Python312\python.exe` / `PYTHONPATH` workaround as the default validation path.
-Only use local direct pytest as a temporary debugging fallback when Docker testing is not practical, and clearly say so.
-
-Important:
-
-- The Docker test command may print an orphan-container warning for the main app containers. That is expected in this repo.
-- Do not add `--remove-orphans` to the Docker test command, because it can interfere with the running app stack.
-- **The test container caches source code in its image. After editing any `app/**/*.py`, `tests/**/*.py`, or `Dockerfile`, run `docker compose -f docker-compose.test.yml build tests` before `docker compose ... run --rm tests`** — otherwise the test container will run the OLD code and tests will pass against the wrong version.
-
-### Async test gotchas
-
-- When a test triggers a script run (`POST /api/scripts/{id}/run`) and then immediately tries a guarded action (delete / install / rebuild-env), **never use a flat `await asyncio.sleep(N)`**. CI runners are slower than local machines; the script may not have entered the running state when you assert on it, or it may already have finished, and the test will be flaky.
-  - Use a polling helper that checks `last_run_status` on `/api/scripts/{id}` until the desired value is observed, with a generous timeout.
-  - When polling for a "terminal" state, never use `want_status=None` to mean "any non-running" — `None == None` is True and the poll returns immediately on the first iteration.
-  - Use an explicit set of terminal statuses (`{"succeeded", "failed", "cancelled", "timeout", "skipped"}`).
-
-## Docker Workflow
-
-When changes touch templates, static assets, Docker files, startup behavior, runtime behavior, or anything user-visible in the app, run:
-
-```powershell
-docker compose -f docker-compose.yml up -d --build
-```
-
-Then always verify status:
-
-```powershell
-docker compose -f docker-compose.yml ps
-```
-
-If `cronator` is still in `health: starting`, wait briefly and check again.
-
-If any container is unhealthy, restarting, or missing, inspect logs before finishing:
-
-```powershell
-docker compose -f docker-compose.yml logs --tail=100 cronator
-docker compose -f docker-compose.yml logs --tail=100 db
-```
-
-## CI Workflow Gotchas
-
-`.github/workflows/ci.yml` runs six jobs on every push. To avoid a red CI:
-
-- **Lint (ruff)**: ruff defaults to `select = ["E", "F", "I", "UP"]`. The `tests/**` ignore in `pyproject.toml` only covers E501 (line length) — F401/F841/F541 still fire on test files. Keep test imports tidy.
-- **Docker compose validate**: `docker compose ... config --quiet` exits 1 if `env_file: .env` is referenced and the file is missing. CI's `docker-validate` step stubs `.env` from `.env.example` + `BACKUP_RETENTION_DAYS=7` before running the validate — **do not remove that step** without providing `.env` another way.
-- **Dockerfile lint (hadolint)**: pinned to commit `08b13a8fc994e434ccaaff93a72f1842dc4c4d11`. Tags like `@v3` are not guaranteed to exist for this community action — pin to a commit SHA.
-- **Tests (Docker)**: same caching rule as the local test command — the image holds the code, so rebuild before re-running.
-- **Tests (PostgreSQL)**: runs `tests/pg/` only, against a service-container `postgres:16-alpine`. No alembic, uses `SKIP_ALEMBIC_MIGRATIONS=1`.
-- **Type check (mypy)**: marked `continue-on-error: true` — it's opt-in and not a gate.
-
-After `git push`, verify with:
+## Run / build / test
 
 ```bash
-gh run list --limit 5 --json databaseId,conclusion,name,event,headBranch
-gh api repos/<owner>/<repo>/actions/runs/<id>/jobs
+uv sync --all-extras                                   # install
+uv run alembic upgrade head                             # migrate
+uv run python -m uvicorn app.main:app --reload --port 8080   # run the app
+uv run pytest tests/stateless tests/stateful -v         # fast path, SQLite
+npm run test:docker                                     # what CI runs, PostgreSQL 16
+uv run pytest tests/pg/ -v                             # the PostgreSQL subset
+uv run pytest tests/ui/ -v                             # Playwright, against a running stack
+uv run ruff check .                                    # lint
+npm run build:css                                      # rebuild the Tailwind bundle
 ```
 
-If a job failed, fetch its logs:
+`npm run test:docker` is `docker compose -f docker-compose.test.yml up
+--build --abort-on-container-exit --exit-code-from tests`. It builds the
+`tests` service from the Dockerfile's `builder` target against a
+`postgres:16-alpine` container, with `SKIP_ALEMBIC_MIGRATIONS=1` and the
+schema built from the SQLAlchemy models.
 
-```bash
-JOB_ID=$(gh api repos/<owner>/<repo>/actions/runs/<id>/jobs | jq '.jobs[] | select(.conclusion=="failure") | .id' | head -1)
-gh api repos/<owner>/<repo>/actions/jobs/$JOB_ID/logs
-```
+The Playwright tests need `playwright==1.49.0` and a Chromium download, and
+they run against the live stack at `http://localhost:8080`, so they never
+run inside the Docker test container.
 
-## Live Smoke After Backend Changes
+## Where things live
 
-After any change to `app/api/**/*.py` or `app/services/**/*.py`, hit the affected endpoint on the live container before claiming done. The pytest suite uses an ASGITransport that bypasses some real-server concerns (e.g. middleware order, response model validation, `request.app.state` setup):
+| Path | What it holds |
+| --- | --- |
+| `app/main.py` | The app, the lifespan, the logging setup, the exception handlers, `/health` and `/metrics`. |
+| `app/api/` | One router per resource. `scripts.py` is the largest; `pages.py` renders the HTML. |
+| `app/services/executor.py` | The execution engine. Read this before touching anything that runs a script. |
+| `app/services/scheduler.py` | The APScheduler wrapper, plus the two internal jobs (cleanup at 03:00, backup at 02:00). |
+| `app/services/environment.py` | The `uv` virtualenvs: creation, dependency resolution, installation, streaming. |
+| `app/services/settings_service.py` | The settings table, the environment fallback, and the Fernet encryption of the sensitive keys. |
+| `app/services/backup_service.py` | The in-app backup, in the COPY-block format the restore endpoint understands. |
+| `app/models/`, `app/schemas/` | SQLAlchemy models and Pydantic schemas, one module per table. |
+| `app/templates/`, `app/static/` | The Jinja2 pages and the Tailwind bundle. |
+| `app/script_templates.py` | The 19 built-in templates, as source strings. |
+| `cronator_lib/` | The library every script imports: logging, artifacts, notifications, timing, context. |
+| `alembic/versions/` | The migrations, one linear chain. Check `alembic heads` before adding one. |
+| `tests/stateless/` | Pure unit tests, no database, no client. |
+| `tests/stateful/` | The fixtures and the full API surface. |
+| `tests/pg/` | A subset re-run against a real PostgreSQL, to catch SQLite-only assumptions. |
+| `tests/ui/` | Playwright flows and their baseline screenshots. |
 
-```bash
-curl -s -o /dev/null -w "%{http_code}\n" -u admin:admin http://localhost:8080/api/<path>
-curl -s -u admin:admin http://localhost:8080/api/<path> | python3 -m json.tool
-```
+## Traps
 
-If the response is 500, inspect logs immediately:
+- **The test image caches the source.** After editing anything under `app/`,
+  `tests/` or the `Dockerfile`, run
+  `docker compose -f docker-compose.test.yml build tests` before running the
+  suite. Without it the container runs the old code and the tests pass
+  against the wrong version.
+- **`update_job()` must be called on every path that touches the schedule.**
+  Enable, disable, edit, bulk action and revert all have to reach
+  `scheduler_service.update_job()`. Miss one and the database shows the new
+  cron expression while the live job keeps firing on the old one.
+- **`ADMIN_PASSWORD` and `SECRET_KEY` have no defaults.** The settings model
+  requires them, and it raises at startup if either still holds the
+  `.env.example` placeholder. `SUPPRESS_CONFIG_WARNINGS=1` silences the
+  length warnings, not that check. The CI jobs set both variables in the
+  workflow environment for the same reason.
+- **Never use a flat `asyncio.sleep()` after triggering a run.** A test that
+  starts a script and then asserts on it is flaky on a slow runner. Poll
+  `last_run_status` on `/api/scripts/{id}` with an explicit set of terminal
+  statuses (`succeeded`, `failed`, `cancelled`, `timeout`, `skipped`); `None`
+  compares equal to `None`, so a "any non-running" check returns at once.
+- **Every `DateTime` column declares `timezone=True`.** A bare `DateTime()`
+  drifts from the PostgreSQL `TIMESTAMPTZ` column and `alembic check` then
+  reports a phantom migration. A stateless test enforces this across the
+  whole model metadata.
+- **`tests/pg/` is a sibling of `tests/stateful/`, not a descendant.** Pytest
+  only walks up a test file's own directory, so `tests/pg/conftest.py` has
+  to re-export the fixtures it needs from `tests/stateful/conftest.py`. A
+  new DB fixture has to be added to that re-export list as well, or the
+  PostgreSQL job fails with "fixture not found".
+- **The failure alert throttle uses its own column.** `last_failure_alert_at`
+  is separate from `last_alert_at` on purpose: a success alert writes
+  `last_alert_at`, and sharing the column let a success reset the failure
+  window and silence the alert for a script that is genuinely broken.
+- **The child process gets a minimal, explicit environment.** Only `PATH`,
+  `HOME`, `LANG`, `TZ`, the Oracle client variables, the `CRONATOR_*`
+  context variables and the script's own `environment_vars` are passed. No
+  ambient credential of Cronator's own reaches a script.
+- **Two different registries hold the running processes.**
+  `executor_service.running_processes` holds the script's own process;
+  `environment_service._active_processes` holds the `uv` subprocess. The
+  graceful shutdown kills both, and the executor's dictionary never contains
+  an environment setup.
+- **The failure path rolls the session back first.** A failed commit leaves
+  the session dirty, and the next query raises the same error again, which
+  skips `close_stream()` and leaves the execution stuck at `running` until
+  the next restart. Keep the rollback where it is.
+- **Ruff ignores `tests/**` for the line length only.** `F401`, `F841` and
+  `F541` still fire on test files, and the CI lint job blocks the merge on
+  them.
+- **The compose validation job stubs `.env` from `.env.example`.**
+  `docker compose config` exits 1 when `env_file: .env` points at a missing
+  file, so that step in `.github/workflows/ci.yml` has to stay.
+- **The hadolint action is pinned to a commit SHA.** The `hadolint/hadolint-action`
+  tags are not guaranteed to exist, and a floating tag fails the build for a
+  reason that has nothing to do with the code.
 
-```bash
-docker compose -f docker-compose.yml logs --tail=50 cronator
-```
+## Style / safety rails
 
-## UI Tests (Playwright)
+- **Comments explain why, never what.** The codebase holds to this, and the
+  comments are usually about a failure mode that has already happened. Keep
+  it that way.
+- **Every new mutating endpoint takes `require_admin`,** including the HTML
+  action routes in `app/api/pages.py`. The whole router is authenticated at
+  the include in `app/api/__init__.py`; do not add an endpoint that escapes
+  it, and do not add a second router without the dependency.
+- **A new secret goes into `SENSITIVE_KEYS`** in
+  `app/services/settings_service.py`, or it sits in the database in
+  plaintext.
+- **The interface must not promise isolation the code does not provide.**
+  Scripts share the `cronator` OS user and the filesystem; there is no CPU
+  or memory limit per script. `docs/SECURITY.md` says so explicitly, and
+  any new copy has to agree with it.
+- **The name of a script becomes a directory name.** The schema allows
+  letters, digits, `_` and `-` only, and the name cannot start or end with
+  `-` or `_`.
+- **A run is a row in `executions`.** Any new outcome gets a status, a
+  `finished_at` and a duration, or the history and the metrics drift apart.
 
-Playwright tests in `tests/ui/` run against the **live stack** at `http://localhost:8080`, not inside the Docker test container. They are excluded from `pyproject.toml`'s `testpaths` so the Docker `npm run test:docker` flow never tries to collect them.
+## Where the product truth lives
 
-Host prerequisites:
-
-- `uv pip install playwright==1.49.0` (newer versions refuse to download Chromium on this OS)
-- `playwright install chromium` (downloads headless shell 1148)
-
-Run:
-
-```bash
-uv run pytest tests/ui/ -v
-```
-
-The shared conftest in `tests/ui/conftest.py` skips the whole module silently if Playwright is not importable.
-
-## Completion Standard
-
-Do not say the task is done until:
-
-- the relevant tests pass (Docker pytest + `uv run ruff check app/ tests/`),
-- `docker compose ps` shows the expected containers up,
-- `cronator` is healthy after rebuild when Docker was part of the change,
-- the live app responds with 200 on every changed/added endpoint,
-- `git status` shows a clean working tree,
-- (after `git push`) `gh run list` shows the CI run for the new SHA as green.
+`PRODUCT.md` holds it. Read it before changing what the product does, and
+write the change there when the behaviour changes.
