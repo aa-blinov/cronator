@@ -1,5 +1,5 @@
 # Build stage
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 
 # Install uv & git (needed for GitPython in tests)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -56,7 +56,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 
 # Runtime stage
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 # Install dependencies for Oracle client, uv, git, gosu, and nodejs
 RUN apt-get update && apt-get install -y --no-install-recommends \
