@@ -6,14 +6,14 @@ The artifacts system lets scripts save files during execution. Artifacts can inc
 
 ## Features
 
-- ✅ Save files up to 10 MB each
-- ✅ Automatic unique filename generation with timestamp suffix
-- ✅ Filename validation and sanitization
-- ✅ Disk space check before saving (minimum 100 MB free required)
-- ✅ Artifact metadata stored in the database for fast access
-- ✅ Download via UI with original filenames
-- ✅ Delete individual artifacts
-- ✅ Bulk clear all artifacts via Settings
+-  Save files up to 10 MB each
+-  Automatic unique filename generation with timestamp suffix
+-  Filename validation and sanitization
+-  Disk space check before saving (minimum 100 MB free required)
+-  Artifact metadata stored in the database for fast access
+-  Download via UI with original filenames
+-  Delete individual artifacts
+-  Bulk clear all artifacts via Settings
 
 ## Usage in scripts
 
@@ -111,7 +111,7 @@ Files are automatically saved with a timestamp suffix to avoid conflicts:
 ### Viewing artifacts for an execution
 
 1. Go to the **Executions** page
-2. Click an execution (executions with artifacts have a 📦 badge)
+2. Click an execution (executions with artifacts have a  badge)
 3. Scroll down to the **Artifacts** section
 4. Each artifact shows:
    - Original filename
@@ -317,8 +317,8 @@ max_filename_length: int = 200
 
 ## Security
 
-✅ **Path validation:** Prevents path traversal attacks
-✅ **Filename sanitization:** Strips dangerous characters
-✅ **Extension blocking:** Rejects executable file types
-✅ **Execution isolation:** Each execution has its own subdirectory
-✅ **Limits:** Enforced size and space constraints
+ **Path validation:** Prevents path traversal attacks
+ **Filename sanitization:** Strips dangerous characters
+ **Extension blocking:** Rejects executable file types
+ **Execution isolation:** Each execution has its own subdirectory
+ **Limits:** Enforced size and space constraints
