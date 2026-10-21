@@ -40,7 +40,7 @@ RUN if [ "$INSTALL_DEV" = "true" ]; then \
     fi
 
 # Build CSS stage
-FROM node:20-slim AS css-builder
+FROM node:25-slim AS css-builder
 
 WORKDIR /app
 
