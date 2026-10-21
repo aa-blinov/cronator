@@ -6,7 +6,7 @@ holds everything that is longer than that.
 
 | Document | What it covers |
 | --- | --- |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | The modules, the request flow, the execution engine, the scheduler and the data model. |
+| [architecture.md](architecture.md) | The modules, the request flow, the execution engine, the scheduler and the data model. |
 | [CONFIGURATION.md](CONFIGURATION.md) | Every environment variable, which of them are stored in the database, and the order of precedence. |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | The Docker Compose stack, the reverse proxy, the log rotation and the upgrades. |
 | [OPERATIONS.md](OPERATIONS.md) | Backups and restore, the disk space, the health endpoints and the runbooks. |
@@ -23,12 +23,12 @@ holds everything that is longer than that.
 ## Reading order
 
 New here: [../README.md](../README.md), then
-[ARCHITECTURE.md](ARCHITECTURE.md) for how a run is put together.
+[architecture.md](architecture.md) for how a run is put together.
 
 Running it on a machine of your own: [DEPLOYMENT.md](DEPLOYMENT.md), then
 [CONFIGURATION.md](CONFIGURATION.md) for the values it needs.
 
-Changing the code: [ARCHITECTURE.md](ARCHITECTURE.md), then
+Changing the code: [architecture.md](architecture.md), then
 [../AGENTS.md](../AGENTS.md) for the traps. The traps cover the paths that
 have to reach `update_job()`, the environment a child process receives,
 and the rollback that has to stay where it is in the failure path.
