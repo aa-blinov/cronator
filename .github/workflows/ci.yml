@@ -14,8 +14,8 @@ jobs:
     name: Lint (ruff)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v1
+      - uses: actions/checkout@v7
+      - uses: astral-sh/ruff-action@v3
 
   # ------------------------------------------------------------------
   # Type checking — opt-in: only runs if mypy is configured
@@ -25,8 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true  # mypy is opt-in for now; remove once fully typed
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install mypy
@@ -42,7 +42,7 @@ jobs:
     name: Docker compose validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # docker-compose.yml references `env_file: .env` and `${BACKUP_RETENTION_DAYS}`.
       # In CI we don't have a real `.env` (it would leak secrets), so copy the
       # checked-in `.env.example` to a stub `.env` so `docker compose config --quiet`
@@ -63,8 +63,8 @@ jobs:
     name: Dockerfile lint (hadolint)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hadolint/hadolint-action@v3.1.0
+      - uses: actions/checkout@v7
+      - uses: hadolint/hadolint-action@v3.5.0
         with:
           # SC2086 (unquoted variable) and DL3008 (apt pinning) often fire on
           # intent in our Dockerfile; we only fail on ERRORs.
@@ -78,7 +78,7 @@ jobs:
     name: Tests (Docker)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run tests in Docker
         run: |
           docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
@@ -111,8 +111,8 @@ jobs:
       ADMIN_PASSWORD: "ci-test-admin-password"
       SECRET_KEY: "ci-test-secret-key-at-least-32-chars-long"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install uv

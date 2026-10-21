@@ -13,12 +13,12 @@ jobs:
       contents: write  # needed to create the GitHub release
       packages: write  # if you later push to GHCR
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # full history for changelog generation
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -65,7 +65,7 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: "Cronator v${{ steps.version.outputs.version }}"
           body: ${{ steps.changelog.outputs.excerpt }}
