@@ -198,7 +198,7 @@ from the default `testpaths`.
 | `tests/` | The suite, split into `stateless`, `stateful`, `pg` and `ui`. |
 
 The longer reference is in [docs/](docs/README.md):
-[architecture](docs/ARCHITECTURE.md),
+[architecture](docs/architecture.md),
 [configuration](docs/CONFIGURATION.md),
 [deployment](docs/DEPLOYMENT.md),
 [operations](docs/OPERATIONS.md),
