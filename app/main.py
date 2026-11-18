@@ -402,7 +402,7 @@ async def value_error_handler(request: Request, exc: ValueError):
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    """Default JSON behavior everywhere, except a 403 on an HTML page route.
+    """Default JSON behavior everywhere, except a 403/404 on an HTML page route.
 
     require_admin (app/api/dependencies.py) raises a plain 403 the same
     way for /api/* calls and for the HTML page-action routes in
@@ -412,9 +412,13 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     browser instead of a page they can navigate away from. 401 keeps the
     default handling unconditionally: it carries the WWW-Authenticate
     header the browser needs to show its native Basic Auth prompt, which
-    an HTML error page would silently break.
+    an HTML error page would silently break. The same HTML treatment for
+    404: a mistyped URL, a deleted script or a deleted execution would
+    otherwise dead-end the user on a bare {"detail": ...} JSON blob with
+    no link back to the dashboard.
     """
-    if exc.status_code == status.HTTP_403_FORBIDDEN and not request.url.path.startswith("/api/"):
+    html_page_route = not request.url.path.startswith("/api/")
+    if exc.status_code == status.HTTP_403_FORBIDDEN and html_page_route:
         return request.app.state.templates.TemplateResponse(
             "error.html",
             {
@@ -422,6 +426,17 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
                 "page_title": "Access Denied",
                 "status_code": exc.status_code,
                 "message": exc.detail,
+            },
+            status_code=exc.status_code,
+        )
+    if exc.status_code == status.HTTP_404_NOT_FOUND and html_page_route:
+        return request.app.state.templates.TemplateResponse(
+            "error.html",
+            {
+                "request": request,
+                "page_title": "Not Found",
+                "status_code": exc.status_code,
+                "message": exc.detail or "This page has moved, was deleted, or never existed.",
             },
             status_code=exc.status_code,
         )

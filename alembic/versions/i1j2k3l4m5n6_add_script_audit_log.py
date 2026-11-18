@@ -38,14 +38,17 @@ def upgrade() -> None:
         "script_audit_log",
         ["changed_at"],
     )
-    op.create_foreign_key(
-        "fk_script_audit_log_script_id",
-        "script_audit_log",
-        "scripts",
-        ["script_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
+    # batch_alter_table: SQLite cannot ALTER ADD CONSTRAINT — on SQLite the
+    # FK must go into the CREATE TABLE, on PostgreSQL the plain call still
+    # works, so the batch wrapper covers both dialects of the same chain.
+    with op.batch_alter_table("script_audit_log") as batch:
+        batch.create_foreign_key(
+            "fk_script_audit_log_script_id",
+            "scripts",
+            ["script_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
 
 
 def downgrade() -> None:

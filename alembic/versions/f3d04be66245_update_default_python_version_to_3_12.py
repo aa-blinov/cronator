@@ -21,41 +21,44 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Update default python_version from 3.11 to 3.12 in scripts table
-    op.alter_column(
-        "scripts",
-        "python_version",
-        existing_type=sa.String(20),
-        server_default="3.12",
-        existing_nullable=True,
-    )
+    # Update default python_version from 3.11 to 3.12 in scripts table.
+    # batch_alter_table because SQLite has no ALTER COLUMN SET DEFAULT —
+    # on SQLite it recreates the table, on PostgreSQL it emits the plain
+    # ALTER, so the documented local-dev path (Alembic on SQLite) survives.
+    with op.batch_alter_table("scripts") as batch:
+        batch.alter_column(
+            "python_version",
+            existing_type=sa.String(20),
+            server_default="3.12",
+            existing_nullable=True,
+        )
 
     # Update default python_version from 3.11 to 3.12 in script_versions table
-    op.alter_column(
-        "script_versions",
-        "python_version",
-        existing_type=sa.String(20),
-        server_default="3.12",
-        existing_nullable=False,
-    )
+    with op.batch_alter_table("script_versions") as batch:
+        batch.alter_column(
+            "python_version",
+            existing_type=sa.String(20),
+            server_default="3.12",
+            existing_nullable=False,
+        )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # Revert default python_version from 3.12 back to 3.11 in scripts table
-    op.alter_column(
-        "scripts",
-        "python_version",
-        existing_type=sa.String(20),
-        server_default="3.11",
-        existing_nullable=True,
-    )
+    with op.batch_alter_table("scripts") as batch:
+        batch.alter_column(
+            "python_version",
+            existing_type=sa.String(20),
+            server_default="3.11",
+            existing_nullable=True,
+        )
 
     # Revert default python_version from 3.12 back to 3.11 in script_versions table
-    op.alter_column(
-        "script_versions",
-        "python_version",
-        existing_type=sa.String(20),
-        server_default="3.11",
-        existing_nullable=False,
-    )
+    with op.batch_alter_table("script_versions") as batch:
+        batch.alter_column(
+            "python_version",
+            existing_type=sa.String(20),
+            server_default="3.11",
+            existing_nullable=False,
+        )
