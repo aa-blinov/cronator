@@ -13,6 +13,7 @@ holds everything that is longer than that.
 | [SECURITY.md](SECURITY.md) | The authentication, the roles, the secrets at rest and the trust model of the scripts. |
 | [API.md](API.md) | The REST endpoints, grouped by resource, with a request for each. |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | The tests, the migrations, the layout of the project and the conventions of a change. |
+| [UX_MAP.md](UX_MAP.md) | The map of every user path — how each action starts, what it ends with, and where it used to dead-end. |
 | [ARTIFACTS_GUIDE.md](ARTIFACTS_GUIDE.md) | How a script saves a file as an artifact of its run. |
 | [screenshots/README.md](screenshots/README.md) | The four pictures of the interface and where each one comes from. |
 | [../README.md](../README.md) | The front door: what it does and how to run it. |
