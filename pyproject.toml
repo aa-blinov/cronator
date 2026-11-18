@@ -74,5 +74,7 @@ filterwarnings = [
 
 [dependency-groups]
 dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
     "pytest-cov>=7.1.0",
 ]
