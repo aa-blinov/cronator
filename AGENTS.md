@@ -72,7 +72,7 @@ run inside the Docker test container.
 - **Never use a flat `asyncio.sleep()` after triggering a run.** A test that
   starts a script and then asserts on it is flaky on a slow runner. Poll
   `last_run_status` on `/api/scripts/{id}` with an explicit set of terminal
-  statuses (`succeeded`, `failed`, `cancelled`, `timeout`, `skipped`); `None`
+  statuses (`success`, `failed`, `cancelled`, `timeout`, `skipped`); `None`
   compares equal to `None`, so a "any non-running" check returns at once.
 - **Every `DateTime` column declares `timezone=True`.** A bare `DateTime()`
   drifts from the PostgreSQL `TIMESTAMPTZ` column and `alembic check` then

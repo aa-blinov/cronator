@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The documented local-dev start crashed on a fresh SQLite database.**
+  Two Alembic migrations used operations SQLite has no syntax for —
+  `ALTER COLUMN … SET DEFAULT` (`f3d04be66245`) and `ADD CONSTRAINT`
+  (`i1j2k3l4m5n6`, the script_audit_log foreign key) — so
+  `alembic upgrade head` failed at startup with
+  `OperationalError: near "ALTER"`, taking the whole first-run
+  experience with it. Both now use `batch_alter_table` (a table rebuild
+  on SQLite, the same plain DDL on PostgreSQL), and a new smoke test
+  (`tests/stateless/test_alembic_sqlite_smoke.py`) runs the full chain
+  against a fresh SQLite file so CI catches the next regression — the
+  Docker job skips Alembic and the pg job runs it against PostgreSQL
+  only, which is exactly how this went unnoticed. `downgrade base` +
+  `upgrade head` verified end-to-end.
+- **404 on an HTML page route dead-ended on raw JSON.** A mistyped URL
+  or a link to a deleted script/execution returned a bare
+  `{"detail": ...}` with no way back — the styled `error.html` page with
+  the "Back to Dashboard" button was already there but only wired to
+  403. It now also renders for 404 on non-`/api` paths; API routes keep
+  their JSON, and 401 still returns `WWW-Authenticate` untouched.
+- The full walkthrough is documented in `docs/UX_MAP.md`.
 - **Prometheus metrics were named `crinator_*`** (typo) instead of
   `cronator_*` — every metric plus its `HELP`/`TYPE` line. Any scraper or
   dashboard keyed on the old names must be updated.
