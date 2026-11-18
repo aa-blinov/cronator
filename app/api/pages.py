@@ -643,10 +643,18 @@ async def rerun_execution_action(
 @router.post("/scripts/{script_id}/toggle")
 async def toggle_script_action(
     script_id: int,
+    request: Request,
+    next: str | None = Query(None),
     username: str = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Toggle script enabled/disabled."""
+    """Toggle script enabled/disabled.
+
+    `next` lets the source page choose the landing spot (e.g. the scripts
+    list a row-toggle button came from). It must be a same-site relative
+    path — anything protocol-relative (`//host`) or absolute with a scheme
+    is refused, so the parameter cannot become an open redirect.
+    """
     result = await db.execute(select(Script).where(Script.id == script_id))
     script = result.scalar_one_or_none()
 
@@ -657,10 +665,24 @@ async def toggle_script_action(
     await db.commit()
     await scheduler_service.update_job(script)
 
+    if next and _is_safe_relative(next):
+        target = next
+    else:
+        target = f"/scripts/{script_id}"
     return RedirectResponse(
-        url=f"/scripts/{script_id}",
+        url=target,
         status_code=status.HTTP_303_SEE_OTHER,
     )
+
+
+def _is_safe_relative(target: str) -> bool:
+    """A landing URL is safe only as a same-site relative path.
+
+    Guards the toggle/run `next` parameter: a protocol-relative
+    (`//evil.example`) or scheme-absolute (`https://…`) value would turn
+    the redirect into an open redirect; a path like `/scripts/5` is fine.
+    """
+    return target.startswith("/") and not target.startswith("//")
 
 
 @router.get("/changelog", response_class=HTMLResponse)
