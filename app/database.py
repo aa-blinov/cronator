@@ -62,7 +62,25 @@ async def init_db() -> None:
     """Initialize database tables (used in tests only).
 
     In production, use Alembic migrations instead (alembic upgrade head).
+
+    The model imports run here rather than at module level: every model does
+    `from app.database import Base`, so a module-level import back into
+    app.models would make either import order fail with a partially
+    initialized module, depending on which side Python reached first.
     """
+    # Import all models to register them with Base.metadata
+    # This ensures tables are created when using Base.metadata.create_all()
+    from app.models import (  # noqa: F401
+        Artifact,
+        Execution,
+        Script,
+        ScriptAuditLog,
+        ScriptVersion,
+        Setting,
+        User,
+        UserAuditLog,
+    )
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -72,15 +90,5 @@ async def close_db() -> None:
     await engine.dispose()
 
 
-# Import all models to register them with Base.metadata
-# This ensures tables are created when using Base.metadata.create_all()
-from app.models import (  # noqa: F401, E402
-    Artifact,
-    Execution,
-    Script,
-    ScriptAuditLog,
-    ScriptVersion,
-    Setting,
-    User,
-    UserAuditLog,
-)
+# Backwards-compatible re-export: importing Base from app.database still works
+# for the models and the tests (see the import in app/models/*.py, alembic/env.py).

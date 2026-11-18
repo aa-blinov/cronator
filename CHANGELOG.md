@@ -32,6 +32,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `data-only` vs `full-or-unknown` and `restorable_via_ui`.
 - **`json_logging` docstring referenced a non-existent `CRONATOR_LOG_FORMAT`**
   env var; the real knob is `LOG_FORMAT`.
+- **`app/api/diagnostics.py` imported the Unix-only `resource` module
+  unconditionally**, so the process-RSS section of `/api/diagnostics` raised
+  `ModuleNotFoundError` on Windows hosts (and crashed the whole snapshot).
+  RSS is now measured per-platform: `resource` on Unix (unit-normalized —
+  bytes on macOS, KiB on Linux), the PSAPI `GetProcessMemoryInfo` working-set
+  counter on Windows, and `null` (omitted from the response) where neither
+  is available.
+- **`app/database.py` imported the models at module level while every model
+  imports `Base` back from it** — an import cycle that only happened to
+  resolve in one direction. Which side broke depended entirely on which
+  module Python reached first: `import app.models` from a cold interpreter
+  failed with
+  `ImportError: cannot import name 'Artifact' from partially initialized module 'app.models'`,
+  and with it the whole test suite failed to collect. Model registration
+  now runs inside `init_db()`; `Base` is imported from `app.database` in
+  both directions.
+- **Test/CI tooling lived in `[project.optional-dependencies]`**, which
+  `uv run` does not install by default — following the documented flow
+  (`uv sync --all-extras` then `uv run pytest`) silently uninstalled
+  `pytest-asyncio` and the suite failed to collect (`No module named
+  'pytest_asyncio'`). `pytest` and `pytest-asyncio` moved to
+  `[dependency-groups] dev`, which every `uv sync`/`uv run` installs, so a
+  fresh clone needs no extras flag to run the tests.
+- **`test_docker_compose_files_validate` depended on operator state**:
+  `docker compose config` resolves `${PORT}`/`${POSTGRES_PASSWORD}`/
+  `${BACKUP_RETENTION_DAYS}` from a `.env` file that only existed where an
+  operator had already followed the quick start, so the test failed
+  (`no port specified: :<empty>`, exit 1) on every fresh checkout. CI
+  papered over it with a stub step. The test now stubs `.env` from
+  `.env.example` itself (same values, `PORT=8080`) and restores the
+  previous state afterwards, so it exercises compose validation anywhere,
+  never overwrites a real `.env`, and no longer needs the CI-side step.
 
 ### Changed
 - **Execution-history retention is now configurable** via

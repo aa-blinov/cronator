@@ -41,28 +41,72 @@ settings = get_settings()
 _PROCESS_START_TIME = time.monotonic()
 
 
+def _rss_bytes_safe() -> int | None:
+    """Peak RSS in bytes, on the platforms this app supports.
+
+    `resource` exists on Unix only (and its ru_maxrss unit differs: bytes on
+    macOS, KiB on Linux). Windows has no `resource`, so the process memory
+    counters come from the PSAPI instead. A platform where neither path works
+    reports None rather than failing the whole diagnostics snapshot — the RSS
+    number is useful when present, but never worth a 500 over.
+    """
+    import sys
+
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+                _fields_ = [
+                    ("cb", wintypes.DWORD),
+                    ("PageFaultCount", wintypes.DWORD),
+                    ("PeakWorkingSetSize", ctypes.c_size_t),
+                    ("WorkingSetSize", ctypes.c_size_t),
+                    ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                    ("PagefileUsage", ctypes.c_size_t),
+                    ("PeakPagefileUsage", ctypes.c_size_t),
+                ]
+
+            pmc = PROCESS_MEMORY_COUNTERS()
+            pmc.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
+            # GetCurrentProcess() returns a pseudohandle of -1
+            if ctypes.windll.psapi.GetProcessMemoryInfo(
+                ctypes.c_void_p(-1), ctypes.byref(pmc), pmc.cb
+            ):
+                return int(pmc.PeakWorkingSetSize)
+        except Exception:
+            pass
+        return None
+
+    try:
+        import resource
+
+        rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return rss * 1024 if sys.platform == "linux" else int(rss)
+    except Exception:
+        return None
+
+
 @router.get("/diagnostics")
 async def get_diagnostics(username: str = Depends(verify_credentials)):
     """Return a comprehensive diagnostic snapshot of the running Cronator instance."""
-    import resource
-
     from app.services.executor import executor_service
     from app.services.scheduler import scheduler_service
 
     # --- Process info ---
     uptime = time.monotonic() - _PROCESS_START_TIME
-    rss_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    # Linux returns KB, macOS returns bytes — normalize
-    if platform.system() == "Darwin":
-        rss_bytes = rss_kb
-    else:
-        rss_bytes = rss_kb * 1024
-
+    rss_bytes = _rss_bytes_safe()
+    # A platform with neither source (RSS None) reports the field as null
+    # rather than failing the snapshot; rss_mb mirrors it.
     process_info = {
         "pid": os.getpid(),
         "uptime_seconds": round(uptime, 3),
         "rss_bytes": rss_bytes,
-        "rss_mb": round(rss_bytes / (1024 * 1024), 2),
+        "rss_mb": round(rss_bytes / (1024 * 1024), 2) if rss_bytes is not None else None,
         "thread_count": _thread_count_safe(),
         "python_version": platform.python_version(),
         "platform": f"{platform.system()} {platform.release()} ({platform.machine()})",

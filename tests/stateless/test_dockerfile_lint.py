@@ -15,6 +15,28 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+@pytest.fixture
+def stub_env_file():
+    """Make docker compose config pass on a fresh checkout.
+
+    The compose files declare `env_file: .env`, so `docker compose config`
+    exits 1 when that file is missing — CI creates the stub in a workflow
+    step, but a `pytest tests/` run on the host does not. This fixture stubs
+    `.env` from `.env.example` (the same three values the README's quick
+    start tells the user to set) and restores the previous state afterwards,
+    so a real operator-provided `.env` is never overwritten.
+    """
+    env_file = REPO_ROOT / ".env"
+    example = REPO_ROOT / ".env.example"
+    created = False
+    if not env_file.exists() and example.exists():
+        env_file.write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
+        created = True
+    yield
+    if created and env_file.exists():
+        env_file.unlink()
+
+
 def _skip_if_not_on_host():
     if not (REPO_ROOT / "Dockerfile").exists():
         pytest.skip("Dockerfile not at expected host path — likely running in container")
@@ -47,7 +69,7 @@ def test_dockerfile_uses_multi_stage():
     assert content.count("FROM ") >= 2, "Dockerfile should use multi-stage build"
 
 
-def test_docker_compose_files_validate():
+def test_docker_compose_files_validate(stub_env_file):
     """docker compose config --quiet must accept both compose files."""
     _skip_if_not_on_host()
     import subprocess
@@ -58,6 +80,7 @@ def test_docker_compose_files_validate():
             capture_output=True,
             text=True,
             timeout=30,
+            cwd=str(REPO_ROOT),
         )
         if "Cannot connect to the Docker daemon" in (result.stderr or ""):
             pytest.skip("Docker daemon not available")
