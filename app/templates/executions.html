@@ -121,6 +121,16 @@ function removeEmptyParams(event) {
                                     {{ icons.archive_box("w-3 h-3") }} {{ exec.artifacts_count }}
                                 </span>
                                 {% endif %}
+                                {% if is_admin and exec.status != 'running' %}
+                                <form method="POST" action="/executions/{{ exec.id }}/rerun" class="inline-block">
+                                    <button type="submit" class="btn btn-ghost btn-xs"
+                                            title="Run again — lands on the new execution page">
+                                        Rerun
+                                    </button>
+                                </form>
+                                {% endif %}
+                                <a href="/executions?script_id={{ exec.script_id }}" class="btn btn-ghost btn-xs"
+                                   title="All runs of this script">History</a>
                             </div>
                         </td>
                     </tr>

@@ -122,15 +122,34 @@
                     </td>
                     <td>
                         {% if script.last_failure_at and (not script.last_success_at or script.last_failure_at > script.last_success_at) %}
-                        <span class="text-xs text-error">{{ script.last_failure_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        <a href="/executions?script_id={{ script.id }}"
+                           class="text-xs text-error hover:underline"
+                           title="Last run failed — click for all runs of this script">{{ script.last_failure_at.strftime('%Y-%m-%d %H:%M') }}</a>
                         {% elif script.last_success_at %}
-                        <span class="text-xs">{{ script.last_success_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        <a href="/executions?script_id={{ script.id }}"
+                           class="text-xs hover:underline"
+                           title="Click for all runs of this script">{{ script.last_success_at.strftime('%Y-%m-%d %H:%M') }}</a>
                         {% else %}
                         <span class="text-xs text-base-content/40">—</span>
                         {% endif %}
                     </td>
                     <td>
                         <a href="/scripts/{{ script.id }}" class="btn btn-xs btn-ghost">View</a>
+                        {% if is_admin %}
+                        <form method="POST" action="/scripts/{{ script.id }}/run" class="inline-block">
+                            <button type="submit" class="btn btn-xs btn-ghost btn-success"
+                                    title="Run now — one click, lands on the execution page">
+                                Run
+                            </button>
+                        </form>
+                        <form method="POST" action="/scripts/{{ script.id }}/toggle" class="inline-block">
+                            <input type="hidden" name="next" value="/scripts" />
+                            <button type="submit" class="btn btn-xs btn-ghost"
+                                    title="{% if script.enabled %}Disable{% else %}Enable{% endif %} — stays on this list">
+                                {% if script.enabled %}Disable{% else %}Enable{% endif %}
+                            </button>
+                        </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
