@@ -118,6 +118,11 @@ If the check itself can't determine free space (permission error, missing
 mount), it **fails open** — an unrelated filesystem hiccup shouldn't stop
 every script from ever running again.
 
+This check only covers *starting a new run*. It does not stop a
+long-running script from filling the disk with its own output or
+artifacts mid-execution — see
+[Security → Script execution model](SECURITY.md#script-execution-model).
+
 ## Off-host copies
 
 Everything above — the database and every file in `./backups` — lives on
@@ -131,16 +136,31 @@ the backups off the host on the same schedule, even a simple one:
 10 2 * * * rclone copy /path/to/cronator/backups remote:cronator-backups --max-age 48h
 ```
 
-Or point `db-backup`'s target at any NFS/S3 mount — anything beats the
-default, which is backups that die with the disk they back up. Ansible
-'image build' flows that re provision the host from scratch must exclude
-the backups volume from the rebuild, or the same drift that removes the
-app will quietly remove the histories too.
+### The scripts git mirror (`script_repo/`)
 
-This check only covers *starting a new run*. It does not stop a
-long-running script from filling the disk with its own output or
-artifacts mid-execution — see
-[Security → Script execution model](SECURITY.md#script-execution-model).
+Every script create / duplicate / update / revert / delete lands as a git
+commit in `./script_repo` (`app/services/script_git.py`): one `<name>.py`
+with the script content and one `<name>.meta.json` with the schedule,
+dependencies, python version and such beside it. `git log` / `git diff`
+there reads as a human history database of the scripts — what changed,
+when, from which version to which (`script <name>: updated (v3)`).
+
+The mirror is **one-way** and **append-only**: the database
+(`script_versions` + `script_audit_log`) remains the machine source of
+truth, and a deletion marks its metadata `deleted: true` while keeping
+the last file state, so nothing in the mirror is ever lost.
+
+To also publish the mirror somewhere off-host, set `SCRIPT_GIT_REMOTE`
+(every save then pushes; a failing push never fails the save — the
+mirror never blocks the app):
+
+```dotenv
+SCRIPT_GIT_REPO_DIR=./script_repo
+SCRIPT_GIT_REMOTE=git@github.com:you/cronator-scripts.git
+```
+
+The remote must already exist; the first successful push sets the
+upstream (`-u`) for everything that follows.
 
 ## Alerting
 

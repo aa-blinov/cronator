@@ -19,6 +19,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.execution import Execution
 from app.models.script import Script
+from app.models.script_version import ScriptVersion
 from app.schemas.script import (
     ScriptCreate,
     ScriptList,
@@ -229,8 +230,9 @@ async def create_script(
     # Register script in environment service for coordination
     environment_service.register_script(script.name, script.id)
 
-    # Create initial version (v1)
-    await _create_version(db, script, change_summary="Initial version")
+    # Create initial version (v1) — and mirror it into the git repo
+    version = await _create_version(db, script, change_summary="Initial version")
+    _mirror(script, "created", version)
 
     # NOTE: Environment setup is now done separately via /scripts/{id}/install
     # to allow streaming of installation logs
@@ -315,7 +317,10 @@ async def duplicate_script(
     await db.refresh(dup)
 
     # Create initial ScriptVersion so the new script appears in history
-    await _create_version(db, dup, change_summary=f"Duplicated from {original.name}")
+    dup_version = await _create_version(
+        db, dup, change_summary=f"Duplicated from {original.name}"
+    )
+    _mirror(dup, "created", dup_version)
 
     return ScriptReadWithInstallStatus(
         **ScriptRead.model_validate(dup).model_dump(),
@@ -441,7 +446,8 @@ async def update_script(
 
     # Create version snapshot if content/deps/python changed
     if data.content is not None or deps_changed or python_changed:
-        await _create_version(db, script, data.change_summary)
+        new_version = await _create_version(db, script, data.change_summary)
+        _mirror(script, "updated", new_version)
 
     # F11: Write audit log entries for each changed field
     if audit_changes:
@@ -501,9 +507,24 @@ async def delete_script(
         logger.warning(f"Failed to delete environment for {script.name}: {message}")
         # Continue with script deletion anyway
 
-    # Delete script
+    # Delete script — the mirror keeps the last state and records the deletion
+    last_known_version = await db.scalar(
+        select(ScriptVersion.version_number)
+        .where(ScriptVersion.script_id == script.id)
+        .order_by(ScriptVersion.version_number.desc())
+        .limit(1)
+    )
     await db.delete(script)
     await db.commit()
+
+    from app.services.script_git import mirror_script
+
+    mirror_script(
+        script.name,
+        "deleted",
+        version_number=last_known_version,
+        metadata={"script_id": script.id},
+    )
 
 
 @router.post("/{script_id}/run")
@@ -873,7 +894,7 @@ async def validate_script(
 
 async def _get_next_version_number(db: AsyncSession, script_id: int) -> int:
     """Get the next version number for a script."""
-    from app.models.script_version import ScriptVersion
+
 
     result = await db.execute(
         select(func.max(ScriptVersion.version_number)).where(ScriptVersion.script_id == script_id)
@@ -882,13 +903,40 @@ async def _get_next_version_number(db: AsyncSession, script_id: int) -> int:
     return (max_version or 0) + 1
 
 
+def _mirror(script: Script, action: str, version: ScriptVersion | None) -> None:
+    """Hand one committed script state to the git mirror (see script_git).
+
+    Sync, inside the request: the caller has just committed, and the
+    mirror is a side effect of a successful save. Fail-open by contract —
+    mirror_script never raises past a warning.
+    """
+    from app.services.script_git import mirror_script
+
+    mirror_script(
+        script.name,
+        action,
+        content=script.content,
+        version_number=version.version_number if version else None,
+        metadata={
+            "script_id": script.id,
+            "description": script.description,
+            "cron_expression": script.cron_expression,
+            "python_version": script.python_version,
+            "dependencies": script.dependencies,
+            "enabled": script.enabled,
+            "path": script.path,
+            "timeout": script.timeout,
+        },
+    )
+
+
 async def _create_version(
     db: AsyncSession,
     script: Script,
     change_summary: str | None = None,
-) -> None:
-    """Create a new version snapshot of the script."""
-    from app.models.script_version import ScriptVersion
+) -> ScriptVersion | None:
+    """Create a new version snapshot of the script, or None if unchanged."""
+
 
     # Calculate hash of current state (content + dependencies + python_version)
     current_state = f"{script.content}|{script.dependencies or ''}|{script.python_version}"
@@ -917,7 +965,7 @@ async def _create_version(
             logging.info(
                 f"Skipping version creation for script {script.id}: content hash unchanged"
             )
-            return
+            return None
 
     version_number = await _get_next_version_number(db, script.id)
 
@@ -939,6 +987,7 @@ async def _create_version(
     logging.info(
         f"Created version {version_number} for script {script.id} (hash: {current_hash[:8]}...)"
     )
+    return version
 
 
 @router.get("/{script_id}/audit")
@@ -991,7 +1040,7 @@ async def list_script_versions(
     db: AsyncSession = Depends(get_db),
 ):
     """List all versions of a script."""
-    from app.models.script_version import ScriptVersion
+
     from app.schemas.script_version import ScriptVersionListItem
 
     # Check script exists
@@ -1035,7 +1084,7 @@ async def get_script_version(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a specific version of a script."""
-    from app.models.script_version import ScriptVersion
+
 
     result = await db.execute(
         select(ScriptVersion).where(
@@ -1059,7 +1108,7 @@ async def revert_to_version(
     username: str = Depends(require_admin),
 ):
     """Revert script to a specific version."""
-    from app.models.script_version import ScriptVersion
+
 
     # Get the version to revert to
     version_result = await db.execute(
@@ -1115,11 +1164,12 @@ async def revert_to_version(
     await scheduler_service.update_job(script)
 
     # Create new version for the revert
-    await _create_version(
+    revert_version = await _create_version(
         db,
         script,
         change_summary=f"Reverted to version {version_number}",
     )
+    _mirror(script, "updated", revert_version)
 
     return {
         "message": f"Script reverted to version {version_number}",
