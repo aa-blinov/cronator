@@ -118,6 +118,25 @@ If the check itself can't determine free space (permission error, missing
 mount), it **fails open** — an unrelated filesystem hiccup shouldn't stop
 every script from ever running again.
 
+## Off-host copies
+
+Everything above — the database and every file in `./backups` — lives on
+**one host** by default. If that host is lost, the database and its backup
+history are lost with it: the daily 02:00 dump protects against a bad
+deploy or a corrupted table, not against losing the machine itself. Copy
+the backups off the host on the same schedule, even a simple one:
+
+```bash
+# cron, on the host or a second machine — every night after 02:10
+10 2 * * * rclone copy /path/to/cronator/backups remote:cronator-backups --max-age 48h
+```
+
+Or point `db-backup`'s target at any NFS/S3 mount — anything beats the
+default, which is backups that die with the disk they back up. Ansible
+'image build' flows that re provision the host from scratch must exclude
+the backups volume from the rebuild, or the same drift that removes the
+app will quietly remove the histories too.
+
 This check only covers *starting a new run*. It does not stop a
 long-running script from filling the disk with its own output or
 artifacts mid-execution — see
