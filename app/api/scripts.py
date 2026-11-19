@@ -232,7 +232,7 @@ async def create_script(
 
     # Create initial version (v1) — and mirror it into the git repo
     version = await _create_version(db, script, change_summary="Initial version")
-    _mirror(script, "created", version)
+    await _mirror(script, "created", version)
 
     # NOTE: Environment setup is now done separately via /scripts/{id}/install
     # to allow streaming of installation logs
@@ -320,7 +320,7 @@ async def duplicate_script(
     dup_version = await _create_version(
         db, dup, change_summary=f"Duplicated from {original.name}"
     )
-    _mirror(dup, "created", dup_version)
+    await _mirror(dup, "created", dup_version)
 
     return ScriptReadWithInstallStatus(
         **ScriptRead.model_validate(dup).model_dump(),
@@ -447,7 +447,7 @@ async def update_script(
     # Create version snapshot if content/deps/python changed
     if data.content is not None or deps_changed or python_changed:
         new_version = await _create_version(db, script, data.change_summary)
-        _mirror(script, "updated", new_version)
+        await _mirror(script, "updated", new_version)
 
     # F11: Write audit log entries for each changed field
     if audit_changes:
@@ -903,14 +903,19 @@ async def _get_next_version_number(db: AsyncSession, script_id: int) -> int:
     return (max_version or 0) + 1
 
 
-def _mirror(script: Script, action: str, version: ScriptVersion | None) -> None:
+async def _mirror(script: Script, action: str, version: ScriptVersion | None) -> None:
     """Hand one committed script state to the git mirror (see script_git).
 
-    Sync, inside the request: the caller has just committed, and the
+    Async, inside the request: the caller has just committed, and the
     mirror is a side effect of a successful save. Fail-open by contract —
-    mirror_script never raises past a warning.
+    mirror_script never raises past a warning. Config comes from the
+    Settings (UI-editable); the .env values are only the fallback.
     """
     from app.services.script_git import mirror_script
+    from app.services.settings_service import settings_service
+
+    settings_remote = await settings_service.get("script_git_remote", "")
+    settings_repo_dir = await settings_service.get("script_git_repo_dir", "")
 
     mirror_script(
         script.name,
@@ -927,6 +932,8 @@ def _mirror(script: Script, action: str, version: ScriptVersion | None) -> None:
             "path": script.path,
             "timeout": script.timeout,
         },
+        remote=settings_remote or None,
+        repo_dir=settings_repo_dir or None,
     )
 
 
@@ -1169,7 +1176,7 @@ async def revert_to_version(
         script,
         change_summary=f"Reverted to version {version_number}",
     )
-    _mirror(script, "updated", revert_version)
+    await _mirror(script, "updated", revert_version)
 
     return {
         "message": f"Script reverted to version {version_number}",

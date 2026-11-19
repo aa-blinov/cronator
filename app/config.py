@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     db_pool_recycle: int = 3600  # Recycle connections after 1 hour
     db_pool_pre_ping: bool = True  # Test connections before using
 
+    # Script git mirror (see app/services/script_git.py). Empty means:
+    # fall back to SCRIPT_GIT_REMOTE / SCRIPT_GIT_REPO_DIR env, and only
+    # then to the built-in defaults — so nothing needs .env on a fresh
+    # install and the Settings UI is the primary place to configure it.
+    script_git_remote: str = ""
+    script_git_repo_dir: str = ""
+
     # Directories
     base_dir: Path = Path(__file__).parent.parent
     scripts_dir: Path = Path("./scripts")

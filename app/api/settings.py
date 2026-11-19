@@ -45,6 +45,13 @@ class SettingsResponse(BaseModel):
     # P0: automated database backup toggle
     auto_backup_enabled: bool = False
 
+    # F18: script git mirror — where the mirror repo lives and where to
+    # push. Empty falls back to SCRIPT_GIT_REMOTE / SCRIPT_GIT_REPO_DIR
+    # env, then to the built-in defaults in script_git.py (see the
+    # mirror's own docstring for that chain).
+    script_git_remote: str = ""
+    script_git_repo_dir: str = ""
+
 
 class SchedulerStatus(BaseModel):
     """Scheduler status."""
@@ -67,6 +74,8 @@ async def get_settings_info() -> SettingsResponse:
     default_timeout = await settings_service.get("default_timeout", settings.default_timeout)
     theme = await settings_service.get("theme", "dim")
     webhook_url = await settings_service.get("webhook_url", "")
+    script_git_remote = await settings_service.get("script_git_remote", "")
+    script_git_repo_dir = await settings_service.get("script_git_repo_dir", "")
     auto_backup_enabled = await settings_service.get("auto_backup_enabled", False)
 
     return SettingsResponse(
@@ -82,6 +91,8 @@ async def get_settings_info() -> SettingsResponse:
         default_timeout=default_timeout,
         theme=theme,
         webhook_url=webhook_url,
+        script_git_remote=script_git_remote,
+        script_git_repo_dir=script_git_repo_dir,
         auto_backup_enabled=auto_backup_enabled,
     )
 
@@ -173,6 +184,12 @@ class UpdateSettingsRequest(BaseModel):
     # backed-up storage (see docs/OPERATIONS.md).
     auto_backup_enabled: bool | None = None
 
+    # F18: script git mirror — where to push and where the mirror repo
+    # lives. Empty string (as opposed to absent) clears the override, and
+    # the env fallbacks in script_git.py then apply.
+    script_git_remote: str | None = None
+    script_git_repo_dir: str | None = None
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -218,6 +235,10 @@ async def update_settings(request: UpdateSettingsRequest, username: str = Depend
         updates["webhook_url"] = request.webhook_url
     if request.auto_backup_enabled is not None:
         updates["auto_backup_enabled"] = request.auto_backup_enabled
+    if request.script_git_remote is not None:
+        updates["script_git_remote"] = request.script_git_remote.strip()
+    if request.script_git_repo_dir is not None:
+        updates["script_git_repo_dir"] = request.script_git_repo_dir.strip()
 
     # Save to database
     await settings_service.bulk_set(updates)

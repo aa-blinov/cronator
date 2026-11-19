@@ -155,11 +155,13 @@ the last file state, so nothing in the mirror is ever lost.
 ```bash
 # once: create the mirror remote (private!) and tell cronator about it
 gh repo create cronator-scripts --private
-# in .env:
-#   SCRIPT_GIT_REPO_DIR=./data/script_repo
+# in the UI, Settings → Script Git Mirror, paste the remote URL — or,
+# headlessly, in .env:
 #   SCRIPT_GIT_REMOTE=git@github.com:<you>/cronator-scripts.git
 # the next save inits ./data/script_repo, commits, and pushes (upstream -u)
 ```
+
+The Settings value wins over the .env one; either needs no restart.
 
 | You want to… | Do this |
 | --- | --- |

@@ -76,6 +76,44 @@ def test_updated_script_grows_history(mirror_dir):
     assert meta["mirror_version"] == 2
 
 
+def test_revert_recreates_the_old_state_as_a_new_commit(mirror_dir):
+    """The revert path: mirroring the old version as a new "updated" keeps
+    the whole history (v1 -> v2 -> back to v1 is three commits) and the
+    working tree ends on the reverted content — the mirror never loses
+    the v2 detour, which is exactly what git buys here.
+    """
+    script_git.mirror_script("probe", "created", content='v1\n', version_number=1)
+    script_git.mirror_script("probe", "updated", content='v2\n', version_number=2)
+    script_git.mirror_script("probe", "updated", content='v1\n', version_number=3)
+    assert (mirror_dir / 'probe.py').read_text(encoding='utf-8') == 'v1\n'
+    commits = _commits(mirror_dir)
+    assert len(commits) == 3
+    assert "script probe: updated (v3)" in commits[0]
+    meta = json.loads((mirror_dir / "probe.meta.json").read_text(encoding="utf-8"))
+    assert meta["mirror_version"] == 3
+
+
+def test_settings_override_the_env(mirror_dir, tmp_path, monkeypatch):
+    """remote / repo_dir passed to mirror_script win over the module
+    defaults — that is the settings-driven path (UI over .env).
+    """
+    alt_repo = tmp_path / "alt_repo"
+    alt_repo.mkdir()
+    script_git.mirror_script(
+        "probe",
+        "created",
+        content='print(alt)\n',
+        version_number=1,
+        repo_dir=alt_repo,
+        remote="https://example.invalid/nope.git",
+    )
+    assert (alt_repo / 'probe.py').read_text(encoding='utf-8') == 'print(alt)\n'
+    assert _commits(alt_repo), "commit must land in the overridden repo"
+    assert not (mirror_dir / "probe.py").exists(), "default mirror must stay untouched"
+    # example.invalid does not resolve; the push must fail open, not raise.
+    # No assertion beyond "mirror_script returned".
+
+
 def test_deleted_script_keeps_history(mirror_dir):
     """Append-only: a deletion keeps the file and marks the metadata."""
     script_git.mirror_script("probe", "created", content="gone soon\n", version_number=1)

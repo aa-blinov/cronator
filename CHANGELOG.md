@@ -26,13 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Setup by token, and what the UI explains.** gh's credentials are
 enough: `git clone https://github.com/<you>/cronator-scripts.git` with
-`gh` logged in — or a PAT works. The mirror itself is configured in
-.env (`SCRIPT_GIT_REPO_DIR`, `SCRIPT_GIT_REMOTE`); nothing about the
-mirror is configurable in the UI, by design — it exports, it never
-imports, so the user flow in the interface stays exactly as it was:
-scripts, runs, statuses. The documented user flow for recovering a
-script from the mirror clone lives in `docs/OPERATIONS.md`
-(`git show <sha>:<name>.py` inside the mirror clone). The user flow lives in
+`gh` logged in — or a PAT works. The mirror is configured in the
+Settings UI (Settings → Script Git Mirror: the remote URL and, if the
+default placement does not fit, the local mirror directory); the
+`.env` variables (`SCRIPT_GIT_REMOTE`, `SCRIPT_GIT_REPO_DIR`) are the
+headless-install fallback, and the UI value wins. The user flow lives in
   `docs/OPERATIONS.md` (Off-host copies → The scripts git mirror).
 
 ### Fixed
