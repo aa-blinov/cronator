@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Scripts are mirrored into a git repository** (`./script_repo` by
+  default): every create / duplicate / update / revert / delete becomes a
+  commit (`script <name>: updated (v3)`), one `<name>.py` per script plus
+  a `<name>.meta.json` holding the schedule, dependencies and python
+  version. The mirror is one-way and append-only — the database stays the
+  machine source of truth, deletions keep the last file state with a
+  `deleted: true` metadata marker — so `git log`/`git diff` reads as a
+  human history database of the scripts and, with `SCRIPT_GIT_REMOTE`
+  set, doubles as the off-host copy the daily backup dump never gave.
+  Mirroring is fail-open: a missing git binary or an unreachable remote
+  is logged and skipped, never a failed save.
+
 ### Fixed
 - **The documented local-dev start crashed on a fresh SQLite database.**
   Two Alembic migrations used operations SQLite has no syntax for —
