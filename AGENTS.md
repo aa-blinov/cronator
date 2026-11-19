@@ -133,6 +133,15 @@ run inside the Docker test container.
   `-` or `_`.
 - **A run is a row in `executions`.** Any new outcome gets a status, a
   `finished_at` and a duration, or the history and the metrics drift apart.
+- **The `house style` job on every push is the CI gate for the repo rules**
+  (`.github/workflows/house-style.yml`, the checker lives in the
+  `aa-blinov/golden-repo` action). CI being green is not enough: check
+  that job before calling work done. It fails `hard` on things a rebuild
+  quietly breaks — for example HS043, a generated file such as
+  `app/static/output.css` that lost its trailing newline in a
+  `--minify` build. After any rebuild of generated artifacts, check the
+  file still ends with `\n` (`tail -c 1 | xxd`) before committing, and
+  re-run the check locally when the action allows it.
 
 ## Where the product truth lives
 
