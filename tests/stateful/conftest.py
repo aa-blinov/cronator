@@ -99,7 +99,7 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
     # Create test session maker
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
-    from app.api.dependencies import verify_credentials
+    from app.api.dependencies import page_admin, page_user, verify_credentials
     from app.api.rate_limit import clear_rate_limits
     from app.database import get_db
     from app.main import app as fastapi_app
@@ -156,6 +156,10 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
 
     fastapi_app.dependency_overrides[get_db] = override_get_db
     fastapi_app.dependency_overrides[verify_credentials] = override_verify_credentials
+    # The HTML pages authenticate through page_user (session cookie), not
+    # through verify_credentials — same blanket access for their tests.
+    fastapi_app.dependency_overrides[page_user] = override_verify_credentials
+    fastapi_app.dependency_overrides[page_admin] = override_verify_credentials
 
     # Seed the default admin user from env so /api/users shows at least one admin.
     # The app's lifespan doesn't run under ASGITransport, so we call it explicitly.

@@ -154,6 +154,18 @@ class SchedulerService:
         except Exception:
             logger.exception("Error during scheduled execution history cleanup")
 
+        # Sessions outlive their owners without this: expired rows are
+        # harmless (validate_session re-checks the date) but pile up in
+        # the table until someone restarts the app.
+        from app.services.auth_session import purge_expired
+
+        try:
+            purged = await purge_expired()
+            if purged:
+                logger.info("Purged %d expired login sessions", purged)
+        except Exception:
+            logger.exception("Error purging expired login sessions")
+
     async def _run_auto_backup(self) -> None:
         """Run the daily automated database backup, if enabled (P0)."""
         from app.services.backup_service import backup_service

@@ -258,7 +258,7 @@ class TestRerunEndpoint:
         ) as mock_execute:
             await test_client.post(f"/api/scripts/{sample_script.id}/rerun")
 
-        mock_execute.assert_called_once_with(sample_script.id, triggered_by="manual")
+        mock_execute.assert_called_once_with(sample_script.id, triggered_by="manual:test_user")
 
     @pytest.mark.asyncio
     async def test_rerun_while_running_returns_skipped_execution(

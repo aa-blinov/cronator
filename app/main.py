@@ -19,6 +19,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from app import __version__
 from app.api import api_router
+from app.api.auth import router as auth_router
 from app.config import get_settings
 from app.database import close_db
 from app.middleware.csrf_origin_guard import CsrfOriginGuardMiddleware
@@ -543,6 +544,11 @@ if static_dir.exists():
 
 # Include routers
 app.include_router(api_router)
+
+# The login flow — /login and /logout are the only anonymous routes in
+# the app, mounted here rather than inside api_router so their
+# exemption (and nothing else) is visible in one place.
+app.include_router(auth_router)
 
 
 async def get_migration_status() -> dict:

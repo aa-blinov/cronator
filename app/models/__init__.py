@@ -2,6 +2,7 @@
 
 from app.models.artifact import Artifact
 from app.models.audit_log import ScriptAuditLog
+from app.models.auth_session import AuthSession
 from app.models.execution import Execution
 from app.models.script import Script
 from app.models.script_version import ScriptVersion
@@ -16,6 +17,7 @@ __all__ = [
     "ScriptVersion",
     "Artifact",
     "ScriptAuditLog",
+    "AuthSession",
     "User",
     "UserAuditLog",
 ]

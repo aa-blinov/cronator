@@ -2,7 +2,7 @@
 
 import secrets
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app.api.rate_limit import check_login_lockout, record_login_failure
@@ -10,24 +10,21 @@ from app.config import get_settings
 
 settings = get_settings()
 security = HTTPBasic()
+# The HTML pages authenticate through a login session cookie, falling
+# back to Basic Auth for API clients (curl, scripts, old bookmarks with
+# stored passwords). auto_error=False is what makes the layering
+# possible: without it, a browser showing the page would get the Basic
+# popup again before the cookie ever had a chance.
+security_optional = HTTPBasic(auto_error=False)
 
 
-async def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)) -> str:
-    """Verify HTTP Basic Auth credentials.
+async def check_credentials(username: str, password: str) -> None:
+    """Validate one username/password pair; raise 401 on failure.
 
-    Order of checks (F21):
-    1. If a User record with this username exists, verify against the
-       stored PBKDF2 hash.
-    2. Otherwise fall back to the env-defined admin (legacy single-user
-       auth) so deployments without a User table still work.
-
-    Failed attempts are rate-limited per username (P0: brute-force
-    protection) before any password check runs, so a locked-out username
-    can't be used to keep probing passwords.
+    The single place both the login form and the Basic Auth path go
+    through, so brute-force protection and the user-vs-env fallback can
+    never drift apart.
     """
-    username = credentials.username
-    password = credentials.password
-
     check_login_lockout(username)
 
     # Try DB-backed auth first (fast-fails: missing user → fall through)
@@ -37,7 +34,7 @@ async def verify_credentials(credentials: HTTPBasicCredentials = Depends(securit
         user = await get_user(username)
         if user is not None:
             if verify_password(password, user.password_hash):
-                return username
+                return
             # User exists but password wrong → reject
             record_login_failure(username)
             raise HTTPException(
@@ -53,11 +50,11 @@ async def verify_credentials(credentials: HTTPBasicCredentials = Depends(securit
 
     # Legacy single-user fallback (env-defined admin)
     correct_username = secrets.compare_digest(
-        credentials.username.encode("utf8"),
+        username.encode("utf8"),
         settings.admin_username.encode("utf8"),
     )
     correct_password = secrets.compare_digest(
-        credentials.password.encode("utf8"),
+        password.encode("utf8"),
         settings.admin_password.encode("utf8"),
     )
 
@@ -69,6 +66,14 @@ async def verify_credentials(credentials: HTTPBasicCredentials = Depends(securit
             headers={"WWW-Authenticate": "Basic"},
         )
 
+
+async def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)) -> str:
+    """Verify HTTP Basic Auth credentials (the API path).
+
+    The shared gate lives in check_credentials above; this wrapper only
+    adapts the HTTPBasicCredentials to it.
+    """
+    await check_credentials(credentials.username, credentials.password)
     return credentials.username
 
 
@@ -80,6 +85,63 @@ async def require_admin(username: str = Depends(verify_credentials)) -> str:
     treated as admin: that account is the one F21 seeds as admin in the
     first place, and there's no "viewer" concept without a User table.
     """
+    from app.services.user_service import get_user
+
+    user = await get_user(username)
+    if user is not None and user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
+    return username
+
+
+SESSION_COOKIE_NAME = "cronator_session"
+
+
+class RoutingToLogin(HTTPException):
+    """A 303 carrying the login location — FastAPI's handler renders it."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_303_SEE_OTHER,
+            detail="Redirecting to login",
+            headers={"Location": "/login"},
+        )
+
+
+async def page_user(
+    request: Request,
+    credentials: HTTPBasicCredentials | None = Depends(security_optional),
+) -> str:
+    """Authenticate an HTML page visit; redirect to /login instead of the
+    Basic popup.
+
+    A valid session cookie wins (that is the login flow's own artifact);
+    a Basic header still works for API-style tooling pointed at an HTML
+    route; with neither the browser gets a 303 to the login page — the
+    reason this must raise RoutingToLogin instead of the plain 401 of
+    verify_credentials (the popup).
+    """
+    from app.services.auth_session import validate_session
+
+    session_token = request.cookies.get(SESSION_COOKIE_NAME)
+    if session_token:
+        username = await validate_session(session_token)
+        if username:
+            return username
+
+    if credentials is not None:
+        await check_credentials(credentials.username, credentials.password)
+        return credentials.username
+
+    raise RoutingToLogin()
+
+
+async def page_admin(username: str = Depends(page_user)) -> str:
+    """The HTML equivalent of require_admin: admins only, others land on
+    their own pages (a 403 page for a known viewer, the login page for
+    an anonymous visitor)."""
     from app.services.user_service import get_user
 
     user = await get_user(username)

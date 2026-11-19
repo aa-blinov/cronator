@@ -28,7 +28,7 @@ class TestRunAndTest:
             resp = await test_client.post(f"/api/scripts/{script.id}/run")
         assert resp.status_code == 200, resp.text
         assert resp.json()["execution_id"] == 42
-        mock_exec.execute_script.assert_awaited_once_with(script.id, triggered_by="manual")
+        mock_exec.execute_script.assert_awaited_once_with(script.id, triggered_by="manual:test_user")
 
     async def test_run_unknown_script_404(self, test_client: AsyncClient):
         resp = await test_client.post("/api/scripts/99999/run")
@@ -42,7 +42,7 @@ class TestRunAndTest:
             resp = await test_client.post(f"/api/scripts/{script.id}/test")
         assert resp.status_code == 200, resp.text
         mock_exec.execute_script.assert_awaited_once_with(
-            script.id, triggered_by="test", is_test=True
+            script.id, triggered_by="test:test_user", is_test=True
         )
 
     async def test_test_script_conflicts_with_running_script(

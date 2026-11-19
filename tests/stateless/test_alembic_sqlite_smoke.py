@@ -64,7 +64,7 @@ def test_alembic_upgrade_head_on_fresh_sqlite(tmp_path):
     }
     missing = expected - tables
     assert not missing, f"tables missing after upgrade head: {missing}"
-    assert version == "k3l4m5n6o7p8", f"schema not at head, got: {version}"
+    assert version == "l4m5n6o7p8q9", f"schema not at head, got: {version}"
 
 
 def test_downgrade_base_and_reupgrade_roundtrip(tmp_path):
