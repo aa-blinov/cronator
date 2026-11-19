@@ -542,7 +542,9 @@ async def run_script(
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
 
-    execution_id = await executor_service.execute_script(script_id, triggered_by="manual")
+    execution_id = await executor_service.execute_script(
+        script_id, triggered_by=f"manual:{username}"
+    )
 
     return {"execution_id": execution_id, "message": "Script execution started"}
 
@@ -568,7 +570,7 @@ async def test_script(
 
     # Create execution with is_test=True
     execution_id = await executor_service.execute_script(
-        script_id, triggered_by="test", is_test=True
+        script_id, triggered_by=f"test:{username}", is_test=True
     )
 
     return {"execution_id": execution_id, "message": "Test execution started"}
@@ -1195,7 +1197,9 @@ async def rerun_script(
     script = result.scalar_one_or_none()
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
-    execution_id = await executor_service.execute_script(script_id, triggered_by="manual")
+    execution_id = await executor_service.execute_script(
+        script_id, triggered_by=f"manual:{username}"
+    )
     return {"execution_id": execution_id}
 
 

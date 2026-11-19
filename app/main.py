@@ -2,6 +2,7 @@
 
 import logging
 import logging.handlers
+import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -298,6 +299,48 @@ app.add_middleware(CsrfOriginGuardMiddleware)
 # uncompressed — a real, noticeable slowdown for anyone not on the same
 # LAN as the server. 500 bytes is comfortably below any page/asset here.
 app.add_middleware(GZipMiddleware, minimum_size=500)
+
+
+@app.middleware("http")
+async def access_log(request: Request, call_next):
+    """One log line per request: method, path, status, duration, user.
+
+    Uvicorn's access log shows only the method and path; who did it and
+    what it cost were invisible, which is what an audit trail needs. The
+    user comes from the Authorization header when present — no DB lookup,
+    so the header's own information is the log's.
+    """
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+    except Exception:
+        logger.exception("5xx while handling %s %s", request.method, request.url.path)
+        raise
+    finally:
+        duration_ms = (time.perf_counter() - start) * 1000
+
+    user = "-"
+    auth = request.headers.get("authorization", "")
+    if auth.startswith("Basic "):
+        import base64
+
+        try:
+            user = base64.b64decode(auth.split(" ", 1)[1]).decode(
+                "utf-8", errors="replace"
+            ).split(":", 1)[0]
+        except Exception:
+            user = "-"
+
+    logger.info(
+        "request %s %s -> %s %.0fms user=%s",
+        request.method,
+        request.url.path,
+        status_code,
+        duration_ms,
+        user,
+    )
+    return response
 
 
 @app.get("/metrics", include_in_schema=False)
