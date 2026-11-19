@@ -2345,12 +2345,27 @@ ${separator}
             renderGrid(activeCategory);
         });
 
-        // Templates baked in from server — no fetch needed
-        templates = {{ script_templates | tojson }};
+        // Templates load lazily on the first modal open — baking all 19
+        // into every editor page made it ~170KB of mostly-unused JSON.
+        let templatesLoaded = false;
+        async function ensureTemplatesLoaded() {
+            if (templatesLoaded) return;
+            const grid = document.getElementById('tpl-grid');
+            if (grid) grid.innerHTML = '<div class="col-span-full text-center py-8"><span class="loading loading-spinner loading-md"></span></div>';
+            try {
+                const response = await fetch('/api/scripts/templates');
+                const data = await response.json();
+                templates = data.items || [];
+                templatesLoaded = true;
+            } catch (err) {
+                window.showToast?.('Failed to load templates: ' + err.message, 'error');
+            }
+        }
 
         // Open modal
-        document.getElementById('from-template-btn')?.addEventListener('click', () => {
+        document.getElementById('from-template-btn')?.addEventListener('click', async () => {
             modal.showModal();
+            await ensureTemplatesLoaded();
             if (grid.querySelector('.tpl-card')) return;  // already rendered
             renderGrid(activeCategory);
         });
