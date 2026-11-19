@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app import __version__
-from app.api.dependencies import require_admin, verify_credentials
+from app.api.dependencies import page_admin, page_user
 from app.config import get_settings
 from app.database import get_db
 from app.models.execution import Execution, ExecutionStatus
@@ -51,7 +51,7 @@ security = HTTPBasic()
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(
     request: Request,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(page_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Dashboard page showing all scripts."""
@@ -195,7 +195,7 @@ async def scripts_list(
     per_page: int = 50,
     search: str | None = None,
     status: str | None = Query(None),
-    username: str = Depends(verify_credentials),
+    username: str = Depends(page_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Q1: dedicated /scripts page — sortable list with search, status filter,
@@ -252,7 +252,7 @@ async def scripts_list(
 @router.get("/scripts/new", response_class=HTMLResponse)
 async def script_new(
     request: Request,
-    username: str = Depends(require_admin),
+    username: str = Depends(page_admin),
 ):
     """New script page — editing-only, no reason for a viewer to land here."""
     return request.app.state.templates.TemplateResponse(
@@ -288,7 +288,7 @@ async def script_detail(
     request: Request,
     script_id: int,
     page: int = 1,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(page_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Script detail page with execution history."""
@@ -361,7 +361,7 @@ async def script_detail(
 async def script_edit(
     request: Request,
     script_id: int,
-    username: str = Depends(require_admin),
+    username: str = Depends(page_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Script editor page — editing-only, no reason for a viewer to land here."""
@@ -402,7 +402,7 @@ async def script_version_detail(
     request: Request,
     script_id: int,
     version_number: int,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(page_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Script version detail page."""
@@ -447,7 +447,7 @@ async def executions_list(
     script_id: str | None = Query(None),
     status: str | None = Query(None),
     search: str | None = Query(None),
-    username: str = Depends(verify_credentials),
+    username: str = Depends(page_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Executions list page."""
@@ -525,7 +525,7 @@ async def executions_list(
 async def execution_detail(
     request: Request,
     execution_id: int,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(page_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Execution detail page with full logs."""
@@ -555,7 +555,7 @@ async def execution_detail(
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(
     request: Request,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(page_user),
 ):
     """Settings page."""
     is_admin = await _is_admin(username)
@@ -577,7 +577,7 @@ async def settings_page(
 @router.get("/users", response_class=HTMLResponse)
 async def users_page(
     request: Request,
-    username: str = Depends(require_admin),
+    username: str = Depends(page_admin),
 ):
     """User management page. Admin-only."""
     from app.services.user_service import list_users
@@ -603,7 +603,7 @@ async def users_page(
 @router.post("/scripts/{script_id}/run")
 async def run_script_action(
     script_id: int,
-    username: str = Depends(require_admin),
+    username: str = Depends(page_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Run a script manually."""
@@ -626,7 +626,7 @@ async def run_script_action(
 @router.post("/executions/{execution_id}/rerun")
 async def rerun_execution_action(
     execution_id: int,
-    username: str = Depends(require_admin),
+    username: str = Depends(page_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Re-run the script that produced this execution."""
@@ -648,7 +648,7 @@ async def toggle_script_action(
     script_id: int,
     request: Request,
     next: str | None = Query(None),
-    username: str = Depends(require_admin),
+    username: str = Depends(page_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Toggle script enabled/disabled.
@@ -691,7 +691,7 @@ def _is_safe_relative(target: str) -> bool:
 @router.get("/changelog", response_class=HTMLResponse)
 async def changelog_page(
     request: Request,
-    username: str = Depends(verify_credentials),
+    username: str = Depends(page_user),
 ):
     """Render the project CHANGELOG.md as a simple styled HTML page.
 

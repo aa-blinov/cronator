@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **The browser gets a real login**, not the Basic Auth popup: `GET
+  /login` renders a sign-in page, `POST /login` checks the same
+  credentials as the API (users table first, env admin fallback) under
+  the same brute-force lockout, then hands out a 7-day session cookie
+  (`HttpOnly`, `SameSite=Lax`). The server keeps only the SHA-256 hash
+  of the token in a new `auth_sessions` table — a database dump is not
+  a session kit — and `POST /logout` (button in the sidebar) revokes
+  the session server-side. HTML pages redirect anonymous visitors to
+  `/login` instead of popping the dialog; the REST API keeps Basic Auth
+  for scripts and API clients, and the daily 03:00 job now also purges
+  expired sessions.
+
 - **Scripts are mirrored into a git repository** (`./data/script_repo` by
   default): every create / duplicate / update / revert / delete becomes a
   commit (`script <name>: updated (v3)`), one `<name>.py` per script plus

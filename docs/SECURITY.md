@@ -6,17 +6,31 @@ a real decision to make before exposing an instance beyond a trusted team.
 
 ## Authentication
 
-HTTP Basic Auth (`verify_credentials`, `app/api/dependencies.py`) checked
-against the `users` table first, falling back to `ADMIN_USERNAME`/
-`ADMIN_PASSWORD` from the environment if the username isn't found in the
-DB. A DB lookup exception also falls back to the env credentials, so a
-transient DB issue doesn't lock out the one operator account that doesn't
-depend on it.
+Users sign in at `/login` and carry a session cookie
+(`verify_credentials` / `check_credentials`, `app/api/dependencies.py`;
+`app/services/auth_session.py`). The credentials behind the login are
+checked against the `users` table first, falling back to
+`ADMIN_USERNAME`/`ADMIN_PASSWORD` from the environment if the username
+isn't found in the DB. A DB lookup exception also falls back to the env
+credentials, so a transient DB issue doesn't lock out the one operator
+account that doesn't depend on it.
+
+- The session cookie is `HttpOnly`, `SameSite=Lax`, valid 7 days; the
+  server stores only the SHA-256 of the token (`auth_sessions` table),
+  so a leaked database dump cannot be replayed as sessions. `POST
+  /logout` deletes the session server-side.
+- The REST API (`/api/*`) still accepts HTTP Basic Auth for scripts and
+  API clients; plain HTML routes accept it too (for API-style tooling
+  pointed at a page) but an anonymous browser gets a 303 to `/login`
+  instead of the Basic Auth popup.
+- Expired sessions are purged lazily on read and swept by the daily
+  03:00 maintenance job.
 
 All `/api/*` routes require authentication (enforced at router-include
 level in `app/api/__init__.py`, not per-endpoint) except `/api/locale`
 (needed by the unauthenticated login page for the language switcher) and
-`/health` / `/metrics` (liveness/monitoring probes).
+`/health` / `/metrics` (liveness/monitoring probes). The only anonymous
+HTML routes are `/login` itself and `/logout`.
 
 Passwords are hashed (`app/services/user_service.py`); the admin account is
 seeded from `ADMIN_USERNAME`/`ADMIN_PASSWORD` on first startup if the

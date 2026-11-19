@@ -10,7 +10,7 @@ import base64
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api.dependencies import verify_credentials
+from app.api.dependencies import page_admin, page_user, verify_credentials
 from app.api.rate_limit import clear_rate_limits
 from app.main import app as fastapi_app
 from app.services.user_service import create_user
@@ -26,6 +26,8 @@ def _basic_auth_header(username: str, password: str) -> dict:
 @pytest.fixture
 async def real_auth_client(test_client):
     del fastapi_app.dependency_overrides[verify_credentials]
+    del fastapi_app.dependency_overrides[page_user]
+    del fastapi_app.dependency_overrides[page_admin]
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
