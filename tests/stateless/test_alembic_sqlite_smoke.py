@@ -1,11 +1,4 @@
-"""Smoke test: the documented local-dev path must work from scratch.
-
-`alembic upgrade head` against a fresh SQLite file is exactly what a new
-contributor runs on a fresh clone (see docs/DEVELOPMENT.md). The CI docker
-job never exercises Alembic (SKIP_ALEMBIC_MIGRATIONS=1) and the pg job runs
-Alembic against PostgreSQL only, so without this test a SQLite-incompatible
-migration reaches master untested — which has already happened once.
-"""
+"""Smoke tests that nothing in the documented dev flow broke."""
 
 import os
 import subprocess
@@ -74,11 +67,14 @@ def test_alembic_upgrade_head_on_fresh_sqlite(tmp_path):
     assert version == "k3l4m5n6o7p8", f"schema not at head, got: {version}"
 
 
-def test_downgrade_not_required_for_fresh_install(tmp_path):
-    """A fresh install never downgrades — but the downgrade chain must at
-    least be loadable without syntax errors, or `alembic downgrade base`
-    (used by the reset instructions) breaks on SQLite."""
-    db_path = tmp_path / "fresh.db"
+def test_downgrade_base_and_reupgrade_roundtrip(tmp_path):
+    """`alembic downgrade base` + `upgrade head` must survive on SQLite.
+
+    The reset instructions (README) put the downgrade right next to the
+    upgrade; a SQLite-incompatible downgrade has historically been invisible
+    to the CI suites (docker skips Alembic, pg runs it on PostgreSQL).
+    """
+    db_path = tmp_path / "roundtrip.db"
     env = dict(os.environ)
     env.update(
         {
@@ -88,15 +84,33 @@ def test_downgrade_not_required_for_fresh_install(tmp_path):
             "DATABASE_URL": f"sqlite+aiosqlite:///{db_path.as_posix()}",
         }
     )
-    result = subprocess.run(
-        [sys.executable, "-m", "alembic", "history"],
+
+    up = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
         capture_output=True,
         text=True,
-        timeout=60,
+        timeout=120,
         env=env,
         cwd=str(REPO_ROOT),
     )
-    # The chain must be loadable and linear: one head, no branch points.
-    assert result.returncode == 0, result.stderr
-    chain = [line for line in result.stdout.splitlines() if line.strip()]
-    assert chain, "no migration history at all"
+    assert up.returncode == 0, up.stderr[-400:]
+
+    down = subprocess.run(
+        [sys.executable, "-m", "alembic", "downgrade", "base"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=env,
+        cwd=str(REPO_ROOT),
+    )
+    assert down.returncode == 0, down.stderr[-400:]
+
+    again = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=env,
+        cwd=str(REPO_ROOT),
+    )
+    assert again.returncode == 0, again.stderr[-400:]
