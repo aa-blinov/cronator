@@ -94,15 +94,33 @@
 
             <div class="p-4 border-t border-base-content/10">
                 {% if username is defined %}
-                <div class="text-xs text-base-content/70 flex items-center justify-between">
-                    <span class="truncate" title="{{ username }}">{{ username }}</span>
-                    <button type="button" class="link link-hover" onclick="document.getElementById('change-password-modal').showModal()">
-                        Change password
-                    </button>
+                <!-- One row: avatar-dot, the name, then sign out. The role
+                     line keeps the identity readable without a second link
+                     row; change-password lives in the dropdown menu so the
+                     footer stays one compact line at every width. -->
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center font-semibold shrink-0" aria-hidden="true">
+                        {{ username[0]|upper }}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-medium truncate">{{ username }}</p>
+                    </div>
+                    <details class="relative group" id="user-menu">
+                        <summary class="btn btn-ghost btn-sm btn-square list-none cursor-pointer" aria-label="Account menu">
+                            {{ icons.ellipsis_vertical("w-4 h-4") }}
+                        </summary>
+                        <ul class="absolute right-0 bottom-12 menu bg-base-200 rounded-box shadow-lg border border-base-content/10 w-48 z-20">
+                            <li>
+                                <button type="button" onclick="document.getElementById('change-password-modal').showModal()">Change password</button>
+                            </li>
+                            <li>
+                                <form method="post" action="/logout">
+                                    <button type="submit">Sign out</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </details>
                 </div>
-                <form method="post" action="/logout" class="mt-2">
-                    <button type="submit" class="btn btn-ghost btn-sm w-full">Sign out</button>
-                </form>
                 {% endif %}
             </div>
         </aside>
