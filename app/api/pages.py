@@ -613,7 +613,9 @@ async def run_script_action(
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
 
-    execution_id = await executor_service.execute_script(script_id, triggered_by="manual")
+    execution_id = await executor_service.execute_script(
+        script_id, triggered_by=f"manual:{username}"
+    )
 
     return RedirectResponse(
         url=f"/executions/{execution_id}",
@@ -633,7 +635,7 @@ async def rerun_execution_action(
     if not execution:
         raise HTTPException(status_code=404, detail="Execution not found")
     new_execution_id = await executor_service.execute_script(
-        execution.script_id, triggered_by="manual"
+        execution.script_id, triggered_by=f"manual:{username}"
     )
     return RedirectResponse(
         url=f"/executions/{new_execution_id}",
