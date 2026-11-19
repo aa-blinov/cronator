@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Scripts are mirrored into a git repository** (`./script_repo` by
+- **Scripts are mirrored into a git repository** (`./data/script_repo` by
   default): every create / duplicate / update / revert / delete becomes a
   commit (`script <name>: updated (v3)`), one `<name>.py` per script plus
   a `<name>.meta.json` holding the schedule, dependencies and python
@@ -17,8 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `deleted: true` metadata marker — so `git log`/`git diff` reads as a
   human history database of the scripts and, with `SCRIPT_GIT_REMOTE`
   set, doubles as the off-host copy the daily backup dump never gave.
+  A direct edit to the remote is reconciled on the next save: edits to
+  files Cronator didn't touch survive the rebase; edits to the same
+  lines lose on master (the DB wins) but park on an `external/<sha>`
+  side branch, and the force is race-hardened by `--force-with-lease`.
   Mirroring is fail-open: a missing git binary or an unreachable remote
-  is logged and skipped, never a failed save.
+  is logged and skipped, never a failed save. The user flow lives in
+  `docs/OPERATIONS.md` (Off-host copies → The scripts git mirror).
 
 ### Fixed
 - **The documented local-dev start crashed on a fresh SQLite database.**
