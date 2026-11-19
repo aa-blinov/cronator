@@ -62,7 +62,7 @@
 <div class="glass-card rounded-xl overflow-hidden">
     <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
         <h3 class="text-lg font-semibold">Scripts</h3>
-        <p class="text-sm text-base-content/60">
+        <p class="text-sm text-base-content/70">
             {{ pagination.total }} script(s) total
         </p>
     </div>
@@ -109,7 +109,7 @@
                     <td class="font-medium">
                         <a href="/scripts/{{ script.id }}" class="link link-hover">{{ script.name }}</a>
                         {% if script.description %}
-                        <p class="text-xs text-base-content/50 truncate max-w-md">{{ script.description }}</p>
+                        <p class="text-xs text-base-content/70 truncate max-w-md" title="{{ script.description }}">{{ script.description }}</p>
                         {% endif %}
                     </td>
                     <td><code class="text-xs">{{ script.cron_expression }}</code></td>
@@ -160,7 +160,7 @@
     <!-- Pagination -->
     {% if pagination.pages > 1 %}
     <div class="px-6 py-4 border-t border-base-content/10 flex items-center justify-between">
-        <p class="text-sm text-base-content/60">
+        <p class="text-sm text-base-content/70">
             Showing {{ (pagination.page - 1) * pagination.per_page + 1 }} -
             {{ [pagination.page * pagination.per_page, pagination.total] | min }} of {{ pagination.total }}
         </p>
@@ -189,7 +189,7 @@
     {% endif %}
     {% else %}
     <div class="p-12 text-center">
-        <p class="text-base-content/60 mb-2">
+        <p class="text-base-content/70 mb-2">
             {% if filters.search or filters.status %}No scripts match your filters{% else %}No scripts yet{% endif %}
         </p>
         {% if is_admin %}

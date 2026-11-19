@@ -21,19 +21,19 @@
 
         <div class="space-y-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">App Name</span>
+                <span class="text-base-content/70">App Name</span>
                 <span id="settings-app-name">{{ settings.app_name }}</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Scripts Directory</span>
+                <span class="text-base-content/70">Scripts Directory</span>
                 <code id="settings-scripts-dir" class="text-xs">{{ settings.scripts_dir }}</code>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Environments Directory</span>
+                <span class="text-base-content/70">Environments Directory</span>
                 <code id="settings-envs-dir" class="text-xs">{{ settings.envs_dir }}</code>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Default Timeout</span>
+                <span class="text-base-content/70">Default Timeout</span>
                 <span id="settings-default-timeout">{{ settings.default_timeout }}s</span>
             </div>
         </div>
@@ -60,11 +60,11 @@
                 </select>
             </label>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Version</span>
+                <span class="text-base-content/70">Version</span>
                 <span>Cronator v{{ app_version or version or '0.0.0' }}</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">What's new</span>
+                <span class="text-base-content/70">What's new</span>
                 <a href="/changelog" class="link link-hover">Changelog</a>
             </div>
         </div>
@@ -76,7 +76,7 @@
 
         <div id="settings-email-summary" class="space-y-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">SMTP Enabled</span>
+                <span class="text-base-content/70">SMTP Enabled</span>
                 {% if settings.smtp_enabled %}
                     <span class="badge badge-success">Enabled</span>
                 {% else %}
@@ -85,11 +85,11 @@
             </div>
             {% if settings.smtp_enabled %}
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">SMTP Host</span>
+                <span class="text-base-content/70">SMTP Host</span>
                 <code class="text-xs">{{ settings.smtp_host }}:{{ settings.smtp_port }}</code>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Alert Email</span>
+                <span class="text-base-content/70">Alert Email</span>
                 <span>{{ settings.alert_email or 'Not configured' }}</span>
             </div>
             {% if is_admin %}
@@ -109,7 +109,7 @@
 
         <div id="settings-webhook-summary" class="space-y-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Webhook URL</span>
+                <span class="text-base-content/70">Webhook URL</span>
                 <span>{{ settings.webhook_url or 'Not configured' }}</span>
             </div>
             {% if is_admin and settings.webhook_url %}
@@ -128,7 +128,7 @@
         <h3 class="text-lg font-semibold mb-4">Backups & Maintenance</h3>
 
         <div class="space-y-4">
-            <p class="text-sm text-base-content/60">
+            <p class="text-sm text-base-content/70">
                 All data is stored in the <code>/data</code> and <code>/scripts</code> volumes.
                 Regular backup of these directories is recommended.
             </p>
@@ -153,24 +153,24 @@
 
         <div class="space-y-3 mb-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Total executions</span>
+                <span class="text-base-content/70">Total executions</span>
                 <span id="exec-total">—</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Successful</span>
+                <span class="text-base-content/70">Successful</span>
                 <span id="exec-success" class="text-success">—</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Failed</span>
+                <span class="text-base-content/70">Failed</span>
                 <span id="exec-failed" class="text-error">—</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Oldest record</span>
+                <span class="text-base-content/70">Oldest record</span>
                 <span id="exec-oldest" class="text-xs">—</span>
             </div>
         </div>
 
-        <p class="text-xs text-base-content/50 mb-3">
+        <p class="text-xs text-base-content/70 mb-3">
             Auto-cleanup runs daily at 03:00 UTC: keeps the last 200 successful,
             500 failed, and 100 skipped / cancelled executions per script.
         </p>
@@ -185,7 +185,7 @@
                 max="3650"
                 class="input input-bordered input-sm w-24"
             >
-            <span class="text-sm text-base-content/60">days</span>
+            <span class="text-sm text-base-content/70">days</span>
             <button onclick="withButtonLoading(this, 'Cleaning up...', () => cleanupOlderThan())" class="btn btn-sm btn-outline btn-warning gap-2">
                 {{ icons.trash("w-4 h-4") }} Delete older than
             </button>
@@ -202,19 +202,19 @@
         <div class="space-y-4">
             <div id="artifacts-stats" class="space-y-3">
                 <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                    <span class="text-base-content/60">Total Artifacts</span>
+                    <span class="text-base-content/70">Total Artifacts</span>
                     <span id="total-artifacts">Loading...</span>
                 </div>
                 <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                    <span class="text-base-content/60">Storage Used</span>
+                    <span class="text-base-content/70">Storage Used</span>
                     <span id="storage-used">Loading...</span>
                 </div>
                 <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                    <span class="text-base-content/60">Executions with Artifacts</span>
+                    <span class="text-base-content/70">Executions with Artifacts</span>
                     <span id="executions-with-artifacts">Loading...</span>
                 </div>
                 <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                    <span class="text-base-content/60">Free Disk Space</span>
+                    <span class="text-base-content/70">Free Disk Space</span>
                     <span id="free-space">Loading...</span>
                 </div>
             </div>
@@ -283,7 +283,7 @@
             <!-- Script Git Mirror -->
             <div class="border border-base-300 rounded-lg p-4">
                 <h4 class="font-semibold mb-3">Script Git Mirror</h4>
-                <p class="text-xs text-base-content/60 mb-3">Pushes every saved script to a git repository as a readable, reviewable backup. Point it at an empty repo (or a bare remote) — everything is mirrored automatically on each change.</p>
+                <p class="text-xs text-base-content/70 mb-3">Pushes every saved script to a git repository as a readable, reviewable backup. Point it at an empty repo (or a bare remote) — everything is mirrored automatically on each change.</p>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label class="form-control">
                         <span class="label-text">Remote URL (optional)</span>
@@ -359,11 +359,11 @@
         const smtpDetails = settings.smtp_enabled
             ? `
                 <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                    <span class="text-base-content/60">SMTP Host</span>
+                    <span class="text-base-content/70">SMTP Host</span>
                     <code class="text-xs">${escapeHtml(settings.smtp_host)}:${escapeHtml(String(settings.smtp_port))}</code>
                 </div>
                 <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                    <span class="text-base-content/60">Alert Email</span>
+                    <span class="text-base-content/70">Alert Email</span>
                     <span>${escapeHtml(settings.alert_email || 'Not configured')}</span>
                 </div>
                 <div class="mt-4">
@@ -376,7 +376,7 @@
 
         emailSummary.innerHTML = `
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">SMTP Enabled</span>
+                <span class="text-base-content/70">SMTP Enabled</span>
                 ${smtpEnabledBadge}
             </div>
             ${smtpDetails}
@@ -397,7 +397,7 @@
 
         webhookSummary.innerHTML = `
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Webhook URL</span>
+                <span class="text-base-content/70">Webhook URL</span>
                 <span>${escapeHtml(settings.webhook_url || 'Not configured')}</span>
             </div>
             ${webhookTestButton}
