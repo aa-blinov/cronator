@@ -139,28 +139,56 @@ the backups off the host on the same schedule, even a simple one:
 ### The scripts git mirror (`script_repo/`)
 
 Every script create / duplicate / update / revert / delete lands as a git
-commit in `./script_repo` (`app/services/script_git.py`): one `<name>.py`
-with the script content and one `<name>.meta.json` with the schedule,
-dependencies, python version and such beside it. `git log` / `git diff`
-there reads as a human history database of the scripts — what changed,
-when, from which version to which (`script <name>: updated (v3)`).
+commit in `./data/script_repo` (`app/services/script_git.py`): one
+`<name>.py` with the script content and one `<name>.meta.json` with the
+schedule, dependencies, python version and such beside it. `git log` /
+`git diff` there reads as a human history database of the scripts — what
+changed, when, from which version to which (`script <name>: updated (v3)`).
 
 The mirror is **one-way** and **append-only**: the database
 (`script_versions` + `script_audit_log`) remains the machine source of
 truth, and a deletion marks its metadata `deleted: true` while keeping
 the last file state, so nothing in the mirror is ever lost.
 
-To also publish the mirror somewhere off-host, set `SCRIPT_GIT_REMOTE`
-(every save then pushes; a failing push never fails the save — the
-mirror never blocks the app):
+**User flow.**
 
-```dotenv
-SCRIPT_GIT_REPO_DIR=./script_repo
-SCRIPT_GIT_REMOTE=git@github.com:you/cronator-scripts.git
+```bash
+# once: create the mirror remote (private!) and tell cronator about it
+gh repo create cronator-scripts --private
+# in .env:
+#   SCRIPT_GIT_REPO_DIR=./data/script_repo
+#   SCRIPT_GIT_REMOTE=git@github.com:<you>/cronator-scripts.git
+# the next save inits ./data/script_repo, commits, and pushes (upstream -u)
 ```
 
+| You want to… | Do this |
+| --- | --- |
+| See what changed in a script | `git -C data/script_repo log -p -- <name>.py` |
+| See when a script was deleted | `git -C data/script_repo log -- <name>.meta.json` (the `deleted: true` commit) |
+| Review through GitHub | open the private repo — every save is a commit |
+| Recover a script Cronator lost | the git mirror keeps every version's file verbatim: `git show <sha>:<name>.py` inside the mirror clone |
+
+**Conflicts: what happens if someone edits the repo directly.**
+
+The mirror's authority is Cronator's database, and the reconcile is
+race-hardened, so a direct edit can never corrupt either side:
+
+- **Edits to files Cronator didn't touch** (notes, docs, another
+  script's files) survive: the next save replays Cronator's local
+  commits on top of them (`rebase`).
+- **Edits to the same lines Cronator also wrote**: the database wins on
+  `master` — that is the whole point of a one-way mirror — but the
+  remote's version parks on `external/<sha>` first, and the force is
+  bound by `--force-with-lease` to the exact sha that was fetched. A
+  commit landing in between (a race) is refused rather than lost.
+
+So: nothing is ever silently discarded; the price of a wrong direct edit
+is that it lives on a side branch instead of `master`.
+
 The remote must already exist; the first successful push sets the
-upstream (`-u`) for everything that follows.
+upstream (`-u`) for everything that follows. Mirroring is fail-open —
+a missing git binary or an unreachable remote is logged and skipped,
+never a failed save.
 
 ## Alerting
 

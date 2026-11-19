@@ -72,3 +72,4 @@ scripts/*/
 # Node.js
 node_modules/
 script_repo/
+scratch_*.py
