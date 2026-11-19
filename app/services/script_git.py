@@ -39,8 +39,12 @@ logger = logging.getLogger(__name__)
 # mounted in the compose stack; the mirror must never sit inside the app
 # repository itself (a mirror repo committed as a gitlink is exactly the
 # pollution this placement avoids).
-repo_root_env = "SCRIPT_GIT_REPO_DIR"
-MIRROR_DIR = Path(os.environ.get(repo_root_env, "./data/script_repo")).resolve()
+#
+# Overridable two ways, in priority order: the Settings UI (UI-editable,
+# read by the callers of mirror_script) and the SCRIPT_GIT_REPO_DIR env
+# read once at import here — the .env route is a fallback, not the main
+# configuration path.
+MIRROR_DIR = Path(os.environ.get("SCRIPT_GIT_REPO_DIR", "./data/script_repo")).resolve()
 
 
 def _run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess | None:
@@ -145,9 +149,9 @@ def _push(cwd: Path, remote_sha: str | None) -> None:
         logger.warning("git mirror: push to origin failed (%s); local mirror is intact", err)
 
 
-def _push_if_remote(cwd: Path) -> None:
+def _push_if_remote(cwd: Path, remote: str | None = None) -> None:
     """Reconcile local mirror state with origin and push; fail open."""
-    remote = os.environ.get("SCRIPT_GIT_REMOTE", "").strip()
+    remote = (remote or os.environ.get("SCRIPT_GIT_REMOTE", "")).strip()
     has_origin = _run_git(["remote", "get-url", "origin"], cwd)
     origin_configured = has_origin is not None and has_origin.returncode == 0
     if not remote and not origin_configured:
@@ -214,22 +218,27 @@ def mirror_script(
     content: str | None = None,
     metadata: dict | None = None,
     version_number: int | None = None,
+    remote: str | None = None,
+    repo_dir: Path | None = None,
 ) -> None:
     """Mirror one script state into the git repo, then push when told to.
 
-    action: "created" | "updated" | "deleted".
-    Deletion keeps the history (the file's last state is committed with a
-    note instead of being erased) — the mirror is append-only by policy.
+    remote / repo_dir come from the caller (Settings via scripts.py) and
+    win over the environment; the environment (SCRIPT_GIT_REMOTE /
+    SCRIPT_GIT_REPO_DIR) is the fallback, so a fresh install can be
+    configured either way and nothing here hardcodes a host layout.
     """
     try:
-        if not _ensure_repo(MIRROR_DIR):
+        mirror_dir = repo_dir or MIRROR_DIR
+
+        if not _ensure_repo(mirror_dir):
             logger.warning("git mirror: repository unavailable, skipping %s", script_name)
             return
         # A reconcile aborted midway must never leak into this save.
-        _abandon_rebase(MIRROR_DIR, _resolve_sha(MIRROR_DIR, "refs/heads/master"))
+        _abandon_rebase(mirror_dir, _resolve_sha(mirror_dir, "refs/heads/master"))
 
-        file_path = MIRROR_DIR / f"{script_name}.py"
-        meta_path = MIRROR_DIR / f"{script_name}.meta.json"
+        file_path = mirror_dir / f"{script_name}.py"
+        meta_path = mirror_dir / f"{script_name}.meta.json"
 
         if action == "deleted":
             # Append-only: keep the last state, note the deletion in metadata.
@@ -257,15 +266,15 @@ def mirror_script(
             )
             message = f"script {script_name}: {action} (v{version_number or '?'})"
 
-        _run_git(["add", "-A"], MIRROR_DIR)
+        _run_git(["add", "-A"], mirror_dir)
         commit = _run_git(
-            ["commit", "-m", message, "--allow-empty", "--no-verify"], MIRROR_DIR
+            ["commit", "-m", message, "--allow-empty", "--no-verify"], mirror_dir
         )
         if commit is None or commit.returncode != 0:
             logger.info("git mirror: nothing to commit for %s", script_name)
             return
 
-        _push_if_remote(MIRROR_DIR)
+        _push_if_remote(mirror_dir, remote=remote)
         logger.info("git mirror: committed %s (%s)", script_name, action)
     except Exception as e:  # pragma: no cover - defensive: never break a save
         logger.warning("git mirror: unexpected error for %s: %s", script_name, e)

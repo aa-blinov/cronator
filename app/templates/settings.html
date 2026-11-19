@@ -280,6 +280,22 @@
                 </label>
             </div>
 
+            <!-- Script Git Mirror -->
+            <div class="border border-base-300 rounded-lg p-4">
+                <h4 class="font-semibold mb-3">Script Git Mirror</h4>
+                <p class="text-xs text-base-content/60 mb-3">Pushes every saved script to a git repository as a readable, reviewable backup. Point it at an empty repo (or a bare remote) — everything is mirrored automatically on each change.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="form-control">
+                        <span class="label-text">Remote URL (optional)</span>
+                        <input type="url" name="script_git_remote" value="{{ settings.script_git_remote }}" placeholder="https://github.com/user/repo.git" class="input input-bordered input-sm">
+                    </label>
+                    <label class="form-control">
+                        <span class="label-text">Local mirror directory (optional)</span>
+                        <input type="text" name="script_git_repo_dir" value="{{ settings.script_git_repo_dir }}" placeholder="/path/to/repo" class="input input-bordered input-sm">
+                    </label>
+                </div>
+            </div>
+
             <!-- Execution Settings -->
             <div class="border border-base-300 rounded-lg p-4">
                 <h4 class="font-semibold mb-3">Execution</h4>
@@ -402,6 +418,8 @@
         form.elements.smtp_from.value = settings.smtp_from || '';
         form.elements.alert_email.value = settings.alert_email || '';
         form.elements.webhook_url.value = settings.webhook_url || '';
+        form.elements.script_git_remote.value = settings.script_git_remote || '';
+        form.elements.script_git_repo_dir.value = settings.script_git_repo_dir || '';
         form.elements.default_timeout.value = settings.default_timeout ?? '';
         form.elements.auto_backup_enabled.checked = Boolean(settings.auto_backup_enabled);
     }
@@ -537,6 +555,8 @@
         if (formData.get('smtp_from')) data.smtp_from = formData.get('smtp_from');
         if (formData.get('alert_email')) data.alert_email = formData.get('alert_email');
         if (formData.get('webhook_url')) data.webhook_url = formData.get('webhook_url');
+        if (formData.get('script_git_remote')) data.script_git_remote = formData.get('script_git_remote');
+        if (formData.get('script_git_repo_dir')) data.script_git_repo_dir = formData.get('script_git_repo_dir');
 
         if (formData.get('default_timeout')) data.default_timeout = parseInt(formData.get('default_timeout'));
         data.auto_backup_enabled = formData.get('auto_backup_enabled') === 'on';
