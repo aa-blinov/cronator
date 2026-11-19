@@ -27,10 +27,12 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Where the mirror lives. One directory, one git repo, one file per script
-# with the script's content plus a metadata json alongside.
+# Where the mirror lives. Defaults under ./data — already gitignored and
+# mounted in the compose stack; the mirror must never sit inside the app
+# repository itself (a mirror repo committed as a gitlink is exactly the
+# pollution this placement avoids).
 repo_root_env = "SCRIPT_GIT_REPO_DIR"
-MIRROR_DIR = Path(os.environ.get(repo_root_env, "./script_repo")).resolve()
+MIRROR_DIR = Path(os.environ.get(repo_root_env, "./data/script_repo")).resolve()
 
 
 def _run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess | None:
