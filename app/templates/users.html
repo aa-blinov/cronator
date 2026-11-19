@@ -11,7 +11,7 @@
 <div class="glass-card rounded-xl overflow-hidden">
     <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
         <h3 class="text-lg font-semibold">Users</h3>
-        <p class="text-sm text-base-content/60">{{ users|length }} user(s)</p>
+        <p class="text-sm text-base-content/70">{{ users|length }} user(s)</p>
     </div>
 
     <div class="overflow-x-auto">
@@ -36,7 +36,7 @@
                         </select>
                     </td>
                     <td>
-                        <span class="text-xs text-base-content/60">
+                        <span class="text-xs text-base-content/70">
                             {{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '—' }}
                         </span>
                     </td>
@@ -60,7 +60,7 @@
 <div class="glass-card rounded-xl overflow-hidden mt-6">
     <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
         <h3 class="text-lg font-semibold">Recent Activity</h3>
-        <p class="text-sm text-base-content/60" data-testid="audit-count"></p>
+        <p class="text-sm text-base-content/70" data-testid="audit-count"></p>
     </div>
 
     <div class="overflow-x-auto">
@@ -75,7 +75,7 @@
                 </tr>
             </thead>
             <tbody id="audit-log-body" data-testid="audit-log-body">
-                <tr><td colspan="5" class="text-center text-base-content/50 py-6">Loading…</td></tr>
+                <tr><td colspan="5" class="text-center text-base-content/70 py-6">Loading…</td></tr>
             </tbody>
         </table>
     </div>
@@ -250,7 +250,7 @@ async function loadAuditLog() {
             `${data.total} entr${data.total === 1 ? 'y' : 'ies'}`;
 
         if (data.items.length === 0) {
-            body.innerHTML = '<tr><td colspan="5" class="text-center text-base-content/50 py-6">No activity yet</td></tr>';
+            body.innerHTML = '<tr><td colspan="5" class="text-center text-base-content/70 py-6">No activity yet</td></tr>';
             return;
         }
 
@@ -259,7 +259,7 @@ async function loadAuditLog() {
             const when = new Date(e.changed_at).toLocaleString();
             return `
                 <tr data-testid="audit-row">
-                    <td class="text-xs text-base-content/60">${escapeHtml(when)}</td>
+                    <td class="text-xs text-base-content/70">${escapeHtml(when)}</td>
                     <td><span class="badge badge-sm ${badge}">${escapeHtml(e.action)}</span></td>
                     <td class="font-medium">${escapeHtml(e.target_username)}</td>
                     <td class="text-xs text-base-content/70">${escapeHtml(e.detail || '—')}</td>

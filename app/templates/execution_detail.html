@@ -29,13 +29,13 @@
 
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
-                <p class="text-base-content/60 text-sm">Script</p>
+                <p class="text-base-content/70 text-sm">Script</p>
                 <a href="/scripts/{{ execution.script_id }}" class="font-medium hover:text-primary">
                     {{ execution.script.name if execution.script else 'Unknown' }}
                 </a>
             </div>
             <div>
-                <p class="text-base-content/60 text-sm">Status</p>
+                <p class="text-base-content/70 text-sm">Status</p>
                 <span id="execution-status-badge" class="status-badge {{ execution.status }}">
                     {% if execution.status == 'running' %}
                         <span class="pulse-dot"></span>
@@ -44,35 +44,35 @@
                 </span>
             </div>
             <div>
-                <p class="text-base-content/60 text-sm">Exit Code</p>
+                <p class="text-base-content/70 text-sm">Exit Code</p>
                 <p id="execution-exit-code">
                     {% if execution.exit_code is not none %}
                         <code class="{% if execution.exit_code == 0 %}text-success{% else %}text-error{% endif %} text-lg">{{ execution.exit_code }}</code>
                     {% else %}
-                        <span class="text-base-content/50">-</span>
+                        <span class="text-base-content/70">-</span>
                     {% endif %}
                 </p>
             </div>
             <div>
-                <p class="text-base-content/60 text-sm">Started At</p>
+                <p class="text-base-content/70 text-sm">Started At</p>
                 <p>{{ execution.started_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</p>
             </div>
             <div>
-                <p class="text-base-content/60 text-sm">Finished At</p>
+                <p class="text-base-content/70 text-sm">Finished At</p>
                 <p id="execution-finished-at">
                     {% if execution.finished_at %}
                         {{ execution.finished_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}
                     {% else %}
-                        <span class="text-base-content/50">Running...</span>
+                        <span class="text-base-content/70">Running...</span>
                     {% endif %}
                 </p>
             </div>
             <div>
-                <p class="text-base-content/60 text-sm">Duration</p>
+                <p class="text-base-content/70 text-sm">Duration</p>
                 <p id="execution-duration" class="text-lg font-medium">{{ execution.duration_formatted }}</p>
             </div>
             <div>
-                <p class="text-base-content/60 text-sm">Triggered By</p>
+                <p class="text-base-content/70 text-sm">Triggered By</p>
                 <span class="badge badge-ghost">{{ execution.triggered_by }}</span>
                 {% if execution.attempt > 1 %}
                 <span class="badge badge-warning ml-1">Retry #{{ execution.attempt - 1 }}</span>
@@ -81,7 +81,7 @@
         </div>
 
         <div id="execution-error-message-section" class="mt-6{% if not execution.error_message %} hidden{% endif %}">
-            <p class="text-base-content/60 text-sm mb-2">Error Message</p>
+            <p class="text-base-content/70 text-sm mb-2">Error Message</p>
             <div class="bg-red-900/30 border border-red-500/30 rounded-lg p-4">
                 <pre id="execution-error-message-text" class="text-red-300 text-sm whitespace-pre-wrap">{{ execution.error_message or '' }}</pre>
             </div>
@@ -94,15 +94,15 @@
 
         <div class="space-y-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Execution ID</span>
+                <span class="text-base-content/70">Execution ID</span>
                 <code class="text-primary">#{{ execution.id }}</code>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/60">Script ID</span>
+                <span class="text-base-content/70">Script ID</span>
                 <code>{{ execution.script_id }}</code>
             </div>
             <div id="execution-duration-ms-row" class="flex items-center justify-between p-3 bg-base-200 rounded-lg{% if execution.duration_ms is none %} hidden{% endif %}">
-                <span class="text-base-content/60">Duration (ms)</span>
+                <span class="text-base-content/70">Duration (ms)</span>
                 <code id="execution-duration-ms">{% if execution.duration_ms is not none %}{{ execution.duration_ms }}{% endif %}</code>
             </div>
         </div>
@@ -123,13 +123,13 @@
                 {% endif %}
             </h3>
             <div class="flex items-center gap-2">
-                <span id="stdout-char-count" class="text-xs text-base-content/50" data-char-count="{{ execution.stdout | length }}">{{ execution.stdout | length }} chars</span>
+                <span id="stdout-char-count" class="text-xs text-base-content/70" data-char-count="{{ execution.stdout | length }}">{{ execution.stdout | length }} chars</span>
                 <button type="button" id="copy-stdout-btn" class="btn btn-ghost btn-xs">Copy</button>
                 <button type="button" id="download-stdout-btn" class="btn btn-ghost btn-xs">Download</button>
             </div>
         </div>
         <div class="p-4">
-            <div id="stdout-log-window-note" class="hidden mb-2 text-xs text-base-content/50"></div>
+            <div id="stdout-log-window-note" class="hidden mb-2 text-xs text-base-content/70"></div>
             <div id="stdout-log" class="log-output">{% if execution.status == 'running' %}Waiting for output...{% else %}Loading output...{% endif %}</div>
         </div>
     </div>
@@ -141,13 +141,13 @@
                 {{ icons.exclamation_triangle("w-5 h-5 text-error") }} stderr
             </h3>
             <div class="flex items-center gap-2">
-                <span id="stderr-char-count" class="text-xs text-base-content/50" data-char-count="{{ execution.stderr | length }}">{{ execution.stderr | length }} chars</span>
+                <span id="stderr-char-count" class="text-xs text-base-content/70" data-char-count="{{ execution.stderr | length }}">{{ execution.stderr | length }} chars</span>
                 <button type="button" id="copy-stderr-btn" class="btn btn-ghost btn-xs">Copy</button>
                 <button type="button" id="download-stderr-btn" class="btn btn-ghost btn-xs">Download</button>
             </div>
         </div>
         <div class="p-4">
-            <div id="stderr-log-window-note" class="hidden mb-2 text-xs text-base-content/50"></div>
+            <div id="stderr-log-window-note" class="hidden mb-2 text-xs text-base-content/70"></div>
             <div id="stderr-log" class="log-output text-error">{% if execution.status == 'running' %}Waiting for output...{% else %}Loading output...{% endif %}</div>
         </div>
     </div>
@@ -162,10 +162,10 @@
         </h3>
     </div>
     <div id="artifacts-container" class="p-4">
-        <div id="artifacts-loading" class="text-center py-8 text-base-content/50">
+        <div id="artifacts-loading" class="text-center py-8 text-base-content/70">
             <p>Loading artifacts...</p>
         </div>
-        <div id="artifacts-empty" class="hidden text-center py-8 text-base-content/50">
+        <div id="artifacts-empty" class="hidden text-center py-8 text-base-content/70">
             <p>No artifacts</p>
         </div>
         <div id="artifacts-list" class="hidden overflow-x-auto">
@@ -447,7 +447,7 @@
         if (!exitCodeEl) return;
 
         if (exitCode === null || exitCode === undefined) {
-            exitCodeEl.innerHTML = '<span class="text-base-content/50">-</span>';
+            exitCodeEl.innerHTML = '<span class="text-base-content/70">-</span>';
             return;
         }
 
@@ -465,7 +465,7 @@
             return;
         }
 
-        finishedAtEl.innerHTML = '<span class="text-base-content/50">Running...</span>';
+        finishedAtEl.innerHTML = '<span class="text-base-content/70">Running...</span>';
     }
 
     function updateExecutionDuration(durationFormatted, durationMs) {

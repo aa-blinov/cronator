@@ -49,18 +49,18 @@
 
             <div class="space-y-4">
                 <div>
-                    <p class="text-base-content/60 text-sm">Created</p>
+                    <p class="text-base-content/70 text-sm">Created</p>
                     <p class="font-medium">{{ version.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
                 </div>
 
                 <div>
-                    <p class="text-base-content/60 text-sm">Created By</p>
+                    <p class="text-base-content/70 text-sm">Created By</p>
                     <p class="font-medium">{{ version.created_by or 'Unknown' }}</p>
                 </div>
 
                 {% if version.change_summary %}
                 <div>
-                    <p class="text-base-content/60 text-sm">Description</p>
+                    <p class="text-base-content/70 text-sm">Description</p>
                     <p class="font-medium">{{ version.change_summary }}</p>
                 </div>
                 {% endif %}
@@ -68,23 +68,23 @@
                 <div class="divider my-2"></div>
 
                 <div>
-                    <p class="text-base-content/60 text-sm">Python Version</p>
+                    <p class="text-base-content/70 text-sm">Python Version</p>
                     <code class="text-sm bg-base-200 px-2 py-1 rounded">{{ version.python_version }}</code>
                 </div>
 
                 <div>
-                    <p class="text-base-content/60 text-sm">Schedule</p>
+                    <p class="text-base-content/70 text-sm">Schedule</p>
                     <code class="text-sm bg-base-200 px-2 py-1 rounded">{{ version.cron_expression }}</code>
                 </div>
 
                 <div>
-                    <p class="text-base-content/60 text-sm">Timeout</p>
+                    <p class="text-base-content/70 text-sm">Timeout</p>
                     <p class="font-medium">{{ version.timeout }}s</p>
                 </div>
 
                 {% if version.dependencies %}
                 <div>
-                    <p class="text-base-content/60 text-sm mb-2">Dependencies</p>
+                    <p class="text-base-content/70 text-sm mb-2">Dependencies</p>
                     <pre class="log-output text-xs p-2 rounded bg-base-300">{{ version.dependencies }}</pre>
                 </div>
                 {% endif %}
@@ -101,7 +101,7 @@
                 </svg>
                 Restore this version
             </button>
-            <p class="text-xs text-base-content/50 mt-2">
+            <p class="text-xs text-base-content/70 mt-2">
                 This will replace the current script content with this version and create a new version snapshot.
             </p>
         </div>

@@ -184,11 +184,13 @@ if (themeSelect) {
 window.openSidebar = function openSidebar() {
     document.getElementById('sidebar')?.classList.remove('-translate-x-full');
     document.getElementById('sidebar-backdrop')?.classList.remove('hidden');
+    document.getElementById('menu-toggle')?.setAttribute('aria-expanded', 'true');
 };
 
 window.closeSidebar = function closeSidebar() {
     document.getElementById('sidebar')?.classList.add('-translate-x-full');
     document.getElementById('sidebar-backdrop')?.classList.add('hidden');
+    document.getElementById('menu-toggle')?.setAttribute('aria-expanded', 'false');
 };
 
 // Shared button-loading state for async actions — a handful of buttons

@@ -153,7 +153,7 @@
                 <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                     <div>
                         <h3 class="text-lg font-semibold">Script Code</h3>
-                        <p class="text-xs text-base-content/50 mt-1">Autocomplete: `Ctrl+Space` or just keep typing</p>
+                        <p class="text-xs text-base-content/70 mt-1">Autocomplete: `Ctrl+Space` or just keep typing</p>
                     </div>
                     <div class="flex gap-2 flex-wrap">
                         {% if not script %}
@@ -222,7 +222,7 @@
                               rows="6"
                               placeholder="requests&#10;pandas&#10;numpy==1.24.0">{{ script.dependencies if script else '' }}</textarea>
                     <label class="label">
-                        <span class="label-text-alt text-base-content/50">One package per line (pip format)</span>
+                        <span class="label-text-alt text-base-content/70">One package per line (pip format)</span>
                     </label>
                 </div>
 
@@ -287,7 +287,7 @@
                               rows="4"
                               placeholder="API_KEY=secret&#10;DEBUG=true">{{ script.environment_vars if script else '' }}</textarea>
                     <label class="label">
-                        <span class="label-text-alt text-base-content/50">KEY=VALUE format, one per line</span>
+                        <span class="label-text-alt text-base-content/70">KEY=VALUE format, one per line</span>
                     </label>
                 </div>
             </div>
@@ -311,7 +311,7 @@
                                required
                                {% if script %}readonly{% endif %}>
                         <label class="label">
-                            <span class="label-text-alt text-base-content/50">Letters, numbers, underscores, hyphens only</span>
+                            <span class="label-text-alt text-base-content/70">Letters, numbers, underscores, hyphens only</span>
                         </label>
                     </div>
 
@@ -324,7 +324,7 @@
                                   rows="2"
                                   placeholder="What does this script do? (general purpose, stays unchanged)">{{ script.description if script else '' }}</textarea>
                         <label class="label">
-                            <span class="label-text-alt text-base-content/50">Permanent description of the script's purpose</span>
+                            <span class="label-text-alt text-base-content/70">Permanent description of the script's purpose</span>
                         </label>
                     </div>
 
@@ -337,7 +337,7 @@
                                   class="textarea textarea-bordered w-full text-sm"
                                   placeholder="e.g., Fixed bug with data parsing, Updated dependencies, Added new feature..."></textarea>
                         <label class="label">
-                            <span class="label-text-alt text-base-content/50">Describe what you changed in this save. Visible in version history.</span>
+                            <span class="label-text-alt text-base-content/70">Describe what you changed in this save. Visible in version history.</span>
                         </label>
                     </div>
                     {% endif %}
@@ -384,7 +384,7 @@
                         </div>
 
                         <label class="label">
-                            <span class="label-text-alt text-base-content/60 font-medium">Format: minute hour day month weekday</span>
+                            <span class="label-text-alt text-base-content/70 font-medium">Format: minute hour day month weekday</span>
                             <a href="https://crontab.guru/" target="_blank" class="label-text-alt link link-primary font-medium">Cron helper</a>
                         </label>
                     </div>
@@ -410,7 +410,7 @@
                                value="{{ script.timeout if script else 3600 }}"
                                min="1" max="86400"
                                class="input input-bordered w-full">
-                        <p class="text-xs text-base-content/50 mt-1">
+                        <p class="text-xs text-base-content/70 mt-1">
                             Maximum <strong>86400 s (24 h)</strong>. Recommended ≤ 3600 s.
                             Use a longer timeout only for known long jobs (migrations, big exports).
                         </p>
@@ -425,7 +425,7 @@
                                min="0" max="3600"
                                class="input input-bordered w-full">
                         <label class="label">
-                            <span class="label-text-alt text-base-content/50">Wait time for missed runs</span>
+                            <span class="label-text-alt text-base-content/70">Wait time for missed runs</span>
                         </label>
                     </div>
 
@@ -437,7 +437,7 @@
                                    {% if not script or script.enabled %}checked{% endif %}>
                         </label>
                         <label class="label">
-                            <span class="label-text-alt text-base-content/50">Enable automatic cron execution</span>
+                            <span class="label-text-alt text-base-content/70">Enable automatic cron execution</span>
                         </label>
                     </div>
                 </div>
@@ -455,7 +455,7 @@
                                    {% if not script or script.prevent_overlap %}checked{% endif %}>
                         </label>
                         <label class="label">
-                            <span class="label-text-alt text-base-content/50">Skip execution if script is already running</span>
+                            <span class="label-text-alt text-base-content/70">Skip execution if script is already running</span>
                         </label>
                     </div>
 
@@ -468,7 +468,7 @@
                                min="0" max="10"
                                class="input input-bordered w-full">
                         <label class="label">
-                            <span class="label-text-alt text-base-content/50">Number of retries on failure (0 = no retries)</span>
+                            <span class="label-text-alt text-base-content/70">Number of retries on failure (0 = no retries)</span>
                         </label>
                     </div>
 
@@ -482,7 +482,7 @@
                                    min="5" max="3600"
                                    class="input input-bordered w-full">
                             <label class="label">
-                                <span class="label-text-alt text-base-content/50">Seconds to wait between retry attempts</span>
+                                <span class="label-text-alt text-base-content/70">Seconds to wait between retry attempts</span>
                             </label>
                         </div>
 
@@ -495,7 +495,7 @@
                                    min="60" max="86400"
                                    class="input input-bordered w-full">
                             <label class="label">
-                                <span class="label-text-alt text-base-content/50">Stop retrying after this many seconds from first attempt</span>
+                                <span class="label-text-alt text-base-content/70">Stop retrying after this many seconds from first attempt</span>
                             </label>
                         </div>
                     </div>
@@ -515,7 +515,7 @@
                     <span id="version-count-badge" class="badge badge-info badge-sm">0</span>
                 </div>
                 <div id="versions-list" class="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
-                    <div class="text-sm text-base-content/50 italic">Loading versions...</div>
+                    <div class="text-sm text-base-content/70 italic">Loading versions...</div>
                 </div>
             </div>
             {% endif %}
@@ -565,7 +565,7 @@
             <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3">✕</button>
         </form>
         <h3 class="font-bold text-xl mb-1">Start from a Template</h3>
-        <p class="text-sm text-base-content/50 mb-5">Pick a template — all fields will be pre-filled. You can change anything before saving.</p>
+        <p class="text-sm text-base-content/70 mb-5">Pick a template — all fields will be pre-filled. You can change anything before saving.</p>
 
         <!-- Category filter -->
         <div class="flex flex-wrap gap-2 mb-5" id="template-filters">
@@ -1915,7 +1915,7 @@ ${separator}
             versionBadge.textContent = data.total;
 
             if (data.total === 0) {
-                versionsList.innerHTML = '<div class="text-sm text-base-content/50 italic p-3">No versions yet. Versions are created automatically when you save changes.</div>';
+                versionsList.innerHTML = '<div class="text-sm text-base-content/70 italic p-3">No versions yet. Versions are created automatically when you save changes.</div>';
                 return;
             }
 
@@ -1927,10 +1927,10 @@ ${separator}
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
                                 <span class="badge badge-sm badge-primary">v${v.version_number}</span>
-                                <span class="text-xs text-base-content/50">${date}</span>
-                                <span class="text-xs text-base-content/60">${sizeKB} KB</span>
+                                <span class="text-xs text-base-content/70">${date}</span>
+                                <span class="text-xs text-base-content/70">${sizeKB} KB</span>
                             </div>
-                            ${v.change_summary ? `<div class="text-sm mt-1 text-base-content/70">${escapeHtml(v.change_summary)}</div>` : '<div class="text-xs mt-1 text-base-content/60 italic">No description</div>'}
+                            ${v.change_summary ? `<div class="text-sm mt-1 text-base-content/70">${escapeHtml(v.change_summary)}</div>` : '<div class="text-xs mt-1 text-base-content/70 italic">No description</div>'}
                         </div>
                         <div class="flex gap-2 ml-4">
                             <a href="/scripts/${scriptId}/versions/${v.version_number}" class="btn btn-sm btn-outline btn-info" title="View version ${v.version_number} content" aria-label="View version ${v.version_number}">
@@ -2277,7 +2277,7 @@ ${separator}
                         <div class="min-w-0">
                             <div class="font-semibold text-sm truncate">${t.name}</div>
                             <div class="mt-1"><span class="badge badge-xs ${badgeClass}">${t.category}</span></div>
-                            <p class="text-xs text-base-content/50 mt-2 leading-snug">${t.description}</p>
+                            <p class="text-xs text-base-content/70 mt-2 leading-snug">${t.description}</p>
                         </div>
                     </div>
                 </button>`;

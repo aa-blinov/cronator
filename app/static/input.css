@@ -90,3 +90,14 @@ body {
 .stat-card:hover {
     transform: translateY(-2px);
 }
+/* Tap targets in tables on a phone: the action buttons (Run, View, ...)
+   rendered 24px tall and 0px apart — a thumb lands on the neighbour.
+   44px is the touch-target minimum; give them height and spacing below
+   the breakpoints where the table compresses. */
+@media (max-width: 1023px) {
+    .table .btn-xs {
+        min-height: 44px;
+        min-width: 44px;
+        margin: 2px 0;
+    }
+}

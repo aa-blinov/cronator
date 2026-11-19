@@ -73,3 +73,9 @@ scripts/*/
 node_modules/
 script_repo/
 scratch_*.py
+
+# Taste-skill check artifacts and local skill caches
+.taste-skill/
+.claude/
+.agents/
+skills-lock.json
