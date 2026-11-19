@@ -78,4 +78,5 @@ scratch_*.py
 .taste-skill/
 .claude/
 .agents/
+agent/
 skills-lock.json
