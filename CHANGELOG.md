@@ -22,7 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lines lose on master (the DB wins) but park on an `external/<sha>`
   side branch, and the force is race-hardened by `--force-with-lease`.
   Mirroring is fail-open: a missing git binary or an unreachable remote
-  is logged and skipped, never a failed save. The user flow lives in
+  is logged and skipped, never a failed save.
+
+**Setup by token, and what the UI explains.** gh's credentials are
+enough: `git clone https://github.com/<you>/cronator-scripts.git` with
+`gh` logged in — or a PAT works. The mirror itself is configured in
+.env (`SCRIPT_GIT_REPO_DIR`, `SCRIPT_GIT_REMOTE`); nothing about the
+mirror is configurable in the UI, by design — it exports, it never
+imports, so the user flow in the interface stays exactly as it was:
+scripts, runs, statuses. The documented user flow for recovering a
+script from the mirror clone lives in `docs/OPERATIONS.md`
+(`git show <sha>:<name>.py` inside the mirror clone). The user flow lives in
   `docs/OPERATIONS.md` (Off-host copies → The scripts git mirror).
 
 ### Fixed
