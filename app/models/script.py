@@ -7,6 +7,7 @@ from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.types import EncryptedText
 
 if TYPE_CHECKING:
     from app.models.execution import Execution
@@ -42,7 +43,9 @@ class Script(Base):
     timeout: Mapped[int] = mapped_column(Integer, default=3600)  # seconds
     misfire_grace_time: Mapped[int] = mapped_column(Integer, default=60)  # seconds
     working_directory: Mapped[str] = mapped_column(String(500), default="")
-    environment_vars: Mapped[str] = mapped_column(Text, default="")  # JSON format
+    # Operator secrets live here (DB passwords, API tokens) — encrypted at
+    # rest via EncryptedText, never plaintext in a dump or a backup.
+    environment_vars: Mapped[str] = mapped_column(EncryptedText, default="")
 
     # Reliability
     retry_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -69,6 +72,14 @@ class Script(Base):
         DateTime(timezone=True), nullable=True
     )
     last_alert_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Delivery failures of the last alert attempt. An expired SMTP
+    # password or a webhook answering 500 used to be visible only in the
+    # application log — the operator found out when nothing arrived.
+    last_alert_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_alert_error_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Metadata
     created_at: Mapped[datetime] = mapped_column(

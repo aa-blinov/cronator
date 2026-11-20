@@ -34,18 +34,12 @@ class SettingsService:
 
     def _get_cipher(self) -> Fernet:
         """Get encryption cipher using secret key from config."""
-        import hashlib
-        from base64 import urlsafe_b64encode
+        # Shared with the encrypted script columns — one derivation in one
+        # place (app/secret_cipher.py) so the settings table and the scripts
+        # table can never drift apart.
+        from app.secret_cipher import get_cipher
 
-        env_settings = get_settings()
-        # Use secret_key as basis for encryption key
-        # Ensure it's 32 bytes URL-safe base64-encoded
-
-        # Derive a proper Fernet key from secret_key
-        key_material = hashlib.sha256(env_settings.secret_key.encode()).digest()
-        fernet_key = urlsafe_b64encode(key_material)
-
-        return Fernet(fernet_key)
+        return get_cipher()
 
     async def load_from_db(self) -> None:
         """Load all settings from database into cache."""
@@ -115,6 +109,21 @@ class SettingsService:
             result[key] = self._parse_value(value)
 
         return result
+
+    def get_cached(self, key: str, default: Any = None) -> Any:
+        """Sync read of the in-memory cache, for display code only.
+
+        Jinja filters run synchronously inside a render, so they cannot
+        await `get()`. The cache is loaded at startup; before that (tests,
+        first render) the default is returned. Never used for anything that
+        decides behaviour — only for how a value is shown.
+        """
+        if key in self._cache:
+            value = self._cache[key]
+            if key in SENSITIVE_KEYS:
+                value = self._decrypt(value)
+            return self._parse_value(value)
+        return default
 
     async def bulk_set(self, settings: dict[str, Any]) -> None:
         """Set multiple settings at once."""

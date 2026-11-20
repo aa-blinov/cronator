@@ -7,7 +7,7 @@
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
     </svg>
-    Edit Settings
+    {{ t("Edit Settings") }}
 </button>
 {% endif %}
 {% endblock %}
@@ -17,23 +17,23 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- General Settings -->
     <div class="glass-card rounded-xl p-6">
-        <h3 class="text-lg font-semibold mb-4">General Settings</h3>
+        <h3 class="text-lg font-semibold mb-4">{{ t("General Settings") }}</h3>
 
         <div class="space-y-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">App Name</span>
+                <span class="text-base-content/70">{{ t("App Name") }}</span>
                 <span id="settings-app-name">{{ settings.app_name }}</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Scripts Directory</span>
+                <span class="text-base-content/70">{{ t("Scripts Directory") }}</span>
                 <code id="settings-scripts-dir" class="text-xs">{{ settings.scripts_dir }}</code>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Environments Directory</span>
+                <span class="text-base-content/70">{{ t("Environments Directory") }}</span>
                 <code id="settings-envs-dir" class="text-xs">{{ settings.envs_dir }}</code>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Default Timeout</span>
+                <span class="text-base-content/70">{{ t("Default Timeout") }}</span>
                 <span id="settings-default-timeout">{{ settings.default_timeout }}s</span>
             </div>
         </div>
@@ -41,11 +41,11 @@
 
     <!-- Appearance & About -->
     <div class="glass-card rounded-xl p-6">
-        <h3 class="text-lg font-semibold mb-4">Appearance & About</h3>
+        <h3 class="text-lg font-semibold mb-4">{{ t("Appearance & About") }}</h3>
 
         <div class="space-y-4">
             <label class="form-control">
-                <span class="label-text">Theme</span>
+                <span class="label-text">{{ t("Theme") }}</span>
                 {# F16: Theme toggle. Reads current theme from localStorage so the
                    choice persists across reloads without a server round-trip. #}
                 <select id="theme-select"
@@ -60,42 +60,42 @@
                 </select>
             </label>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Version</span>
+                <span class="text-base-content/70">{{ t("Version") }}</span>
                 <span>Cronator v{{ app_version or version or '0.0.0' }}</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">What's new</span>
-                <a href="/changelog" class="link link-hover">Changelog</a>
+                <span class="text-base-content/70">{{ t("What's new") }}</span>
+                <a href="/changelog" class="link link-hover">{{ t("Changelog") }}</a>
             </div>
         </div>
     </div>
 
     <!-- Email Settings -->
     <div class="glass-card rounded-xl p-6">
-        <h3 class="text-lg font-semibold mb-4">Email Alerts</h3>
+        <h3 class="text-lg font-semibold mb-4">{{ t("Email Alerts") }}</h3>
 
         <div id="settings-email-summary" class="space-y-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">SMTP Enabled</span>
+                <span class="text-base-content/70">{{ t("SMTP Enabled") }}</span>
                 {% if settings.smtp_enabled %}
-                    <span class="badge badge-success">Enabled</span>
+                    <span class="badge badge-success">{{ t("Enabled") }}</span>
                 {% else %}
-                    <span class="badge badge-ghost">Disabled</span>
+                    <span class="badge badge-ghost">{{ t("Disabled") }}</span>
                 {% endif %}
             </div>
             {% if settings.smtp_enabled %}
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">SMTP Host</span>
+                <span class="text-base-content/70">{{ t("SMTP Host") }}</span>
                 <code class="text-xs">{{ settings.smtp_host }}:{{ settings.smtp_port }}</code>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Alert Email</span>
-                <span>{{ settings.alert_email or 'Not configured' }}</span>
+                <span class="text-base-content/70">{{ t("Alert Email") }}</span>
+                <span>{{ settings.alert_email or t('Not configured') }}</span>
             </div>
             {% if is_admin %}
             <div class="mt-4">
                 <button onclick="withButtonLoading(this, 'Sending...', () => testEmail())" class="btn btn-sm btn-outline gap-2">
-                    {{ icons.envelope("w-4 h-4") }} Send Test Email
+                    {{ icons.envelope("w-4 h-4") }} {{ t("Send Test Email") }}
                 </button>
             </div>
             {% endif %}
@@ -105,17 +105,17 @@
 
     <!-- Webhook Settings -->
     <div class="glass-card rounded-xl p-6">
-        <h3 class="text-lg font-semibold mb-4">Webhook Alerts</h3>
+        <h3 class="text-lg font-semibold mb-4">{{ t("Webhook Alerts") }}</h3>
 
         <div id="settings-webhook-summary" class="space-y-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Webhook URL</span>
-                <span>{{ settings.webhook_url or 'Not configured' }}</span>
+                <span class="text-base-content/70">{{ t("Webhook URL") }}</span>
+                <span>{{ settings.webhook_url or t('Not configured') }}</span>
             </div>
             {% if is_admin and settings.webhook_url %}
             <div class="mt-4">
                 <button onclick="withButtonLoading(this, 'Sending...', () => testWebhook())" class="btn btn-sm btn-outline gap-2">
-                    {{ icons.bolt("w-4 h-4") }} Send Test Webhook
+                    {{ icons.bolt("w-4 h-4") }} {{ t("Send Test Webhook") }}
                 </button>
             </div>
             {% endif %}
@@ -125,54 +125,104 @@
     {% if is_admin %}
     <!-- Maintenance & Backups -->
     <div class="glass-card rounded-xl p-6">
-        <h3 class="text-lg font-semibold mb-4">Backups & Maintenance</h3>
+        <h3 class="text-lg font-semibold mb-4">{{ t("Backups & Maintenance") }}</h3>
 
         <div class="space-y-4">
             <p class="text-sm text-base-content/70">
-                All data is stored in the <code>/data</code> and <code>/scripts</code> volumes.
-                Regular backup of these directories is recommended.
+                {{ t("All data is stored in the /data and /scripts volumes. Regular backup of these directories is recommended.") }}
             </p>
 
             <div class="flex flex-col gap-2">
                 <a href="/api/settings/download-db" class="btn btn-sm btn-outline gap-2">
-                    {{ icons.arrow_down_tray("w-4 h-4") }} Download DB Backup
+                    {{ icons.arrow_down_tray("w-4 h-4") }} {{ t("Download DB Backup") }}
                 </a>
                 <button onclick="withButtonLoading(this, 'Reloading...', () => reloadScheduler())" class="btn btn-sm btn-outline gap-2">
-                    {{ icons.arrow_path("w-4 h-4") }} Reload Scheduler Jobs
+                    {{ icons.arrow_path("w-4 h-4") }} {{ t("Reload Scheduler Jobs") }}
                 </button>
             </div>
         </div>
     </div>
     {% endif %}
 
+    {% if is_admin %}
+    <!-- API Tokens -->
+    <div class="glass-card rounded-xl p-6">
+        <h3 class="text-lg font-semibold mb-4">{{ t("API Tokens") }}</h3>
+        <p class="text-xs text-base-content/70 mb-4">
+            {{ t("Revocable credentials for scripts and API calls. Only a hash is stored — copy the token when it is created.") }}
+        </p>
+        <form id="token-create-form" class="flex flex-wrap gap-2 mb-4">
+            <input type="text" name="name" required minlength="2" maxlength="100"
+                   placeholder="{{ t('Token name') }}" class="input input-bordered input-sm flex-1 min-w-[180px]"
+                   aria-label="{{ t('Token name') }}">
+            <button type="submit" class="btn btn-sm btn-primary">{{ t("Create Token") }}</button>
+        </form>
+        <div id="new-token-box" class="hidden mb-4 p-3 rounded-lg bg-base-200">
+            <p class="text-xs text-base-content/70 mb-2">{{ t("Copy this token now — it will not be shown again.") }}</p>
+            <div class="flex gap-2 items-center">
+                <code id="new-token-value" class="text-xs break-all flex-1 select-all"></code>
+                <button type="button" id="copy-new-token" class="btn btn-xs btn-ghost">{{ t("Copy") }}</button>
+            </div>
+        </div>
+        <div id="tokens-list" class="space-y-2 text-sm">
+            <p class="text-base-content/70">{{ t("Loading tokens...") }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if is_admin %}
+    <!-- Landlock Sandbox -->
+    <div class="glass-card rounded-xl p-6">
+        <h3 class="text-lg font-semibold mb-4">{{ t("Script Sandbox (Landlock)") }}</h3>
+        <p class="text-xs text-base-content/70 mb-3">
+            {{ t("When enabled, each script process may only read its own files, the Python environment and system libraries, and may only write its own directory, its artifacts, /tmp and the paths below. Network, CPU and memory are not restricted.") }}
+        </p>
+        <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg mb-3">
+            <span class="text-base-content/70">{{ t("Host support") }}</span>
+            <code class="text-xs">{{ sandbox_status }}</code>
+        </div>
+        <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg mb-3">
+            <span class="text-base-content/70">{{ t("Sandbox for script runs") }}</span>
+            {% if settings.sandbox_enabled %}
+                <span class="badge badge-success">{{ t("Enabled") }}</span>
+            {% else %}
+                <span class="badge badge-ghost">{{ t("Disabled") }}</span>
+            {% endif %}
+        </div>
+        <p class="text-xs text-error">
+            {{ t("If Landlock is unavailable, scripts still run without filesystem restrictions. An ERROR is logged and a warning appears at the top of the run's stderr.") }}
+        </p>
+        <p class="text-xs text-base-content/70 mt-3">{{ t("Set the toggle and extra writable paths in Edit Settings.") }}</p>
+    </div>
+    {% endif %}
+
     <!-- Execution History -->
     <div class="glass-card rounded-xl p-6">
         <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-            {{ icons.clock("w-5 h-5") }} Execution History
+            {{ icons.clock("w-5 h-5") }} {{ t("Execution History") }}
         </h3>
 
         <div class="space-y-3 mb-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Total executions</span>
+                <span class="text-base-content/70">{{ t("Total executions") }}</span>
                 <span id="exec-total">—</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Successful</span>
+                <span class="text-base-content/70">{{ t("Successful") }}</span>
                 <span id="exec-success" class="text-success">—</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Failed</span>
+                <span class="text-base-content/70">{{ t("Failed") }}</span>
                 <span id="exec-failed" class="text-error">—</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Oldest record</span>
+                <span class="text-base-content/70">{{ t("Oldest record") }}</span>
                 <span id="exec-oldest" class="text-xs">—</span>
             </div>
         </div>
 
         <p class="text-xs text-base-content/70 mb-3">
-            Auto-cleanup runs daily at 03:00 UTC: keeps the last 200 successful,
-            500 failed, and 100 skipped / cancelled executions per script.
+            {{ t("Auto-cleanup runs daily at 03:00 UTC: keeps the last 200 successful, 500 failed, and 100 skipped / cancelled / missed executions per script.") }}
         </p>
 
         {% if is_admin %}
@@ -183,13 +233,13 @@
                 value="90"
                 min="1"
                 max="3650"
-                aria-label="Minimum days back for executions to delete"
-                placeholder="Days"
+                aria-label="{{ t('Minimum days back for executions to delete') }}"
+                placeholder="{{ t('Days') }}"
                 class="input input-bordered input-sm w-24"
             >
-            <span class="text-sm text-base-content/70">days</span>
+            <span class="text-sm text-base-content/70">{{ t("days") }}</span>
             <button onclick="withButtonLoading(this, 'Cleaning up...', () => cleanupOlderThan())" class="btn btn-sm btn-outline btn-warning gap-2">
-                {{ icons.trash("w-4 h-4") }} Delete older than
+                {{ icons.trash("w-4 h-4") }} {{ t("Delete older than") }}
             </button>
         </div>
         {% endif %}
@@ -198,25 +248,25 @@
     <!-- Artifacts Storage -->
     <div class="glass-card rounded-xl p-6">
         <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-            {{ icons.archive_box("w-5 h-5") }} Artifacts Storage
+            {{ icons.archive_box("w-5 h-5") }} {{ t("Artifacts Storage") }}
         </h3>
 
         <div class="space-y-4">
             <div id="artifacts-stats" class="space-y-3">
                 <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                    <span class="text-base-content/70">Total Artifacts</span>
+                    <span class="text-base-content/70">{{ t("Total Artifacts") }}</span>
                     <span id="total-artifacts">Loading...</span>
                 </div>
                 <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                    <span class="text-base-content/70">Storage Used</span>
+                    <span class="text-base-content/70">{{ t("Storage Used") }}</span>
                     <span id="storage-used">Loading...</span>
                 </div>
                 <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                    <span class="text-base-content/70">Executions with Artifacts</span>
+                    <span class="text-base-content/70">{{ t("Executions with Artifacts") }}</span>
                     <span id="executions-with-artifacts">Loading...</span>
                 </div>
                 <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                    <span class="text-base-content/70">Free Disk Space</span>
+                    <span class="text-base-content/70">{{ t("Free Disk Space") }}</span>
                     <span id="free-space">Loading...</span>
                 </div>
             </div>
@@ -224,7 +274,7 @@
             {% if is_admin %}
             <div class="mt-4">
                 <button onclick="clearAllArtifacts(this)" class="btn btn-sm btn-outline btn-error gap-2">
-                    {{ icons.trash("w-4 h-4") }} Clear All Artifacts
+                    {{ icons.trash("w-4 h-4") }} {{ t("Clear All Artifacts") }}
                 </button>
             </div>
             {% endif %}
@@ -235,39 +285,39 @@
 <!-- Edit Settings Modal -->
 <dialog id="edit-modal" class="modal">
     <div class="modal-box max-w-3xl">
-        <h3 class="font-bold text-lg mb-4">Edit Settings</h3>
+        <h3 class="font-bold text-lg mb-4">{{ t("Edit Settings") }}</h3>
 
         <form id="settings-form" class="space-y-6">
             <!-- Email Settings -->
             <div class="border border-base-300 rounded-lg p-4">
-                <h4 class="font-semibold mb-3">Email Alerts</h4>
+                <h4 class="font-semibold mb-3">{{ t("Email Alerts") }}</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label class="form-control">
-                        <span class="label-text">SMTP Enabled</span>
+                        <span class="label-text">{{ t("SMTP Enabled") }}</span>
                         <input type="checkbox" name="smtp_enabled" class="toggle toggle-primary" {% if settings.smtp_enabled %}checked{% endif %}>
                     </label>
                     <label class="form-control">
-                        <span class="label-text">SMTP Host</span>
+                        <span class="label-text">{{ t("SMTP Host") }}</span>
                         <input type="text" name="smtp_host" value="{{ settings.smtp_host }}" class="input input-bordered input-sm">
                     </label>
                     <label class="form-control">
-                        <span class="label-text">SMTP Port</span>
+                        <span class="label-text">{{ t("SMTP Port") }}</span>
                         <input type="number" name="smtp_port" value="{{ settings.smtp_port }}" class="input input-bordered input-sm">
                     </label>
                     <label class="form-control">
-                        <span class="label-text">SMTP User</span>
+                        <span class="label-text">{{ t("SMTP User") }}</span>
                         <input type="text" name="smtp_user" value="{{ settings.smtp_user }}" class="input input-bordered input-sm">
                     </label>
                     <label class="form-control">
-                        <span class="label-text">SMTP Password</span>
+                        <span class="label-text">{{ t("SMTP Password") }}</span>
                         <input type="password" name="smtp_password" placeholder="••••••••" class="input input-bordered input-sm" autocomplete="off">
                     </label>
                     <label class="form-control">
-                        <span class="label-text">From Address</span>
+                        <span class="label-text">{{ t("From Address") }}</span>
                         <input type="email" name="smtp_from" value="{{ settings.smtp_from }}" class="input input-bordered input-sm">
                     </label>
                     <label class="form-control">
-                        <span class="label-text">Alert Email</span>
+                        <span class="label-text">{{ t("Alert Email") }}</span>
                         <input type="email" name="alert_email" value="{{ settings.alert_email }}" class="input input-bordered input-sm">
                     </label>
                 </div>
@@ -275,24 +325,24 @@
 
             <!-- Webhook Settings -->
             <div class="border border-base-300 rounded-lg p-4">
-                <h4 class="font-semibold mb-3">Webhook Alerts</h4>
+                <h4 class="font-semibold mb-3">{{ t("Webhook Alerts") }}</h4>
                 <label class="form-control">
-                    <span class="label-text">Webhook URL</span>
+                    <span class="label-text">{{ t("Webhook URL") }}</span>
                     <input type="url" name="webhook_url" value="{{ settings.webhook_url }}" placeholder="https://example.com/webhook" class="input input-bordered input-sm">
                 </label>
             </div>
 
             <!-- Script Git Mirror -->
             <div class="border border-base-300 rounded-lg p-4">
-                <h4 class="font-semibold mb-3">Script Git Mirror</h4>
-                <p class="text-xs text-base-content/70 mb-3">Pushes every saved script to a git repository as a readable, reviewable backup. Point it at an empty repo (or a bare remote) — everything is mirrored automatically on each change.</p>
+                <h4 class="font-semibold mb-3">{{ t("Script Git Mirror") }}</h4>
+                <p class="text-xs text-base-content/70 mb-3">{{ t("Pushes every saved script to a git repository as a readable, reviewable backup. Point it at an empty repo (or a bare remote) — everything is mirrored automatically on each change.") }}</p>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label class="form-control">
-                        <span class="label-text">Remote URL (optional)</span>
+                        <span class="label-text">{{ t("Remote URL (optional)") }}</span>
                         <input type="url" name="script_git_remote" value="{{ settings.script_git_remote }}" placeholder="https://github.com/user/repo.git" class="input input-bordered input-sm">
                     </label>
                     <label class="form-control">
-                        <span class="label-text">Local mirror directory (optional)</span>
+                        <span class="label-text">{{ t("Local mirror directory (optional)") }}</span>
                         <input type="text" name="script_git_repo_dir" value="{{ settings.script_git_repo_dir }}" placeholder="/path/to/repo" class="input input-bordered input-sm">
                     </label>
                 </div>
@@ -300,28 +350,61 @@
 
             <!-- Execution Settings -->
             <div class="border border-base-300 rounded-lg p-4">
-                <h4 class="font-semibold mb-3">Execution</h4>
+                <h4 class="font-semibold mb-3">{{ t("Execution") }}</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label class="form-control">
-                        <span class="label-text">Default Timeout (seconds)</span>
+                        <span class="label-text">{{ t("Default Timeout (seconds)") }}</span>
                         <input type="number" name="default_timeout" value="{{ settings.default_timeout }}" class="input input-bordered input-sm">
+                    </label>
+                    <label class="form-control">
+                        <span class="label-text">{{ t("Display Timezone (IANA name)") }}</span>
+                        <input type="text" name="display_timezone" value="{{ display_timezone or 'UTC' }}" list="display-timezone-list" placeholder="UTC" class="input input-bordered input-sm">
+                        <datalist id="display-timezone-list">
+                            <option value="UTC">UTC</option>
+                            <option value="Europe/Moscow">Europe/Moscow</option>
+                            <option value="Europe/London">Europe/London</option>
+                            <option value="Europe/Berlin">Europe/Berlin</option>
+                            <option value="America/New_York">America/New_York</option>
+                            <option value="America/Chicago">America/Chicago</option>
+                            <option value="America/Los_Angeles">America/Los_Angeles</option>
+                            <option value="Asia/Tbilisi">Asia/Tbilisi</option>
+                            <option value="Asia/Almaty">Asia/Almaty</option>
+                            <option value="Asia/Singapore">Asia/Singapore</option>
+                            <option value="Asia/Tokyo">Asia/Tokyo</option>
+                            <option value="Australia/Sydney">Australia/Sydney</option>
+                        </datalist>
+                        <span class="text-xs text-base-content/70 mt-1">{{ t("Storage and schedules stay UTC; this only changes how times are shown.") }}</span>
+                    </label>
+                    <label class="form-control">
+                        <span class="label-text">{{ t("Max Concurrent Executions") }}</span>
+                        <input type="number" name="max_concurrent_executions" value="{{ max_concurrent_executions }}" min="0" max="100" class="input input-bordered input-sm">
+                        <span class="text-xs text-base-content/70 mt-1">{{ t("0 = unlimited. Above that, scheduled fires beyond the cap are recorded as skipped executions.") }}</span>
+                    </label>
+                    <label class="form-control flex-row items-center gap-2">
+                        <input type="checkbox" name="sandbox_enabled" class="toggle toggle-primary" {% if settings.sandbox_enabled %}checked{% endif %}>
+                        <span class="label-text">{{ t("Enable Landlock sandbox for script runs") }}</span>
+                    </label>
+                    <label class="form-control md:col-span-2">
+                        <span class="label-text">{{ t("Additional writable paths (JSON array, one line)") }}</span>
+                        <textarea name="sandbox_extra_paths" rows="2" class="textarea textarea-bordered textarea-sm w-full font-mono">{{ sandbox_extra_paths }}</textarea>
+                        <span class="text-xs text-base-content/70 mt-1">{{ t('Example: ["/srv/reports", "/var/tmp/my-app"]') }}</span>
                     </label>
                 </div>
             </div>
 
             <!-- Backups -->
             <div class="border border-base-300 rounded-lg p-4">
-                <h4 class="font-semibold mb-3">Backups</h4>
+                <h4 class="font-semibold mb-3">{{ t("Backups") }}</h4>
                 <label class="form-control flex-row items-center gap-2">
                     <input type="checkbox" name="auto_backup_enabled" class="toggle toggle-primary" {% if settings.auto_backup_enabled %}checked{% endif %}>
-                    <span class="label-text">Automatic daily backup (02:00 UTC, keeps the 7 most recent)</span>
+                    <span class="label-text">{{ t("Automatic daily backup (02:00 UTC, keeps the 7 most recent)") }}</span>
                 </label>
             </div>
         </form>
 
         <div class="modal-action">
-            <button type="button" onclick="closeEditModal()" class="btn btn-ghost">Cancel</button>
-            <button type="button" onclick="withButtonLoading(this, 'Saving...', () => saveSettings())" class="btn btn-primary">Save Changes</button>
+            <button type="button" onclick="closeEditModal()" class="btn btn-ghost">{{ t("Cancel") }}</button>
+            <button type="button" onclick="withButtonLoading(this, 'Saving...', () => saveSettings())" class="btn btn-primary">{{ t("Save Changes") }}</button>
         </div>
     </div>
     <form method="dialog" class="modal-backdrop">
@@ -340,7 +423,7 @@
     // server-rendered email/webhook cards (those come from env defaults,
     // not the DB-backed settings) with the actual persisted values.
     window.addEventListener('DOMContentLoaded', async () => {
-        await Promise.all([loadArtifactsStats(), loadExecutionStats(), refreshSettingsSummary()]);
+        await Promise.all([loadArtifactsStats(), loadExecutionStats(), refreshSettingsSummary(), loadTokens()]);
     });
 
     function applySettingsSummary(settings) {
@@ -423,6 +506,10 @@
         form.elements.script_git_remote.value = settings.script_git_remote || '';
         form.elements.script_git_repo_dir.value = settings.script_git_repo_dir || '';
         form.elements.default_timeout.value = settings.default_timeout ?? '';
+        form.elements.display_timezone.value = settings.display_timezone || 'UTC';
+        form.elements.max_concurrent_executions.value = settings.max_concurrent_executions ?? 0;
+        form.elements.sandbox_enabled.checked = Boolean(settings.sandbox_enabled);
+        form.elements.sandbox_extra_paths.value = settings.sandbox_extra_paths || '[]';
         form.elements.auto_backup_enabled.checked = Boolean(settings.auto_backup_enabled);
     }
 
@@ -561,6 +648,11 @@
         if (formData.get('script_git_repo_dir')) data.script_git_repo_dir = formData.get('script_git_repo_dir');
 
         if (formData.get('default_timeout')) data.default_timeout = parseInt(formData.get('default_timeout'));
+        // Always sent (even when unchanged) — an empty field means UTC.
+        data.display_timezone = (formData.get('display_timezone') || 'UTC').trim() || 'UTC';
+        data.max_concurrent_executions = parseInt(formData.get('max_concurrent_executions')) || 0;
+        data.sandbox_enabled = formData.get('sandbox_enabled') === 'on';
+        data.sandbox_extra_paths = formData.get('sandbox_extra_paths') || '[]';
         data.auto_backup_enabled = formData.get('auto_backup_enabled') === 'on';
 
         try {
@@ -613,6 +705,77 @@
         } catch (err) {
             window.showToast?.(err.message || 'Failed to reload scheduler', 'error');
         }
+    }
+
+    // --- API tokens (admin only) ---
+    async function loadTokens() {
+        const list = document.getElementById('tokens-list');
+        if (!list) return;
+        try {
+            const response = await fetch('/api/tokens');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const tokens = await response.json();
+            if (!tokens.length) {
+                list.innerHTML = `<p class="text-base-content/70">No tokens yet</p>`;
+                return;
+            }
+            list.innerHTML = tokens.map(t => `
+                <div class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-base-200">
+                    <div class="min-w-0">
+                        <div class="font-medium">${escapeHtml(t.name)} ${t.revoked_at ? `<span class="badge badge-ghost badge-xs">revoked</span>` : `<span class="badge badge-success badge-xs">active</span>`}</div>
+                        <div class="text-xs text-base-content/70">${escapeHtml(t.prefix)}… · created ${escapeHtml((t.created_at || '').slice(0, 10))} · last used ${t.last_used_at ? escapeHtml(t.last_used_at.slice(0, 16)) : 'never'}</div>
+                    </div>
+                    ${t.revoked_at ? '' : `<button type="button" class="btn btn-xs btn-error btn-outline" onclick="revokeToken(${t.id})">Revoke</button>`}
+                </div>
+            `).join('');
+        } catch (err) {
+            list.innerHTML = `<p class="text-error text-xs">Failed to load tokens: ${escapeHtml(err.message)}</p>`;
+        }
+    }
+
+    async function revokeToken(id) {
+        if (!confirm('Revoke this token? Clients using it will get 401 immediately.')) return;
+        try {
+            const response = await fetch(`/api/tokens/${id}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            window.showToast?.('Token revoked', 'success');
+            await loadTokens();
+        } catch (err) {
+            window.showToast?.(err.message || 'Failed to revoke token', 'error');
+        }
+    }
+
+    const tokenForm = document.getElementById('token-create-form');
+    if (tokenForm) {
+        tokenForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const name = new FormData(tokenForm).get('name');
+            try {
+                const response = await fetch('/api/tokens', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ name }),
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+                document.getElementById('new-token-value').textContent = data.token;
+                document.getElementById('new-token-box').classList.remove('hidden');
+                tokenForm.reset();
+                await loadTokens();
+                window.showToast?.('Token created — copy it now', 'success');
+            } catch (err) {
+                window.showToast?.(err.message || 'Failed to create token', 'error');
+            }
+        });
+    }
+
+    const copyTokenBtn = document.getElementById('copy-new-token');
+    if (copyTokenBtn) {
+        copyTokenBtn.addEventListener('click', async () => {
+            const value = document.getElementById('new-token-value').textContent;
+            await navigator.clipboard?.writeText(value);
+            window.showToast?.('Token copied', 'success');
+        });
     }
 </script>
 {% endblock %}

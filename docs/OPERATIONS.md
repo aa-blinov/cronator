@@ -98,6 +98,10 @@ status:
 | `TIMEOUT`    | 500 most recent |
 | `SKIPPED`    | 100 most recent |
 | `CANCELLED`  | 100 most recent |
+| `MISSED`     | 100 most recent |
+
+Missed rows come from the five-minute schedule detector, which also covers
+cron moments lost while the app was down (up to a seven-day lookback).
 
 Anything beyond those counts is deleted along with its artifact directory
 on disk. There's also an age-based cleanup
@@ -214,6 +218,14 @@ payload — see `app/services/alerting.py::send_webhook`).
   opt-in and presumably wanted every time), not an oversight.
 - **Manual notifications** (`cronator_lib.notify()` called from inside a
   script) go out immediately, independent of the above throttling.
+- **Missed schedules alert like failures**: the five-minute detector stores
+  `missed` executions and sends one throttled failure alert per script for
+  the newest missed moment.
+- **Delivery failures are visible**: an expired SMTP password or a webhook
+  answering 500 lands on the script as `last_alert_error` /
+  `last_alert_error_at` (shown on the script page) and is logged at ERROR.
+  A later successful delivery clears the field. If alerts "stopped coming",
+  check that row before assuming the script succeeded.
 
 Test the current SMTP config and webhook URL from **Settings**
 (`POST /api/settings/test-email`, `POST /api/settings/test-webhook`)
@@ -222,14 +234,13 @@ without waiting for a real failure.
 ## Troubleshooting
 
 **An execution is stuck at `RUNNING` and nothing is happening.**
-`executor_service.cleanup_stale_executions()` only runs once, at app
-startup — it does not poll periodically. If an execution got stuck (e.g.
-an unhandled exception during finalization, or the container was killed
-mid-run), it stays `RUNNING` in the DB until the next restart. A restart
-will mark stale `RUNNING` rows as failed; if you can't restart right now,
-correct the row manually or use `POST /api/executions/{id}/cancel` (only
-works if the app still has a live process handle for it — won't help after
-a container restart severed that link).
+`executor_service.cleanup_stale_executions()` runs once at app startup and
+covers rows stranded by a restart. A 15-minute internal sweep
+(`sweep_stale_running_executions`) now also fails rows that outlived their
+script's timeout *and* have no live process in either registry, while
+leaving genuinely running jobs alone. If a row is newer than the timeout
+or still has a process handle, give it time or use
+`POST /api/executions/{id}/cancel`.
 
 **Logs aren't showing up in `cronator.log` / aren't JSON despite
 `LOG_FORMAT=json`.** Check whether this is actually an HTTP access line —

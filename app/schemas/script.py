@@ -200,6 +200,8 @@ class ScriptRead(ScriptBase):
     last_run_at: datetime | None = None
     next_run_at: datetime | None = None
     last_alert_at: datetime | None = None
+    last_alert_error: str | None = None
+    last_alert_error_at: datetime | None = None
 
     # Stats (read-only)
     last_success_at: datetime | None = None

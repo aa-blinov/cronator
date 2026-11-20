@@ -8,6 +8,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+- **Missed-schedule detection.** Cron expressions are evaluated in UTC
+  explicitly (they used the host's local timezone on non-container hosts),
+  and a five-minute internal sweep recomputes expected fires against actual
+  execution rows. Fires with no row — e.g. the whole window while the app
+  was down — are stored as `missed` executions with a timestamp, a duration
+  and an error message. A per-script failure alert is sent (throttled like
+  any other), the dashboard gained a "Missed Schedules Today" card and an
+  attention trigger, and retention keeps the newest 100 missed rows per
+  script (`EXECUTION_RETENTION_MISSED` overrides it).
+- **API tokens.** `GET/POST /api/tokens` and `DELETE /api/tokens/{id}`
+  (admin-only) issue and revoke bearer credentials for scripts and API
+  clients. `Authorization: Bearer ctk_…` works on every REST endpoint;
+  only the SHA-256 hash is stored. Tokens act with admin rights over the
+  API and can be revoked without changing any password.
+- **Alert delivery errors are visible.** SMTP failures and webhook failures
+  are recorded on the script (`last_alert_error`, `last_alert_error_at`),
+  shown on the script page, and logged at ERROR. A successful delivery
+  clears the stale error. Webhook failures no longer log at WARNING.
+- **Display timezone.** The `display_timezone` setting (IANA name, default
+  UTC) converts every server-rendered timestamp and names the zone. Storage
+  and cron remain UTC. The editor's cron preview is explicitly labelled
+  "(UTC)" because the browser computes it client-side.
+- **Global concurrency cap.** `max_concurrent_executions` (0 = unlimited)
+  records scheduled fires beyond the cap as `skipped` executions instead
+  of starting them. Manual and test runs are unaffected. A periodic sweep
+  fails `RUNNING` rows whose live process is long gone, complementing the
+  startup-only crash cleanup.
+
+- **Optional Landlock filesystem sandbox.** `sandbox_enabled` plus
+  `sandbox_extra_paths` restrict each child process to its own files, venv,
+  the artifacts directory, a private TMPDIR and an explicit allowlist. The rules are
+  applied via ctypes syscalls in a `preexec_fn` with no new dependency.
+  If Landlock is unavailable on the host, the script still runs and the
+  missing sandbox is flagged at ERROR in the log and in the run's stderr.
+  Network, CPU and memory are not part of this sandbox.
+
+### Changed
+
+- **The locale now changes the words on the page.** A `t()` Jinja global
+  backed by `app/translations/ru.json` covers the navigation, tables,
+  forms and cards on every server-rendered page; the English default is
+  unchanged. A few inert data labels and all strings generated in
+  JavaScript (toasts, console markers) remain English and are documented
+  as such. The login page now uses the app's shared template environment.
+- **Accessibility:** live log regions (`role="log"`, `aria-live="polite"`)
+  on execution details and the test console, and the running indicator
+  honours `prefers-reduced-motion`.
+- `CronTrigger` is constructed with `timezone="UTC"` explicitly.
+
+### Security
+
+- **`environment_vars` is encrypted at rest.** A `EncryptedText` column
+  type Fernet-encrypts the scripts and script_versions columns; the key
+  derivation is shared with settings_service. Values written before this
+  change are re-encrypted at startup. Values are redacted in the script
+  audit log, and the git mirror never carried them. Restarting with a
+  rotated `SECRET_KEY` makes old values unreadable — same rule as the
+  encrypted settings.
+
+### Added
 - **The browser gets a real login**, not the Basic Auth popup: `GET
   /login` renders a sign-in page, `POST /login` checks the same
   credentials as the API (users table first, env admin fallback) under

@@ -3,25 +3,25 @@
 
 {% block header_actions %}
 <button class="btn btn-primary btn-sm gap-2" onclick="openCreateModal()">
-    {{ icons.sparkles("w-4 h-4") }} New User
+    {{ icons.sparkles("w-4 h-4") }} {{ t("New User") }}
 </button>
 {% endblock %}
 
 {% block content %}
 <div class="glass-card rounded-xl overflow-hidden">
     <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Users</h3>
-        <p class="text-sm text-base-content/70">{{ users|length }} user(s)</p>
+        <h3 class="text-lg font-semibold">{{ t("Users") }}</h3>
+        <p class="text-sm text-base-content/70">{{ t("{count} user(s)", count=users|length) }}</p>
     </div>
 
     <div class="overflow-x-auto">
         <table class="table w-full" data-testid="users-table">
             <thead>
                 <tr class="border-b border-base-content/10">
-                    <th class="bg-transparent">Username</th>
-                    <th class="bg-transparent">Role</th>
-                    <th class="bg-transparent">Created</th>
-                    <th class="bg-transparent">Actions</th>
+                    <th class="bg-transparent">{{ t("Username") }}</th>
+                    <th class="bg-transparent">{{ t("Role") }}</th>
+                    <th class="bg-transparent">{{ t("Created") }}</th>
+                    <th class="bg-transparent">{{ t("Actions") }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -37,17 +37,17 @@
                     </td>
                     <td>
                         <span class="text-xs text-base-content/70">
-                            {{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '—' }}
+                            {{ user.created_at|dt('%Y-%m-%d %H:%M') }}
                         </span>
                     </td>
                     <td class="flex gap-2">
                         <button class="btn btn-xs btn-ghost" data-testid="reset-password-btn"
                                 onclick="openResetModal({{ user.id }}, '{{ user.username }}')">
-                            Reset password
+                            {{ t("Reset password") }}
                         </button>
                         <button class="btn btn-xs btn-error btn-outline" data-testid="delete-user-btn"
                                 onclick="deleteUser({{ user.id }}, '{{ user.username }}', this)">
-                            Delete
+                            {{ t("Delete") }}
                         </button>
                     </td>
                 </tr>
@@ -59,7 +59,7 @@
 
 <div class="glass-card rounded-xl overflow-hidden mt-6">
     <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Recent Activity</h3>
+        <h3 class="text-lg font-semibold">{{ t("Recent Activity") }}</h3>
         <p class="text-sm text-base-content/70" data-testid="audit-count"></p>
     </div>
 
@@ -67,11 +67,11 @@
         <table class="table w-full" data-testid="audit-table">
             <thead>
                 <tr class="border-b border-base-content/10">
-                    <th class="bg-transparent">When</th>
-                    <th class="bg-transparent">Action</th>
-                    <th class="bg-transparent">User</th>
-                    <th class="bg-transparent">Detail</th>
-                    <th class="bg-transparent">By</th>
+                    <th class="bg-transparent">{{ t("When") }}</th>
+                    <th class="bg-transparent">{{ t("Action") }}</th>
+                    <th class="bg-transparent">{{ t("User") }}</th>
+                    <th class="bg-transparent">{{ t("Detail") }}</th>
+                    <th class="bg-transparent">{{ t("By") }}</th>
                 </tr>
             </thead>
             <tbody id="audit-log-body" data-testid="audit-log-body">
@@ -84,20 +84,20 @@
 <!-- Create User Modal -->
 <dialog id="create-user-modal" class="modal">
     <div class="modal-box">
-        <h3 class="font-bold text-lg mb-4">New User</h3>
+        <h3 class="font-bold text-lg mb-4">{{ t("New User") }}</h3>
         <form id="create-user-form" class="space-y-4">
             <label class="form-control">
-                <span class="label-text">Username</span>
+                <span class="label-text">{{ t("Username") }}</span>
                 <input type="text" name="username" class="input input-bordered input-sm" required
                        pattern="[a-zA-Z0-9_-]+" minlength="2" maxlength="64" data-testid="new-username-input">
             </label>
             <label class="form-control">
-                <span class="label-text">Password</span>
+                <span class="label-text">{{ t("Password") }}</span>
                 <input type="password" name="password" class="input input-bordered input-sm" required
                        minlength="8" maxlength="128" autocomplete="new-password" data-testid="new-password-input">
             </label>
             <label class="form-control">
-                <span class="label-text">Role</span>
+                <span class="label-text">{{ t("Role") }}</span>
                 <select name="role" class="select select-bordered select-sm" data-testid="new-role-select">
                     <option value="viewer" selected>viewer</option>
                     <option value="admin">admin</option>
@@ -105,8 +105,8 @@
             </label>
         </form>
         <div class="modal-action">
-            <button type="button" class="btn btn-ghost" onclick="document.getElementById('create-user-modal').close()">Cancel</button>
-            <button type="button" class="btn btn-primary" data-testid="create-user-submit" onclick="withButtonLoading(this, 'Creating...', () => createUser())">Create</button>
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('create-user-modal').close()">{{ t("Cancel") }}</button>
+            <button type="button" class="btn btn-primary" data-testid="create-user-submit" onclick="withButtonLoading(this, 'Creating...', () => createUser())">{{ t("Create") }}</button>
         </div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
@@ -115,17 +115,17 @@
 <!-- Reset Password Modal -->
 <dialog id="reset-password-modal" class="modal">
     <div class="modal-box">
-        <h3 class="font-bold text-lg mb-4">Reset password for <span id="reset-target-username"></span></h3>
+        <h3 class="font-bold text-lg mb-4">{{ t("Reset password for {username}", username='') }}<span id="reset-target-username"></span></h3>
         <form id="reset-password-form">
             <label class="form-control">
-                <span class="label-text">New password</span>
+                <span class="label-text">{{ t("New password") }}</span>
                 <input type="password" name="password" class="input input-bordered input-sm w-full" required
                        minlength="8" maxlength="128" autocomplete="new-password" data-testid="reset-password-input">
             </label>
         </form>
         <div class="modal-action">
-            <button type="button" class="btn btn-ghost" onclick="document.getElementById('reset-password-modal').close()">Cancel</button>
-            <button type="button" class="btn btn-primary" data-testid="reset-password-submit" onclick="withButtonLoading(this, 'Resetting...', () => submitResetPassword())">Reset</button>
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('reset-password-modal').close()">{{ t("Cancel") }}</button>
+            <button type="button" class="btn btn-primary" data-testid="reset-password-submit" onclick="withButtonLoading(this, 'Resetting...', () => submitResetPassword())">{{ t("Reset") }}</button>
         </div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>

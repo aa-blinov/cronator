@@ -96,11 +96,14 @@ def _render_login(request: Request, error: str | None = None) -> HTMLResponse:
     HTML-in-a-string from an early draft: the app already ships Jinja2,
     and escaping an injected error through a hand-built f-string is a
     foot-gun (a user-entered username echoed back in an error message
-    would be an XSS)."""
-    from fastapi.templating import Jinja2Templates
+    would be an XSS).
 
-    templates = Jinja2Templates(directory="app/templates")
-    return templates.TemplateResponse(
+    Uses the app's shared template environment (request.app.state) rather
+    than building a second one: the shared env carries the globals every
+    other page gets — `t` and `lang` included — so the login screen
+    follows the stored locale instead of silently staying English.
+    """
+    return request.app.state.templates.TemplateResponse(
         request,
         name="login.html",
         context={"error": error},

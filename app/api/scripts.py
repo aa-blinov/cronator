@@ -317,9 +317,7 @@ async def duplicate_script(
     await db.refresh(dup)
 
     # Create initial ScriptVersion so the new script appears in history
-    dup_version = await _create_version(
-        db, dup, change_summary=f"Duplicated from {original.name}"
-    )
+    dup_version = await _create_version(db, dup, change_summary=f"Duplicated from {original.name}")
     await _mirror(dup, "created", dup_version)
 
     return ScriptReadWithInstallStatus(
@@ -393,6 +391,11 @@ async def update_script(
             old = getattr(script, field)
             new = update_data[field]
             if old != new:
+                # environment_vars holds operator secrets — the audit trail
+                # must not become a second plaintext copy of them.
+                if field == "environment_vars":
+                    audit_changes.append((field, "<redacted>", "<redacted>"))
+                    continue
                 audit_changes.append(
                     (
                         field,
@@ -897,7 +900,6 @@ async def validate_script(
 async def _get_next_version_number(db: AsyncSession, script_id: int) -> int:
     """Get the next version number for a script."""
 
-
     result = await db.execute(
         select(func.max(ScriptVersion.version_number)).where(ScriptVersion.script_id == script_id)
     )
@@ -945,7 +947,6 @@ async def _create_version(
     change_summary: str | None = None,
 ) -> ScriptVersion | None:
     """Create a new version snapshot of the script, or None if unchanged."""
-
 
     # Calculate hash of current state (content + dependencies + python_version)
     current_state = f"{script.content}|{script.dependencies or ''}|{script.python_version}"
@@ -1094,7 +1095,6 @@ async def get_script_version(
 ):
     """Get a specific version of a script."""
 
-
     result = await db.execute(
         select(ScriptVersion).where(
             ScriptVersion.script_id == script_id,
@@ -1117,7 +1117,6 @@ async def revert_to_version(
     username: str = Depends(require_admin),
 ):
     """Revert script to a specific version."""
-
 
     # Get the version to revert to
     version_result = await db.execute(

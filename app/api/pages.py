@@ -1,5 +1,6 @@
 """Page routes for HTML templates."""
 
+import json
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -90,6 +91,22 @@ async def dashboard(
     attention_scripts = []
     healthy_scripts = []
 
+    # A missed schedule is its own attention trigger even when the script
+    # later ran fine (a manual re-run does not undo the missed moment), so
+    # today's missed rows are counted per script, not judged from the last
+    # execution alone.
+    missed_today_by_script: dict[int, int] = {}
+    missed_today_rows = await db.execute(
+        select(Execution.script_id, func.count())
+        .where(
+            Execution.started_at >= today_start,
+            Execution.status == ExecutionStatus.MISSED.value,
+        )
+        .group_by(Execution.script_id)
+    )
+    for script_id, missed_count in missed_today_rows.all():
+        missed_today_by_script[script_id] = missed_count
+
     for item in scripts_data:
         script = item["script"]
         last_exec = item["last_execution"]
@@ -102,6 +119,10 @@ async def dashboard(
             if last_started.tzinfo is None:
                 last_started = last_started.replace(tzinfo=UTC)
         is_unhealthy = False
+
+        # Missed schedule today — the cron moment passed with no run
+        if missed_today_by_script.get(script.id, 0):
+            is_unhealthy = True
 
         # Failed today
         if (
@@ -156,6 +177,18 @@ async def dashboard(
         or 0
     )
 
+    missed_today = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Execution)
+            .where(
+                Execution.started_at >= today_start,
+                Execution.status == ExecutionStatus.MISSED.value,
+            )
+        )
+        or 0
+    )
+
     running_now = (
         await db.scalar(
             select(func.count())
@@ -181,6 +214,7 @@ async def dashboard(
                 "enabled_scripts": enabled_scripts,
                 "today_executions": today_execs,
                 "failed_today": failed_today,
+                "missed_today": missed_today,
                 "running_now": running_now,
             },
             "now": now,
@@ -552,6 +586,21 @@ async def execution_detail(
     )
 
 
+def _json_text(value) -> str:
+    """Settings cache parses JSON strings; templates want the JSON text."""
+    if isinstance(value, str):
+        return value
+    return json.dumps(value)
+
+
+def _landlock_status() -> str:
+    """One-line capability status for the sandbox card."""
+    from app.sandbox import landlock_abi_version
+
+    abi = landlock_abi_version()
+    return f"Landlock ABI v{abi}" if abi else "Landlock unavailable on this host"
+
+
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(
     request: Request,
@@ -559,6 +608,8 @@ async def settings_page(
 ):
     """Settings page."""
     is_admin = await _is_admin(username)
+    from app.services.settings_service import settings_service as _settings_service
+
     return request.app.state.templates.TemplateResponse(
         "settings.html",
         {
@@ -569,6 +620,16 @@ async def settings_page(
             "is_admin": is_admin,
             "username": username,
             "settings": settings,
+            # Live DB values — the env config object has no such fields, and
+            # the operator may have changed them after startup.
+            "display_timezone": await _settings_service.get("display_timezone", "UTC"),
+            "max_concurrent_executions": await _settings_service.get(
+                "max_concurrent_executions", 0
+            ),
+            "sandbox_extra_paths": _json_text(
+                await _settings_service.get("sandbox_extra_paths", "[]")
+            ),
+            "sandbox_status": _landlock_status(),
             "scheduler_jobs": scheduler_service.get_all_jobs_info(),
         },
     )

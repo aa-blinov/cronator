@@ -7,7 +7,7 @@
     <form method="GET" action="/executions" class="flex flex-wrap items-center gap-4" onsubmit="removeEmptyParams(event)">
         <div class="form-control">
             <select name="script_id" class="select select-bordered select-sm">
-                <option value="">All Scripts</option>
+                <option value="">{{ t("All Scripts") }}</option>
                 {% for script in scripts %}
                 <option value="{{ script.id }}" {% if filters.script_id == script.id %}selected{% endif %}>
                     {{ script.name }}
@@ -18,7 +18,7 @@
 
         <div class="form-control">
             <select name="status" class="select select-bordered select-sm">
-                <option value="">All Statuses</option>
+                <option value="">{{ t("All Statuses") }}</option>
                 {% for s in statuses %}
                 <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>
                     {{ s }}
@@ -32,15 +32,15 @@
                 type="search"
                 name="search"
                 value="{{ filters.search or '' }}"
-                placeholder="Search stdout / stderr / script name…"
+                placeholder="{{ t('Search stdout / stderr / script name…') }}"
                 class="input input-bordered input-sm w-full"
                 autocomplete="off"
                 data-testid="executions-search-input"
             />
         </div>
 
-        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
-        <a href="/executions" class="btn btn-ghost btn-sm">Reset</a>
+        <button type="submit" class="btn btn-primary btn-sm">{{ t("Filter") }}</button>
+        <a href="/executions" class="btn btn-ghost btn-sm">{{ t("Reset") }}</a>
     </form>
 </div>
 
@@ -64,14 +64,14 @@ function removeEmptyParams(event) {
             <table class="table w-full">
                 <thead>
                     <tr class="border-b border-base-content/10">
-                        <th class="bg-transparent">ID</th>
-                        <th class="bg-transparent">Script</th>
-                        <th class="bg-transparent">Status</th>
-                        <th class="bg-transparent">Started</th>
-                        <th class="bg-transparent">Duration</th>
-                        <th class="bg-transparent">Exit Code</th>
-                        <th class="bg-transparent">Triggered By</th>
-                        <th class="bg-transparent">Actions</th>
+                        <th class="bg-transparent">{{ t("ID") }}</th>
+                        <th class="bg-transparent">{{ t("Script") }}</th>
+                        <th class="bg-transparent">{{ t("Status") }}</th>
+                        <th class="bg-transparent">{{ t("Started") }}</th>
+                        <th class="bg-transparent">{{ t("Duration") }}</th>
+                        <th class="bg-transparent">{{ t("Exit Code") }}</th>
+                        <th class="bg-transparent">{{ t("Triggered By") }}</th>
+                        <th class="bg-transparent">{{ t("Actions") }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -93,7 +93,7 @@ function removeEmptyParams(event) {
                                 {{ exec.status }}
                             </span>
                         </td>
-                        <td>{{ exec.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>{{ exec.started_at|dt }}</td>
                         <td>{{ exec.duration_formatted }}</td>
                         <td>
                             {% if exec.exit_code is not none %}
@@ -107,30 +107,30 @@ function removeEmptyParams(event) {
                         </td>
                         <td>
                             <div class="flex items-center gap-2">
-                                <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">View Logs</a>
+                                <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">{{ t("View Logs") }}</a>
                                 {% if is_admin and exec.status == 'running' %}
                                 <button type="button"
                                         class="btn btn-error btn-xs"
                                         onclick="cancelExecution({{ exec.id }}, this)"
-                                        title="Cancel this running execution">
-                                    {{ icons.x_mark("w-3 h-3") }} Cancel
+                                        title="{{ t('Cancel this running execution') }}">
+                                    {{ icons.x_mark("w-3 h-3") }} {{ t("Cancel") }}
                                 </button>
                                 {% endif %}
                                 {% if exec.artifacts_count > 0 %}
-                                <span class="badge badge-sm gap-1 flex items-center" title="{{ exec.artifacts_count }} artifact(s)">
+                                <span class="badge badge-sm gap-1 flex items-center" title="{{ t('{count} artifact(s)', count=exec.artifacts_count) }}">
                                     {{ icons.archive_box("w-3 h-3") }} {{ exec.artifacts_count }}
                                 </span>
                                 {% endif %}
                                 {% if is_admin and exec.status != 'running' %}
                                 <form method="POST" action="/executions/{{ exec.id }}/rerun" class="inline-block">
                                     <button type="submit" class="btn btn-ghost btn-xs"
-                                            title="Run again — lands on the new execution page">
-                                        Rerun
+                                            title="{{ t('Run again — lands on the new execution page') }}">
+                                        {{ t("Rerun") }}
                                     </button>
                                 </form>
                                 {% endif %}
                                 <a href="/executions?script_id={{ exec.script_id }}" class="btn btn-ghost btn-xs"
-                                   title="All runs of this script">History</a>
+                                   title="{{ t('All runs of this script') }}">{{ t("History") }}</a>
                             </div>
                         </td>
                     </tr>
@@ -175,8 +175,8 @@ function removeEmptyParams(event) {
         {% else %}
         <div class="p-12 text-center">
             {{ icons.inbox("w-20 h-20 mb-4 opacity-50 mx-auto") }}
-            <h3 class="text-xl font-medium text-base-content/70 mb-2">No executions found</h3>
-            <p class="text-base-content/70">{% if filters.script_id or filters.status %}Try adjusting your filters{% else %}Run a script to see execution history{% endif %}</p>
+            <h3 class="text-xl font-medium text-base-content/70 mb-2">{{ t("No executions found") }}</h3>
+            <p class="text-base-content/70">{% if filters.script_id or filters.status %}{{ t("Try adjusting your filters") }}{% else %}{{ t("Run a script to see execution history") }}{% endif %}</p>
         </div>
         {% endif %}
     </div>

@@ -11,6 +11,8 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
+from app.services.i18n import current_locale, translate
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -18,6 +20,10 @@ def _render(script: dict | None) -> str:
     """Render script_editor.html exactly like the page routes do."""
     env = Environment(loader=FileSystemLoader(REPO_ROOT / "app" / "templates"))
     env.filters.setdefault("filesizeformat", lambda v: v)
+    # The real app env carries these globals; a bare Environment does not,
+    # and every page now calls t()/lang() for the stored locale.
+    env.globals["t"] = lambda text, **kwargs: translate(text, current_locale(), **kwargs)
+    env.globals["lang"] = current_locale
     template = env.get_template("script_editor.html")
     return template.render(
         request=None,
@@ -46,6 +52,5 @@ def test_editor_lazy_loader_fetches_right_endpoint():
         "scripts prefix, not /api/templates)"
     )
     assert "/api/templates'" not in html, (
-        "lazy loader hits a dead URL: /api/templates 404s (the endpoint is "
-        "/api/scripts/templates)"
+        "lazy loader hits a dead URL: /api/templates 404s (the endpoint is /api/scripts/templates)"
     )

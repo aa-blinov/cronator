@@ -5,12 +5,43 @@ from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import select
 
 from app.database import async_session_maker
 from app.models.script import Script
 
 logger = logging.getLogger(__name__)
+
+
+def parse_cron_expression(cron_expression: str) -> CronTrigger | None:
+    """Parse a five-field cron expression into an APScheduler trigger.
+
+    Module-level on purpose: the missed-run detector recomputes expected fire
+    times from the same expressions the scheduler dispatches, and the two
+    must never disagree about what an expression means.
+    """
+    parts = cron_expression.strip().split()
+    if len(parts) != 5:
+        return None
+
+    minute, hour, day, month, day_of_week = parts
+    try:
+        # timezone="UTC" is explicit on purpose: CronTrigger otherwise
+        # resolves the *host's* local timezone, and the documented contract
+        # ("evaluated in UTC") must hold on a dev Windows box too, not just
+        # in the container where TZ=UTC makes the two coincide.
+        return CronTrigger(
+            minute=minute,
+            hour=hour,
+            day=day,
+            month=month,
+            day_of_week=day_of_week,
+            timezone="UTC",
+        )
+    except Exception as e:
+        logger.error(f"Error parsing cron expression '{cron_expression}': {e}")
+        return None
 
 
 class SchedulerService:
@@ -110,23 +141,7 @@ class SchedulerService:
 
     def _parse_cron(self, cron_expression: str) -> CronTrigger | None:
         """Parse a cron expression into a trigger."""
-        try:
-            parts = cron_expression.strip().split()
-            if len(parts) != 5:
-                return None
-
-            minute, hour, day, month, day_of_week = parts
-
-            return CronTrigger(
-                minute=minute,
-                hour=hour,
-                day=day,
-                month=month,
-                day_of_week=day_of_week,
-            )
-        except Exception as e:
-            logger.error(f"Error parsing cron expression '{cron_expression}': {e}")
-            return None
+        return parse_cron_expression(cron_expression)
 
     def _register_internal_jobs(self) -> None:
         """Register built-in system jobs (cleanup, etc.)."""
@@ -142,6 +157,26 @@ class SchedulerService:
             trigger=CronTrigger(hour=2, minute=0, timezone="UTC"),
             id="internal_auto_backup",
             name="Automated Database Backup",
+            replace_existing=True,
+        )
+        # A cron moment lost to downtime leaves no row by itself; the sweep
+        # recomputes expected fires from the expressions and records the
+        # gap. Frequent on purpose: a missed schedule is only actionable
+        # while the operator still remembers what happened around it.
+        self.scheduler.add_job(
+            self._run_missed_detection,
+            trigger=IntervalTrigger(minutes=5, timezone="UTC"),
+            id="internal_missed_runs",
+            name="Missed Schedule Detection",
+            replace_existing=True,
+        )
+        # The startup cleanup covers rows stranded by a restart; this one
+        # covers the same anomaly while the process stays up.
+        self.scheduler.add_job(
+            self._run_stale_sweep,
+            trigger=IntervalTrigger(minutes=15, timezone="UTC"),
+            id="internal_stale_execution_sweep",
+            name="Stale RUNNING Execution Sweep",
             replace_existing=True,
         )
 
@@ -179,6 +214,28 @@ class SchedulerService:
             logger.info(f"Automated backup created: {path}")
         except Exception:
             logger.exception("Error during scheduled automated backup")
+
+    async def _run_missed_detection(self) -> None:
+        """Record executions for cron moments that fired nothing."""
+        from app.services.missed_runs import detect_missed_runs
+
+        try:
+            await detect_missed_runs()
+        except Exception:
+            # A detector that takes the scheduler down would be worse than
+            # the gap it is trying to measure.
+            logger.exception("Error during missed-run detection")
+
+    async def _run_stale_sweep(self) -> None:
+        """Fail RUNNING rows whose live process is long gone."""
+        from app.services.executor import executor_service
+
+        try:
+            marked = await executor_service.sweep_stale_running_executions()
+            if marked:
+                logger.warning("Stale-execution sweep marked %d row(s) failed", marked)
+        except Exception:
+            logger.exception("Error during stale execution sweep")
 
     async def _execute_script(self, script_id: int) -> None:
         """Execute a script (called by scheduler)."""

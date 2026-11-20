@@ -139,9 +139,13 @@ the same view of the filesystem.
 | `settings` | The settings that can be changed at runtime: SMTP, the webhook URL, the theme and the locale. |
 | `users` | The accounts, with the roles the API checks. |
 | `user_audit_log` | The history of the changes made to the accounts. |
+| `auth_sessions` | Server-side login sessions, stored as SHA-256 hashes. |
+| `api_tokens` | API tokens, likewise hash-only, with revocation timestamps. |
 
 Every datetime column is timezone-aware and the code works in UTC
-throughout. A stateless test asserts that every `DateTime` column in the
+throughout. `environment_vars` is encrypted at rest through an
+`EncryptedText` column type; the API and the executor see plaintext, and a
+database dump does not. A stateless test asserts that every `DateTime` column in the
 model metadata declares `timezone=True`, so a column that drifts from the
 PostgreSQL `TIMESTAMPTZ` cannot be added without the test failing.
 
@@ -152,11 +156,15 @@ PostgreSQL `TIMESTAMPTZ` cannot be added without the test failing.
 | A script run | On the cron schedule, on demand, or on a retry | `scheduler_service` into `executor_service` |
 | The cleanup of the execution history | Every day at 03:00 UTC | `scheduler_service._run_cleanup` into `cleanup_service` |
 | The cleanup of the stale executions | Once, at the start of the process | `executor_service.cleanup_stale_executions()` in the lifespan |
+| The in-uptime stale-execution sweep | Every 15 minutes | `scheduler_service._run_stale_sweep` |
+| Missed-schedule detection | Every 5 minutes, once at startup | `scheduler_service._run_missed_detection` into `missed_runs.detect_missed_runs` |
 | The database backup | Every day at 02:00, on the clock of the host | The `db-backup` service in `docker-compose.yml` |
 
-The cleanup of the stale executions runs only at the start, and not on a
-schedule. An execution that gets stuck at running because of a failure in
-the middle of a run stays stuck until the next restart.
+The startup cleanup covers rows stranded by a restart; the periodic sweep
+covers the in-uptime anomaly. The missed-run detector recomputes expected
+cron fires from the same expressions the scheduler uses and records fires
+with no execution row as `missed`. Its cursor is a setting, so the first
+sweep after a restart sees the whole downtime window.
 
 ## Decisions worth knowing about
 
@@ -177,6 +185,14 @@ Only `PATH`, `HOME`, `LANG`, `TZ`, the Oracle client variables, the
 passed on. Nothing from the environment of the application reaches a
 script, so a credential that the application holds cannot leak into a
 script that prints its own environment.
+
+When `sandbox_enabled` is on, the subprocess also gets a `preexec_fn`
+that calls `landlock_restrict_self` after fork and before exec
+(`app/sandbox.py`). The rules are filesystem-only and are irreversible for
+that child; setup failure exits the child with 127 and the error reaches
+the execution's stderr. On hosts without Landlock the child is launched
+unrestricted, with an ERROR in the log and a warning line at the top of
+that run's stderr.
 
 ### The failure path rolls the session back first
 

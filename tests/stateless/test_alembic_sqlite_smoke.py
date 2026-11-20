@@ -34,7 +34,9 @@ def test_alembic_upgrade_head_on_fresh_sqlite(tmp_path):
         env=env,
         cwd=str(REPO_ROOT),
     )
-    assert result.returncode == 0, f"alembic failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    assert result.returncode == 0, (
+        f"alembic failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
 
     # The schema must actually be at head, with all tables present.
     import sqlite3
@@ -43,9 +45,7 @@ def test_alembic_upgrade_head_on_fresh_sqlite(tmp_path):
     try:
         tables = {
             row[0]
-            for row in conn.execute(
-                "select name from sqlite_master where type='table'"
-            ).fetchall()
+            for row in conn.execute("select name from sqlite_master where type='table'").fetchall()
         }
         version = conn.execute("select version_num from alembic_version").fetchone()[0]
     finally:
@@ -61,10 +61,12 @@ def test_alembic_upgrade_head_on_fresh_sqlite(tmp_path):
         "users",
         "script_audit_log",
         "user_audit_log",
+        "auth_sessions",
+        "api_tokens",
     }
     missing = expected - tables
     assert not missing, f"tables missing after upgrade head: {missing}"
-    assert version == "l4m5n6o7p8q9", f"schema not at head, got: {version}"
+    assert version == "n7o8p9q0r1s2", f"schema not at head, got: {version}"
 
 
 def test_downgrade_base_and_reupgrade_roundtrip(tmp_path):

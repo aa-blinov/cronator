@@ -5,7 +5,7 @@
 {% if is_admin %}
 <div class="flex items-center gap-2">
     <a href="/scripts/new" class="btn btn-primary btn-sm gap-2">
-        {{ icons.sparkles("w-4 h-4") }} New Script
+        {{ icons.sparkles("w-4 h-4") }} {{ t("New Script") }}
     </a>
 </div>
 {% endif %}
@@ -20,7 +20,7 @@
                 type="search"
                 name="search"
                 value="{{ filters.search or '' }}"
-                placeholder="Search name / description / cron / content…"
+                placeholder="{{ t('Search name / description / cron / content…') }}"
                 class="input input-bordered input-sm w-full"
                 autocomplete="off"
                 data-testid="scripts-search-input"
@@ -29,14 +29,14 @@
 
         <div class="form-control">
             <select name="status" class="select select-bordered select-sm">
-                <option value="">All Statuses</option>
-                <option value="enabled" {% if filters.status == 'enabled' %}selected{% endif %}>Enabled</option>
-                <option value="disabled" {% if filters.status == 'disabled' %}selected{% endif %}>Disabled</option>
+                <option value="">{{ t("All Statuses") }}</option>
+                <option value="enabled" {% if filters.status == 'enabled' %}selected{% endif %}>{{ t("Enabled") }}</option>
+                <option value="disabled" {% if filters.status == 'disabled' %}selected{% endif %}>{{ t("Disabled") }}</option>
             </select>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
-        <a href="/scripts" class="btn btn-ghost btn-sm">Reset</a>
+        <button type="submit" class="btn btn-primary btn-sm">{{ t("Filter") }}</button>
+        <a href="/scripts" class="btn btn-ghost btn-sm">{{ t("Reset") }}</a>
     </form>
 </div>
 
@@ -46,24 +46,24 @@
      data-testid="bulk-toolbar"
      class="hidden glass-card rounded-xl p-3 mb-4 flex items-center gap-3 border border-primary/40">
     <span class="text-sm font-semibold">
-        <span data-testid="bulk-selected-count">0</span> selected
+        <span data-testid="bulk-selected-count">0</span> {{ t("selected") }}
     </span>
     <button class="btn btn-sm btn-primary" data-testid="bulk-enable"
-            onclick="bulkAction('enable', this)">Enable</button>
+            onclick="bulkAction('enable', this)">{{ t("Enable") }}</button>
     <button class="btn btn-sm btn-warning" data-testid="bulk-disable"
-            onclick="bulkAction('disable', this)">Disable</button>
+            onclick="bulkAction('disable', this)">{{ t("Disable") }}</button>
     <button class="btn btn-sm btn-error" data-testid="bulk-delete"
-            onclick="bulkAction('delete', this)">Delete</button>
-    <button class="btn btn-sm btn-ghost ml-auto" onclick="clearSelection()">Clear</button>
+            onclick="bulkAction('delete', this)">{{ t("Delete") }}</button>
+    <button class="btn btn-sm btn-ghost ml-auto" onclick="clearSelection()">{{ t("Clear") }}</button>
 </div>
 {% endif %}
 
 <!-- Scripts table -->
 <div class="glass-card rounded-xl overflow-hidden">
     <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Scripts</h3>
+        <h3 class="text-lg font-semibold">{{ t("Scripts") }}</h3>
         <p class="text-sm text-base-content/70">
-            {{ pagination.total }} script(s) total
+            {{ t("{count} script(s) total", count=pagination.total) }}
         </p>
     </div>
 
@@ -79,15 +79,15 @@
                             class="checkbox checkbox-sm"
                             data-testid="select-all"
                             onchange="toggleAll(this)"
-                            aria-label="Select all scripts"
+                            aria-label="{{ t('Select all scripts') }}"
                         />
                     </th>
                     {% endif %}
-                    <th class="bg-transparent">Name</th>
-                    <th class="bg-transparent">Schedule</th>
-                    <th class="bg-transparent">Status</th>
-                    <th class="bg-transparent">Last Run</th>
-                    <th class="bg-transparent">Actions</th>
+                    <th class="bg-transparent">{{ t("Name") }}</th>
+                    <th class="bg-transparent">{{ t("Schedule") }}</th>
+                    <th class="bg-transparent">{{ t("Status") }}</th>
+                    <th class="bg-transparent">{{ t("Last Run") }}</th>
+                    <th class="bg-transparent">{{ t("Actions") }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -124,29 +124,29 @@
                         {% if script.last_failure_at and (not script.last_success_at or script.last_failure_at > script.last_success_at) %}
                         <a href="/executions?script_id={{ script.id }}"
                            class="text-xs text-error hover:underline"
-                           title="Last run failed — click for all runs of this script">{{ script.last_failure_at.strftime('%Y-%m-%d %H:%M') }}</a>
+                           title="{{ t('Last run failed — click for all runs of this script') }}">{{ script.last_failure_at|dt('%Y-%m-%d %H:%M') }}</a>
                         {% elif script.last_success_at %}
                         <a href="/executions?script_id={{ script.id }}"
                            class="text-xs hover:underline"
-                           title="Click for all runs of this script">{{ script.last_success_at.strftime('%Y-%m-%d %H:%M') }}</a>
+                           title="{{ t('Click for all runs of this script') }}">{{ script.last_success_at|dt('%Y-%m-%d %H:%M') }}</a>
                         {% else %}
                         <span class="text-xs text-base-content/40">—</span>
                         {% endif %}
                     </td>
                     <td>
-                        <a href="/scripts/{{ script.id }}" class="btn btn-xs btn-ghost">View</a>
+                        <a href="/scripts/{{ script.id }}" class="btn btn-xs btn-ghost">{{ t("View") }}</a>
                         {% if is_admin %}
                         <form method="POST" action="/scripts/{{ script.id }}/run" class="inline-block">
                             <button type="submit" class="btn btn-xs btn-ghost btn-success"
-                                    title="Run now — one click, lands on the execution page">
-                                Run
+                                    title="{{ t('Run now — one click, lands on the execution page') }}">
+                                {{ t("Run") }}
                             </button>
                         </form>
                         <form method="POST" action="/scripts/{{ script.id }}/toggle" class="inline-block">
                             <input type="hidden" name="next" value="/scripts" />
                             <button type="submit" class="btn btn-xs btn-ghost"
-                                    title="{% if script.enabled %}Disable{% else %}Enable{% endif %} — stays on this list">
-                                {% if script.enabled %}Disable{% else %}Enable{% endif %}
+                                    title="{{ t('{action} — stays on this list', action=(t('Disable') if script.enabled else t('Enable'))) }}">
+                                {% if script.enabled %}{{ t("Disable") }}{% else %}{{ t("Enable") }}{% endif %}
                             </button>
                         </form>
                         {% endif %}
@@ -190,10 +190,10 @@
     {% else %}
     <div class="p-12 text-center">
         <p class="text-base-content/70 mb-2">
-            {% if filters.search or filters.status %}No scripts match your filters{% else %}No scripts yet{% endif %}
+            {% if filters.search or filters.status %}{{ t("No scripts match your filters") }}{% else %}{{ t("No scripts yet") }}{% endif %}
         </p>
         {% if is_admin %}
-        <a href="/scripts/new" class="btn btn-primary btn-sm mt-3">Create your first script</a>
+        <a href="/scripts/new" class="btn btn-primary btn-sm mt-3">{{ t("Create your first script") }}</a>
         {% endif %}
     </div>
     {% endif %}

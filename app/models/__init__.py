@@ -1,5 +1,6 @@
 """Database models package."""
 
+from app.models.api_token import ApiToken
 from app.models.artifact import Artifact
 from app.models.audit_log import ScriptAuditLog
 from app.models.auth_session import AuthSession
@@ -20,4 +21,5 @@ __all__ = [
     "AuthSession",
     "User",
     "UserAuditLog",
+    "ApiToken",
 ]

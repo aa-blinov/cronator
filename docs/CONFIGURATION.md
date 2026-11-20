@@ -92,6 +92,18 @@ access lines never reached `cronator.log` or the JSON format regardless of
 | -------------------------- | ------- | --------- |
 | `BACKUP_RETENTION_DAYS`   | `7`     | The `db-backup` service's cleanup loop (`find ... -mtime +N -delete`) — this is a shell script, not app code, so changing it doesn't need a restart of `cronator` itself |
 
+### Database-backed display and scheduling settings
+
+No restart required; set these in Settings or via `POST /api/settings/update`:
+
+| Key | Default | What it does |
+| --- | ------- | ------------ |
+| `display_timezone` | `UTC` | IANA zone for rendering timestamps in HTML. Storage and cron stay UTC. An unknown name falls back to UTC. |
+| `max_concurrent_executions` | `0` | Cap on simultaneous scheduled runs (0 = unlimited). Fires over the cap are recorded as `skipped`. Manual/test runs are not capped. |
+| `sandbox_enabled` | `false` | Landlock filesystem sandbox for script subprocesses. If the host lacks Landlock, scripts still run and the run's stderr carries a warning. |
+| `sandbox_extra_paths` | `[]` | JSON array of additional absolute directories the sandboxed child may write to. |
+| `EXECUTION_RETENTION_MISSED` | `100` | Count of `missed` executions kept per script (env override, like the other retention values). |
+
 ## Precedence
 
 Two independent layers exist, and they resolve differently:

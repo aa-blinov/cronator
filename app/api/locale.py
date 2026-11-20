@@ -1,9 +1,10 @@
 """i18n / locale endpoints for F15.
 
 Locale preference is stored in the settings DB so it persists across
-restarts. The Jinja templates don't have full i18n wired up yet — that
-needs a base.html refactor with a translation function. For now we expose
-a minimal API surface that the UI can use to switch language.
+restarts. The Jinja templates translate through the `t()` global (see
+app/services/i18n.py and app/translations/), so setting a locale here
+changes the words on every server-rendered page. Strings the browser
+composes in JavaScript (toasts, console markers) remain English for now.
 """
 
 from __future__ import annotations

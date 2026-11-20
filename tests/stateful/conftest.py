@@ -127,9 +127,11 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
     import app.api.settings
     import app.database
     import app.main
+    import app.services.api_token_service
     import app.services.backup_service
     import app.services.cleanup_service
     import app.services.executor
+    import app.services.missed_runs
     import app.services.scheduler
     import app.services.settings_service
     import app.services.user_service
@@ -137,9 +139,11 @@ async def test_client(test_engine, db_session, monkeypatch) -> AsyncGenerator[As
     modules_to_patch = [
         app.database,
         app.main,
+        app.services.api_token_service,
         app.services.backup_service,
         app.services.cleanup_service,
         app.services.executor,
+        app.services.missed_runs,
         app.services.scheduler,
         app.services.settings_service,
         app.services.user_service,

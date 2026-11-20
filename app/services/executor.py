@@ -10,6 +10,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.config import get_settings
 from app.database import async_session_maker
@@ -19,6 +20,14 @@ from app.models.script import Script
 from app.services.environment import environment_service
 
 logger = logging.getLogger(__name__)
+
+# Kept in one place so the log line and the run's stderr marker cannot
+# drift apart. The marker makes an unsandboxed run visible in the UI and
+# in the SSE replay, not just in server logs.
+SANDBOX_FALLBACK_WARNING = (
+    "WARNING: Landlock is unavailable on this host — this script "
+    "is running WITHOUT a filesystem sandbox.\n"
+)
 settings = get_settings()
 
 
@@ -241,6 +250,59 @@ class ExecutorService:
                 await low_space_db.refresh(failed)
                 return failed.id
 
+        # Optional filesystem sandbox. Landlock is best-effort by operator
+        # choice: when it is unavailable the script still runs, but the
+        # omission is loud — an ERROR in the log and a warning line at the
+        # top of this run's stderr, visible in the UI and the SSE replay.
+        from app.sandbox import landlock_abi_version
+        from app.services.settings_service import settings_service
+
+        sandbox_requested = bool(await settings_service.get("sandbox_enabled", False))
+        if sandbox_requested and landlock_abi_version() is None:
+            logger.error(
+                "Landlock sandbox unavailable for script %s — running it WITHOUT "
+                "a filesystem sandbox (sandbox_enabled is on)",
+                script_id,
+            )
+
+        # A global cap on simultaneous runs. Scripts scheduled at the same
+        # cron minute all fire together, and on a small host that is a
+        # self-inflicted thundering herd with no backstop. The cap is a
+        # soft limit — the check sits outside the script lock, so two
+        # fires in the same tick can both pass — it exists to shed load,
+        # not to give exact guarantees. Only scheduled fires are capped: a
+        # manual or test run is a deliberate operator action.
+        max_concurrent = await settings_service.get("max_concurrent_executions", 0)
+        if (
+            isinstance(max_concurrent, int)
+            and max_concurrent > 0
+            and triggered_by == "scheduler"
+            and len(self._running_scripts) >= max_concurrent
+        ):
+            logger.warning(
+                f"Refusing scheduled run of script {script_id}: "
+                f"{len(self._running_scripts)} executions already running, "
+                f"max_concurrent_executions={max_concurrent}"
+            )
+            async with async_session_maker() as busy_db:
+                refused = Execution(
+                    script_id=script_id,
+                    status=ExecutionStatus.SKIPPED.value,
+                    triggered_by=triggered_by,
+                    started_at=datetime.now(UTC),
+                    finished_at=datetime.now(UTC),
+                    duration_ms=0,
+                    stdout=(
+                        f"Skipped: {len(self._running_scripts)} executions already "
+                        f"running, max_concurrent_executions={max_concurrent}"
+                    ),
+                    attempt=attempt,
+                )
+                busy_db.add(refused)
+                await busy_db.commit()
+                await busy_db.refresh(refused)
+                return refused.id
+
         # Acquire lock to prevent race condition
         lock = self._get_script_lock(script_id)
         async with lock:
@@ -355,6 +417,11 @@ class ExecutorService:
         first_attempt_at: datetime | None = None,
     ) -> None:
         """Actually run the script (called in background)."""
+        from app.sandbox import landlock_abi_version
+        from app.services.settings_service import settings_service
+
+        sandbox_requested = bool(await settings_service.get("sandbox_enabled", False))
+        sandbox_fallback = sandbox_requested and landlock_abi_version() is None
         async with async_session_maker() as db:
             try:
                 # Get script and execution
@@ -479,6 +546,75 @@ class ExecutorService:
                 else:
                     cwd = script_path.parent
 
+                # Landlock rules are applied in the child between fork and
+                # exec. Read paths cover the interpreter, stdlib, venv,
+                # cronator_lib and the script's own source; write paths are
+                # deliberately small: this run's artifacts dir, the script's
+                # own directory, /tmp and operator-configured extras.
+                preexec_fn = None
+                if sandbox_requested:
+                    from app.sandbox import make_preexec
+
+                    raw_extra = await settings_service.get("sandbox_extra_paths", "[]")
+                    if isinstance(raw_extra, list):
+                        extra_paths = raw_extra
+                    else:
+                        try:
+                            extra_paths = json.loads(raw_extra or "[]")
+                        except json.JSONDecodeError:
+                            extra_paths = []
+                    if not isinstance(extra_paths, list):
+                        extra_paths = []
+
+                    # A private TMPDIR instead of the shared /tmp: the
+                    # sandbox rules below grant access only to this run's
+                    # directory, so temp files of the app or other scripts
+                    # are not readable from inside the sandbox.
+                    sandbox_tmp = settings.data_dir / "sandbox_tmp" / str(execution_id)
+                    try:
+                        sandbox_tmp.mkdir(parents=True, exist_ok=True)
+                    except (PermissionError, OSError) as exc:
+                        logger.warning("Could not create sandbox TMPDIR %s: %s", sandbox_tmp, exc)
+                    env["TMPDIR"] = str(sandbox_tmp)
+
+                    script_dir = settings.scripts_dir / script.name
+                    venv_dir = settings.envs_dir / script.name
+                    read_paths = [
+                        str(settings.base_dir),
+                        str(settings.scripts_dir),
+                        str(script_dir),
+                        str(settings.envs_dir),
+                        str(venv_dir),
+                        str(settings.data_dir),
+                        str(settings.logs_dir),
+                        "/usr",
+                        "/lib",
+                        "/lib64",
+                        "/bin",
+                        "/sbin",
+                        "/etc",
+                        "/opt",
+                        "/dev",
+                        "/proc",
+                        "/sys",
+                        str(sandbox_tmp),
+                    ]
+                    write_paths = [
+                        str(script_dir),
+                        str(venv_dir),
+                    ]
+                    if execution_artifacts_dir:
+                        write_paths.append(str(execution_artifacts_dir))
+                    write_paths.append(str(sandbox_tmp))
+                    if script.working_directory:
+                        write_paths.append(str(cwd))
+                    write_paths.extend(p for p in extra_paths if isinstance(p, str) and p)
+
+                    preexec_fn = make_preexec(read_paths, write_paths)
+                    # Bytecode writes in the read-only app tree are pointless
+                    # for a sandboxed run and would otherwise be denied.
+                    env["PYTHONDONTWRITEBYTECODE"] = "1"
+
                 # Run the script
                 logger.info(f"Executing script {script.name} (execution_id={execution_id})")
                 logger.info(f"Python path: {python_path} (exists: {python_path.exists()})")
@@ -496,6 +632,7 @@ class ExecutorService:
                         stderr=asyncio.subprocess.PIPE,
                         cwd=str(cwd),
                         env=env,
+                        preexec_fn=preexec_fn,
                     )
 
                     self.running_processes[execution_id] = process
@@ -503,13 +640,16 @@ class ExecutorService:
                     # Collect output and keep a replayable stream buffer in memory.
                     stdout_lines = []
                     stderr_lines = []
+                    warning = SANDBOX_FALLBACK_WARNING if sandbox_fallback else ""
+                    if warning:
+                        stderr_lines.append(warning)
                     self.live_output_buffers[execution_id] = {
                         "stdout": stdout_lines,
                         "stderr": stderr_lines,
                     }
                     self.live_output_char_counts[execution_id] = {
                         "stdout": 0,
-                        "stderr": 0,
+                        "stderr": len(warning),
                     }
                     artifacts_metadata = []  # Track artifacts created during execution
 
@@ -979,6 +1119,7 @@ class ExecutorService:
                         return
 
                 await alerting_service.send_failure_alert(script, execution)
+                self._record_delivery_errors(script, alerting_service)
                 script.last_failure_alert_at = now
                 script.last_alert_at = now
                 await db.commit()
@@ -993,8 +1134,27 @@ class ExecutorService:
 
             if script and script.alert_on_success:
                 await alerting_service.send_success_alert(script, execution)
+                self._record_delivery_errors(script, alerting_service)
                 script.last_alert_at = datetime.now(UTC)
                 await db.commit()
+
+    def _record_delivery_errors(self, script: Script, alerting_service) -> None:
+        """Persist the last alert delivery attempt's errors on the script.
+
+        A failure to *deliver* (expired SMTP password, webhook answering
+        500) used to live only in the application log; the operator found
+        out when nothing arrived. No errors recorded means the attempt
+        either succeeded or nothing was configured — in both cases a stale
+        error from an earlier attempt would mislead, so it is cleared.
+        """
+        errors = alerting_service.take_delivery_errors()
+        if errors:
+            script.last_alert_error = "; ".join(errors)[:500]
+            script.last_alert_error_at = datetime.now(UTC)
+            logger.error("Alert delivery failed for %s: %s", script.name, script.last_alert_error)
+        else:
+            script.last_alert_error = None
+            script.last_alert_error_at = None
 
     async def _send_manual_alert(self, execution_id: int, title: str, message: str) -> None:
         """Send a manual alert triggered by notify() in a script."""
@@ -1104,6 +1264,61 @@ class ExecutorService:
                 execution.error_message = "Execution interrupted by service restart"
 
             await db.commit()
+
+    async def sweep_stale_running_executions(self) -> int:
+        """Mark executions stuck at RUNNING while the process is alive.
+
+        cleanup_stale_executions runs once at startup and covers the
+        restart case; this sweep covers the in-uptime anomaly — a row
+        whose process died without the executor's knowledge (a task lost
+        to an unhandled error path). A row is only touched when BOTH
+        registries say nothing is actually running for it, and only once
+        it outlived its script's own timeout plus a buffer, so a
+        legitimately long run is never mistaken for a lost one.
+
+        Returns the number of rows marked failed.
+        """
+        now = datetime.now(UTC)
+        marked = 0
+        async with async_session_maker() as db:
+            result = await db.execute(
+                select(Execution)
+                .where(Execution.status == ExecutionStatus.RUNNING.value)
+                .options(joinedload(Execution.script))
+            )
+            running_rows = result.scalars().all()
+
+            for execution in running_rows:
+                if execution.id in self.running_processes:
+                    continue
+                if execution.script_id in self._running_scripts:
+                    continue
+
+                started = execution.started_at
+                if started.tzinfo is None:
+                    started = started.replace(tzinfo=UTC)
+                timeout = execution.script.timeout if execution.script else 3600
+                if (now - started).total_seconds() <= timeout + 300:
+                    continue
+
+                execution.status = ExecutionStatus.FAILED.value
+                execution.finished_at = now
+                execution.error_message = (
+                    "Execution lost: no live process, but the row stayed RUNNING past its timeout"
+                )
+                execution.duration_ms = int((now - started).total_seconds() * 1000)
+                marked += 1
+                logger.error(
+                    "Swept stale RUNNING execution %s (script %s, started %s)",
+                    execution.id,
+                    execution.script_id,
+                    started.isoformat(),
+                )
+
+            if marked:
+                await db.commit()
+
+        return marked
 
 
 # Global instance

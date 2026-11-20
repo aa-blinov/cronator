@@ -1,10 +1,11 @@
 """API routes for settings."""
 
+import json
 import shutil
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 
 from app.api.dependencies import require_admin
@@ -52,6 +53,19 @@ class SettingsResponse(BaseModel):
     script_git_remote: str = ""
     script_git_repo_dir: str = ""
 
+    # Rendering zone for the HTML pages. Storage and the scheduler stay
+    # UTC — this only changes what the operator reads.
+    display_timezone: str = "UTC"
+
+    # Concurrency cap. 0 means unlimited. An upper bound stops a typo from
+    # silently throttling every scheduled run to a single slot.
+    max_concurrent_executions: int = 0
+
+    # Optional Landlock filesystem sandbox. Off by default because scripts
+    # that write outside their own directory need an explicit allowlist.
+    sandbox_enabled: bool = False
+    sandbox_extra_paths: str = "[]"
+
 
 class SchedulerStatus(BaseModel):
     """Scheduler status."""
@@ -77,6 +91,14 @@ async def get_settings_info() -> SettingsResponse:
     script_git_remote = await settings_service.get("script_git_remote", "")
     script_git_repo_dir = await settings_service.get("script_git_repo_dir", "")
     auto_backup_enabled = await settings_service.get("auto_backup_enabled", False)
+    display_timezone = await settings_service.get("display_timezone", "UTC")
+    max_concurrent = await settings_service.get("max_concurrent_executions", 0)
+    sandbox_enabled = await settings_service.get("sandbox_enabled", False)
+    sandbox_extra_paths = await settings_service.get("sandbox_extra_paths", "[]")
+    # The settings cache parses JSON strings into lists; the response and
+    # the textarea both want the original JSON text.
+    if not isinstance(sandbox_extra_paths, str):
+        sandbox_extra_paths = json.dumps(sandbox_extra_paths)
 
     return SettingsResponse(
         app_name=settings.app_name,
@@ -94,6 +116,10 @@ async def get_settings_info() -> SettingsResponse:
         script_git_remote=script_git_remote,
         script_git_repo_dir=script_git_repo_dir,
         auto_backup_enabled=auto_backup_enabled,
+        display_timezone=display_timezone,
+        max_concurrent_executions=max_concurrent,
+        sandbox_enabled=sandbox_enabled,
+        sandbox_extra_paths=sandbox_extra_paths,
     )
 
 
@@ -190,6 +216,52 @@ class UpdateSettingsRequest(BaseModel):
     script_git_remote: str | None = None
     script_git_repo_dir: str | None = None
 
+    # Rendering zone for the HTML pages (storage and the scheduler stay
+    # UTC). "UTC" is the default; anything else must be an IANA name the
+    # runtime actually knows.
+    display_timezone: str | None = Field(default=None, max_length=64)
+
+    # 0 = unlimited. An upper bound stops a typo from silently throttling
+    # every scheduled run to a single slot.
+    max_concurrent_executions: int | None = Field(default=None, ge=0, le=100)
+
+    # Optional Landlock sandbox. Extra writable paths are a JSON array of
+    # absolute directories; anything else is rejected instead of silently
+    # granting a wrong path.
+    sandbox_enabled: bool | None = None
+    sandbox_extra_paths: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("sandbox_extra_paths")
+    @classmethod
+    def validate_sandbox_extra_paths(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            parsed = json.loads(v or "[]")
+        except json.JSONDecodeError:
+            raise ValueError("sandbox_extra_paths must be a JSON array of paths")
+        if not isinstance(parsed, list) or not all(
+            isinstance(item, str) and item.startswith("/") for item in parsed
+        ):
+            raise ValueError("sandbox_extra_paths must be absolute paths in a JSON array")
+        return v
+
+    @field_validator("display_timezone")
+    @classmethod
+    def validate_display_timezone(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            return "UTC"
+        from zoneinfo import ZoneInfo
+
+        try:
+            ZoneInfo(v)
+        except Exception:
+            raise ValueError(f"Unknown timezone: {v}")
+        return v
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -239,6 +311,14 @@ async def update_settings(request: UpdateSettingsRequest, username: str = Depend
         updates["script_git_remote"] = request.script_git_remote.strip()
     if request.script_git_repo_dir is not None:
         updates["script_git_repo_dir"] = request.script_git_repo_dir.strip()
+    if request.display_timezone is not None:
+        updates["display_timezone"] = request.display_timezone
+    if request.max_concurrent_executions is not None:
+        updates["max_concurrent_executions"] = request.max_concurrent_executions
+    if request.sandbox_enabled is not None:
+        updates["sandbox_enabled"] = request.sandbox_enabled
+    if request.sandbox_extra_paths is not None:
+        updates["sandbox_extra_paths"] = request.sandbox_extra_paths
 
     # Save to database
     await settings_service.bulk_set(updates)

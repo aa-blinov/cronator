@@ -7,6 +7,7 @@ from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.types import EncryptedText
 
 if TYPE_CHECKING:
     from app.models.script import Script
@@ -39,7 +40,8 @@ class ScriptVersion(Base):
     python_version: Mapped[str] = mapped_column(String(20), nullable=False, default="3.12")
     cron_expression: Mapped[str] = mapped_column(String(100), nullable=False, default="0 * * * *")
     timeout: Mapped[int] = mapped_column(nullable=False, default=3600)
-    environment_vars: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Snapshot of operator secrets — encrypted at rest like scripts.environment_vars.
+    environment_vars: Mapped[str] = mapped_column(EncryptedText, nullable=False, default="")
 
     # Version metadata — DateTime(timezone=True) to match the actual DB
     # column (TIMESTAMPTZ, per the initial migration) and every other

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dim">
+<html lang="{{ lang() }}" data-theme="dim">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign in - Cronator</title>
+    <title>{{ t("Sign in") }} - Cronator</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="stylesheet" href="/static/vendor/fonts/fonts.css">
     <link rel="stylesheet" href="/static/output.css">
@@ -13,7 +13,7 @@
         <div class="card glass-card shadow-xl w-full max-w-sm">
             <div class="card-body">
                 <h1 class="text-2xl font-bold">Cronator</h1>
-                <p class="text-sm text-base-content/70 mb-2">Python Script Scheduler — sign in to continue</p>
+                <p class="text-sm text-base-content/70 mb-2">{{ t("Python Script Scheduler — sign in to continue") }}</p>
 
                 {% if error %}
                 <div class="alert alert-error text-sm mb-2" role="alert">
@@ -23,17 +23,17 @@
 
                 <form method="post" action="/login">
                     <label class="form-control mb-3">
-                        <span class="label-text">Username</span>
+                        <span class="label-text">{{ t("Username") }}</span>
                         <input name="username" required autocomplete="username"
                                autofocus
                                class="input input-bordered w-full">
                     </label>
                     <label class="form-control mb-4">
-                        <span class="label-text">Password</span>
+                        <span class="label-text">{{ t("Password") }}</span>
                         <input type="password" name="password" required autocomplete="current-password"
                                class="input input-bordered w-full">
                     </label>
-                    <button type="submit" class="btn btn-primary w-full">Sign in</button>
+                    <button type="submit" class="btn btn-primary w-full">{{ t("Sign in") }}</button>
                 </form>
             </div>
         </div>

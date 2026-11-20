@@ -5,18 +5,18 @@
 <div class="flex items-center gap-2 flex-wrap">
     {% if is_admin and execution.status == 'running' %}
     <button type="button" id="cancel-exec-btn" data-execution-id="{{ execution.id }}" class="btn btn-error btn-sm gap-2">
-        {{ icons.x_mark("w-4 h-4") }} Cancel
+        {{ icons.x_mark("w-4 h-4") }} {{ t("Cancel") }}
     </button>
     {% endif %}
     {% if is_admin and execution.status not in ('running', 'pending') %}
     <form method="POST" action="/executions/{{ execution.id }}/rerun">
         <button type="submit" class="btn btn-sm btn-primary gap-2">
-            {{ icons.arrow_path("w-4 h-4") }} Run again
+            {{ icons.arrow_path("w-4 h-4") }} {{ t("Run again") }}
         </button>
     </form>
     {% endif %}
     <a href="/scripts/{{ execution.script_id }}" class="btn btn-ghost btn-sm">
-        Back to Script
+        {{ t("Back to Script") }}
     </a>
 </div>
 {% endblock %}
@@ -25,17 +25,17 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
     <!-- Execution Info -->
     <div class="lg:col-span-2 glass-card rounded-xl p-6">
-        <h3 class="text-lg font-semibold mb-4">Execution Details</h3>
+        <h3 class="text-lg font-semibold mb-4">{{ t("Execution Details") }}</h3>
 
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
-                <p class="text-base-content/70 text-sm">Script</p>
+                <p class="text-base-content/70 text-sm">{{ t("Script") }}</p>
                 <a href="/scripts/{{ execution.script_id }}" class="font-medium hover:text-primary">
-                    {{ execution.script.name if execution.script else 'Unknown' }}
+                    {{ execution.script.name if execution.script else t('Unknown') }}
                 </a>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Status</p>
+                <p class="text-base-content/70 text-sm">{{ t("Status") }}</p>
                 <span id="execution-status-badge" class="status-badge {{ execution.status }}">
                     {% if execution.status == 'running' %}
                         <span class="pulse-dot"></span>
@@ -44,7 +44,7 @@
                 </span>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Exit Code</p>
+                <p class="text-base-content/70 text-sm">{{ t("Exit Code") }}</p>
                 <p id="execution-exit-code">
                     {% if execution.exit_code is not none %}
                         <code class="{% if execution.exit_code == 0 %}text-success{% else %}text-error{% endif %} text-lg">{{ execution.exit_code }}</code>
@@ -54,34 +54,34 @@
                 </p>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Started At</p>
-                <p>{{ execution.started_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</p>
+                <p class="text-base-content/70 text-sm">{{ t("Started At") }}</p>
+                <p>{{ execution.started_at|dt }}</p>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Finished At</p>
+                <p class="text-base-content/70 text-sm">{{ t("Finished At") }}</p>
                 <p id="execution-finished-at">
                     {% if execution.finished_at %}
-                        {{ execution.finished_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+                        {{ execution.finished_at|dt }}
                     {% else %}
-                        <span class="text-base-content/70">Running...</span>
+                        <span class="text-base-content/70">{{ t("Running...") }}</span>
                     {% endif %}
                 </p>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Duration</p>
+                <p class="text-base-content/70 text-sm">{{ t("Duration") }}</p>
                 <p id="execution-duration" class="text-lg font-medium">{{ execution.duration_formatted }}</p>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Triggered By</p>
+                <p class="text-base-content/70 text-sm">{{ t("Triggered By") }}</p>
                 <span class="badge badge-ghost">{{ execution.triggered_by }}</span>
                 {% if execution.attempt > 1 %}
-                <span class="badge badge-warning ml-1">Retry #{{ execution.attempt - 1 }}</span>
+                <span class="badge badge-warning ml-1">{{ t("Retry #{n}", n=execution.attempt - 1) }}</span>
                 {% endif %}
             </div>
         </div>
 
         <div id="execution-error-message-section" class="mt-6{% if not execution.error_message %} hidden{% endif %}">
-            <p class="text-base-content/70 text-sm mb-2">Error Message</p>
+            <p class="text-base-content/70 text-sm mb-2">{{ t("Error Message") }}</p>
             <div class="bg-red-900/30 border border-red-500/30 rounded-lg p-4">
                 <pre id="execution-error-message-text" class="text-red-300 text-sm whitespace-pre-wrap">{{ execution.error_message or '' }}</pre>
             </div>
@@ -90,19 +90,19 @@
 
     <!-- Quick Stats -->
     <div class="glass-card rounded-xl p-6">
-        <h3 class="text-lg font-semibold mb-4">Quick Info</h3>
+        <h3 class="text-lg font-semibold mb-4">{{ t("Quick Info") }}</h3>
 
         <div class="space-y-4">
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Execution ID</span>
+                <span class="text-base-content/70">{{ t("Execution ID") }}</span>
                 <code class="text-primary">#{{ execution.id }}</code>
             </div>
             <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-                <span class="text-base-content/70">Script ID</span>
+                <span class="text-base-content/70">{{ t("Script ID") }}</span>
                 <code>{{ execution.script_id }}</code>
             </div>
             <div id="execution-duration-ms-row" class="flex items-center justify-between p-3 bg-base-200 rounded-lg{% if execution.duration_ms is none %} hidden{% endif %}">
-                <span class="text-base-content/70">Duration (ms)</span>
+                <span class="text-base-content/70">{{ t("Duration (ms)") }}</span>
                 <code id="execution-duration-ms">{% if execution.duration_ms is not none %}{{ execution.duration_ms }}{% endif %}</code>
             </div>
         </div>
@@ -124,13 +124,13 @@
             </h3>
             <div class="flex items-center gap-2">
                 <span id="stdout-char-count" class="text-xs text-base-content/70" data-char-count="{{ execution.stdout | length }}">{{ execution.stdout | length }} chars</span>
-                <button type="button" id="copy-stdout-btn" class="btn btn-ghost btn-xs">Copy</button>
-                <button type="button" id="download-stdout-btn" class="btn btn-ghost btn-xs">Download</button>
+                <button type="button" id="copy-stdout-btn" class="btn btn-ghost btn-xs">{{ t("Copy") }}</button>
+                <button type="button" id="download-stdout-btn" class="btn btn-ghost btn-xs">{{ t("Download") }}</button>
             </div>
         </div>
         <div class="p-4">
             <div id="stdout-log-window-note" class="hidden mb-2 text-xs text-base-content/70"></div>
-            <div id="stdout-log" class="log-output">{% if execution.status == 'running' %}Waiting for output...{% else %}Loading output...{% endif %}</div>
+            <div id="stdout-log" class="log-output" role="log" aria-live="polite" aria-relevant="additions text" aria-label="{{ t('stdout output') }}">{% if execution.status == 'running' %}{{ t('Waiting for output...') }}{% else %}{{ t('Loading output...') }}{% endif %}</div>
         </div>
     </div>
 
@@ -142,13 +142,13 @@
             </h3>
             <div class="flex items-center gap-2">
                 <span id="stderr-char-count" class="text-xs text-base-content/70" data-char-count="{{ execution.stderr | length }}">{{ execution.stderr | length }} chars</span>
-                <button type="button" id="copy-stderr-btn" class="btn btn-ghost btn-xs">Copy</button>
-                <button type="button" id="download-stderr-btn" class="btn btn-ghost btn-xs">Download</button>
+                <button type="button" id="copy-stderr-btn" class="btn btn-ghost btn-xs">{{ t("Copy") }}</button>
+                <button type="button" id="download-stderr-btn" class="btn btn-ghost btn-xs">{{ t("Download") }}</button>
             </div>
         </div>
         <div class="p-4">
             <div id="stderr-log-window-note" class="hidden mb-2 text-xs text-base-content/70"></div>
-            <div id="stderr-log" class="log-output text-error">{% if execution.status == 'running' %}Waiting for output...{% else %}Loading output...{% endif %}</div>
+            <div id="stderr-log" class="log-output text-error" role="log" aria-live="polite" aria-relevant="additions text" aria-label="{{ t('stderr output') }}">{% if execution.status == 'running' %}{{ t('Waiting for output...') }}{% else %}{{ t('Loading output...') }}{% endif %}</div>
         </div>
     </div>
 </div>
@@ -157,25 +157,25 @@
 <div class="glass-card rounded-xl overflow-hidden mt-6">
     <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
         <h3 class="text-lg font-semibold flex items-center gap-2">
-            {{ icons.archive_box("w-5 h-5") }} Artifacts
+            {{ icons.archive_box("w-5 h-5") }} {{ t("Artifacts") }}
             <span id="artifacts-count-badge" class="badge badge-sm badge-ghost">0</span>
         </h3>
     </div>
     <div id="artifacts-container" class="p-4">
         <div id="artifacts-loading" class="text-center py-8 text-base-content/70">
-            <p>Loading artifacts...</p>
+            <p>{{ t("Loading artifacts...") }}</p>
         </div>
         <div id="artifacts-empty" class="hidden text-center py-8 text-base-content/70">
-            <p>No artifacts</p>
+            <p>{{ t("No artifacts") }}</p>
         </div>
         <div id="artifacts-list" class="hidden overflow-x-auto">
             <table class="table table-sm w-full">
                 <thead>
                     <tr class="border-b border-base-content/10">
-                        <th class="bg-transparent">Original Name</th>
-                        <th class="bg-transparent">Size</th>
-                        <th class="bg-transparent">Created</th>
-                        <th class="bg-transparent text-right">Actions</th>
+                        <th class="bg-transparent">{{ t("Original Name") }}</th>
+                        <th class="bg-transparent">{{ t("Size") }}</th>
+                        <th class="bg-transparent">{{ t("Created") }}</th>
+                        <th class="bg-transparent text-right">{{ t("Actions") }}</th>
                     </tr>
                 </thead>
                 <tbody id="artifacts-table-body">

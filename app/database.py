@@ -71,6 +71,7 @@ async def init_db() -> None:
     # Import all models to register them with Base.metadata
     # This ensures tables are created when using Base.metadata.create_all()
     from app.models import (  # noqa: F401
+        ApiToken,
         Artifact,
         Execution,
         Script,

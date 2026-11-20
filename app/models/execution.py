@@ -27,6 +27,10 @@ class ExecutionStatus(StrEnum):
     TIMEOUT = "timeout"
     CANCELLED = "cancelled"
     SKIPPED = "skipped"
+    # The cron moment passed with no execution recorded for it (the
+    # process was down, or the fire was lost) — written by the missed-run
+    # sweep, never by the executor.
+    MISSED = "missed"
 
 
 class Execution(Base):
@@ -114,6 +118,7 @@ class Execution(Base):
             ExecutionStatus.TIMEOUT.value,
             ExecutionStatus.CANCELLED.value,
             ExecutionStatus.SKIPPED.value,
+            ExecutionStatus.MISSED.value,
         )
 
     @property

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="{{ theme|default('dim') }}">
+<html lang="{{ lang() }}" data-theme="{{ theme|default('dim') }}">
 <head>
     <!-- Apply the saved theme before first paint. Doing this in app.js at
          the end of <body> (as before) meant the browser painted the
@@ -54,9 +54,9 @@
                         {{ icons.clock("w-6 h-6 text-primary") }}
                         Cronator
                     </h1>
-                    <p class="text-xs text-base-content/70 mt-1">Python Script Scheduler</p>
+                    <p class="text-xs text-base-content/70 mt-1">{{ t("Python Script Scheduler") }}</p>
                 </div>
-                <button type="button" class="lg:hidden btn btn-ghost btn-md btn-square" aria-label="Close menu" onclick="closeSidebar()">
+                <button type="button" class="lg:hidden btn btn-ghost btn-md btn-square" aria-label="{{ t('Close menu') }}" onclick="closeSidebar()">
                     {{ icons.x_mark_plain("w-5 h-5") }}
                 </button>
             </div>
@@ -64,30 +64,30 @@
             <nav class="flex-1 p-4 space-y-2">
                 <a href="/" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg {% if page_title == 'Dashboard' %}active{% endif %}">
                     {{ icons.dashboard("w-5 h-5") }}
-                    <span>Dashboard</span>
+                    <span>{{ t("Dashboard") }}</span>
                 </a>
                 <a href="/scripts" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg {% if page_title == 'Scripts' %}active{% endif %}">
                     {{ icons.document("w-5 h-5") }}
-                    <span>Scripts</span>
+                    <span>{{ t("Scripts") }}</span>
                 </a>
                 <a href="/executions" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg {% if page_title == 'Executions' %}active{% endif %}">
                     {{ icons.document("w-5 h-5") }}
-                    <span>Executions</span>
+                    <span>{{ t("Executions") }}</span>
                 </a>
                 {% if is_admin is not defined or is_admin %}
                 <a href="/scripts/new" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg {% if page_title == 'New Script' %}active{% endif %}">
                     {{ icons.sparkles("w-5 h-5") }}
-                    <span>New Script</span>
+                    <span>{{ t("New Script") }}</span>
                 </a>
                 {% endif %}
                 <a href="/settings" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg {% if page_title == 'Settings' %}active{% endif %}">
                     {{ icons.cog("w-5 h-5") }}
-                    <span>Settings</span>
+                    <span>{{ t("Settings") }}</span>
                 </a>
                 {% if is_admin is not defined or is_admin %}
                 <a href="/users" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg {% if page_title == 'Users' %}active{% endif %}">
                     {{ icons.users("w-5 h-5") }}
-                    <span>Users</span>
+                    <span>{{ t("Users") }}</span>
                 </a>
                 {% endif %}
             </nav>
@@ -106,7 +106,7 @@
                         <p class="text-sm font-medium truncate">{{ username }}</p>
                     </div>
                     <details class="relative group" id="user-menu">
-                        <summary class="btn btn-ghost btn-sm btn-square list-none cursor-pointer" aria-label="Account menu">
+                        <summary class="btn btn-ghost btn-sm btn-square list-none cursor-pointer" aria-label="{{ t('Account menu') }}">
                             {{ icons.ellipsis_vertical("w-4 h-4") }}
                         </summary>
                         <!-- Opens upward: the footer sits at the viewport's
@@ -115,11 +115,11 @@
                              the menu to the summary's top edge instead. -->
                         <ul class="absolute right-0 bottom-full mb-2 menu bg-base-200 rounded-box shadow-lg border border-base-content/10 w-48 z-20">
                             <li>
-                                <button type="button" onclick="document.getElementById('change-password-modal').showModal()">Change password</button>
+                                <button type="button" onclick="document.getElementById('change-password-modal').showModal()">{{ t("Change password") }}</button>
                             </li>
                             <li>
                                 <form method="post" action="/logout">
-                                    <button type="submit">Sign out</button>
+                                    <button type="submit">{{ t("Sign out") }}</button>
                                 </form>
                             </li>
                         </ul>
@@ -133,10 +133,10 @@
         <main class="flex-1 overflow-auto min-w-0">
             <header class="glass-card border-b border-base-content/10 px-4 lg:px-8 py-4 lg:py-6 sticky top-0 z-10">
                 <div class="flex items-center gap-3 flex-wrap">
-                    <button type="button" id="menu-toggle" class="lg:hidden btn btn-ghost btn-md btn-square" aria-label="Toggle menu" aria-expanded="false" aria-controls="sidebar" onclick="openSidebar()">
+                    <button type="button" id="menu-toggle" class="lg:hidden btn btn-ghost btn-md btn-square" aria-label="{{ t('Toggle menu') }}" aria-expanded="false" aria-controls="sidebar" onclick="openSidebar()">
                         {{ icons.bars_3("w-5 h-5") }}
                     </button>
-                    <h2 class="text-xl font-semibold flex-1 min-w-0 truncate">{{ page_title }}</h2>
+                    <h2 class="text-xl font-semibold flex-1 min-w-0 truncate">{{ t(page_title) }}</h2>
                     <!-- flex-basis:100% on mobile pushes this onto its own row
                          instead of clipping past the viewport edge once the
                          title + hamburger already used up the width; the
@@ -161,20 +161,20 @@
     <!-- Change own password (self-service, any authenticated user) -->
     <dialog id="change-password-modal" class="modal">
         <div class="modal-box">
-            <h3 class="font-bold text-lg mb-4">Change password</h3>
+            <h3 class="font-bold text-lg mb-4">{{ t("Change password") }}</h3>
             <form id="change-password-form" class="space-y-4">
                 <label class="form-control">
-                    <span class="label-text">Current password</span>
+                    <span class="label-text">{{ t("Current password") }}</span>
                     <input type="password" name="current_password" class="input input-bordered input-sm w-full" required autocomplete="current-password" data-testid="current-password-input">
                 </label>
                 <label class="form-control">
-                    <span class="label-text">New password</span>
+                    <span class="label-text">{{ t("New password") }}</span>
                     <input type="password" name="new_password" class="input input-bordered input-sm w-full" required minlength="8" maxlength="128" autocomplete="new-password" data-testid="new-own-password-input">
                 </label>
             </form>
             <div class="modal-action">
-                <button type="button" class="btn btn-ghost" onclick="document.getElementById('change-password-modal').close()">Cancel</button>
-                <button type="button" class="btn btn-primary" data-testid="change-password-submit" onclick="submitOwnPasswordChange()">Change</button>
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('change-password-modal').close()">{{ t("Cancel") }}</button>
+                <button type="button" class="btn btn-primary" data-testid="change-password-submit" onclick="submitOwnPasswordChange()">{{ t("Change") }}</button>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop"><button>close</button></form>

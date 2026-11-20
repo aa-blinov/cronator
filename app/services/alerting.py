@@ -28,6 +28,21 @@ class AlertingService:
         self.password = settings.smtp_password
         self.from_addr = settings.smtp_from or settings.smtp_user
         self.to_addr = settings.alert_email
+        # Delivery failures from the last send attempt. The executor reads
+        # (and clears) these right after send_*_alert so a broken SMTP
+        # password or a dead webhook surfaces on the script instead of
+        # living only in the application log.
+        self._delivery_errors: list[str] = []
+
+    def note_delivery_error(self, message: str) -> None:
+        """Record a delivery failure for the current send attempt."""
+        self._delivery_errors.append(message)
+
+    def take_delivery_errors(self) -> list[str]:
+        """Return the recorded delivery errors and clear them."""
+        errors = list(self._delivery_errors)
+        self._delivery_errors.clear()
+        return errors
 
     async def _get_settings(self) -> dict:
         """Get current settings from DB, fallback to env."""
@@ -101,6 +116,7 @@ class AlertingService:
 
         except Exception as e:
             logger.exception(f"Failed to send alert email: {e}")
+            self.note_delivery_error(f"email: {e}")
             return False
 
     async def send_failure_alert(self, script: Script, execution: Execution) -> bool:
@@ -272,7 +288,11 @@ Stderr:
             logger.info(f"Webhook sent for {event_type} ({script.name}): HTTP {r.status_code}")
             return True
         except Exception as e:
-            logger.warning(f"Failed to send webhook for {event_type} ({script.name}): {e}")
+            # ERROR, not warning: this is a delivery failure for an alert the
+            # operator asked to receive — grep ERROR / log-based alerting
+            # should catch it, same as a failed execution.
+            logger.error(f"Failed to send webhook for {event_type} ({script.name}): {e}")
+            self.note_delivery_error(f"webhook: {e}")
             return False
 
     async def test_connection(self) -> tuple[bool, str]:

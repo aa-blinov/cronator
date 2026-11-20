@@ -152,8 +152,8 @@
             <div class="glass-card rounded-xl p-6">
                 <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                     <div>
-                        <h3 class="text-lg font-semibold">Script Code</h3>
-                        <p class="text-xs text-base-content/70 mt-1">Autocomplete: `Ctrl+Space` or just keep typing</p>
+                        <h3 class="text-lg font-semibold">{{ t("Script Code") }}</h3>
+                        <p class="text-xs text-base-content/70 mt-1">{{ t("Autocomplete: `Ctrl+Space` or just keep typing") }}</p>
                     </div>
                     <div class="flex gap-2 flex-wrap">
                         {% if not script %}
@@ -161,20 +161,20 @@
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
                             </svg>
-                            From Template
+                            {{ t("From Template") }}
                         </button>
                         {% endif %}
                         <button type="button" id="validate-btn" class="btn btn-outline btn-info btn-sm gap-2">
                             {{ icons.check_circle("w-4 h-4") }}
-                            Validate
+                            {{ t("Validate") }}
                         </button>
                         <button type="button" id="run-test-btn" class="btn btn-outline btn-success btn-sm gap-2">
                             {{ icons.play("w-4 h-4") }}
-                            Run Test
+                            {{ t("Run Test") }}
                         </button>
                         <button type="button" id="stop-test-btn" class="btn btn-outline btn-error btn-sm gap-2" style="display: none;">
                             {{ icons.x_mark("w-4 h-4") }}
-                            Stop Test
+                            {{ t("Stop Test") }}
                         </button>
                     </div>
                 </div>
@@ -185,29 +185,29 @@
             <div class="glass-card rounded-xl p-6">
                 <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                     <div class="flex items-center gap-2">
-                        <h3 class="text-lg font-semibold">Output Console</h3>
-                        <span id="console-status" class="badge badge-ghost">Idle</span>
+                        <h3 class="text-lg font-semibold">{{ t("Output Console") }}</h3>
+                        <span id="console-status" class="badge badge-ghost">{{ t("Idle") }}</span>
                     </div>
                     <div class="flex items-center gap-3 flex-wrap">
                         <label class="label cursor-pointer gap-2 py-0">
-                            <span class="label-text text-xs">Auto-scroll</span>
+                            <span class="label-text text-xs">{{ t("Auto-scroll") }}</span>
                             <input type="checkbox" id="auto-scroll-toggle" class="toggle toggle-xs" checked>
                         </label>
                         <button type="button" id="reconnect-btn" class="btn btn-outline btn-warning btn-xs" style="display: none;">
-                            Reconnect
+                            {{ t("Reconnect") }}
                         </button>
                         <button type="button" id="copy-output-btn" class="btn btn-outline btn-xs">
-                            Copy
+                            {{ t("Copy") }}
                         </button>
                         <button type="button" id="download-output-btn" class="btn btn-outline btn-xs">
-                            Download
+                            {{ t("Download") }}
                         </button>
                         <button type="button" id="clear-output-btn" class="btn btn-outline btn-xs">
-                            Clear
+                            {{ t("Clear") }}
                         </button>
                     </div>
                 </div>
-                <pre id="output-console" class="bg-base-200 p-4 rounded-lg font-mono text-sm overflow-y-auto custom-scrollbar" style="resize: vertical; min-height: 200px; max-height: 600px; height: 300px;"></pre>
+                <pre id="output-console" class="bg-base-200 p-4 rounded-lg font-mono text-sm overflow-y-auto custom-scrollbar" style="resize: vertical; min-height: 200px; max-height: 600px; height: 300px;" role="log" aria-live="polite" aria-relevant="additions text" aria-label="{{ t('Test output console') }}"></pre>
             </div>
 
             <!-- Dependencies and Environment Variables live here (not in the
@@ -215,14 +215,14 @@
                  height instead of the sidebar running far past the editor,
                  leaving a large empty gap under the Output Console. -->
             <div class="glass-card rounded-xl p-6">
-                <h3 class="text-lg font-semibold mb-4">Dependencies</h3>
+                <h3 class="text-lg font-semibold mb-4">{{ t("Dependencies") }}</h3>
                 <div class="form-control">
                     <textarea name="dependencies" id="dependencies-input"
                               class="textarea textarea-bordered w-full font-mono text-sm"
                               rows="6"
                               placeholder="requests&#10;pandas&#10;numpy==1.24.0">{{ script.dependencies if script else '' }}</textarea>
                     <label class="label">
-                        <span class="label-text-alt text-base-content/70">One package per line (pip format)</span>
+                        <span class="label-text-alt text-base-content/70">{{ t("One package per line (pip format)") }}</span>
                     </label>
                 </div>
 
@@ -234,7 +234,7 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            Pending Changes
+                            {{ t("Pending Changes") }}
                         </span>
                         <span id="deps-diff-badge" class="badge badge-warning badge-sm">0</span>
                     </div>
@@ -248,25 +248,25 @@
                 </div>
 
                 <div class="mt-3 flex gap-2">
-                    <button type="button" id="validate-deps-btn" class="btn btn-sm btn-outline btn-info flex-1" title="Validate format and resolvability">
+                    <button type="button" id="validate-deps-btn" class="btn btn-sm btn-outline btn-info flex-1" title="{{ t('Validate format and resolvability') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        Validate
+                        {{ t("Validate") }}
                     </button>
-                    <button type="button" id="get-packages-btn" class="btn btn-sm btn-outline btn-warning flex-1" {% if not script %}disabled{% endif %} title="Get currently installed packages">
+                    <button type="button" id="get-packages-btn" class="btn btn-sm btn-outline btn-warning flex-1" {% if not script %}disabled{% endif %} title="{{ t('Get currently installed packages') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                         </svg>
-                        Packages
+                        {{ t("Packages") }}
                     </button>
-                    <button type="button" id="install-deps-btn" class="btn btn-sm btn-outline btn-success flex-1" {% if not script %}disabled{% endif %} title="{% if not script %}Save script first{% else %}Rebuild environment and reinstall all dependencies{% endif %}">
+                    <button type="button" id="install-deps-btn" class="btn btn-sm btn-outline btn-success flex-1" {% if not script %}disabled{% endif %} title="{{ t('Save script first') if not script else t('Rebuild environment and reinstall all dependencies') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                         </svg>
-                        Install
+                        {{ t("Install") }}
                     </button>
-                    <button type="button" id="retry-install-btn" class="btn btn-sm btn-outline btn-warning" {% if not script %}disabled{% endif %} style="display: none;" title="Retry the last failed installation">
+                    <button type="button" id="retry-install-btn" class="btn btn-sm btn-outline btn-warning" {% if not script %}disabled{% endif %} style="display: none;" title="{{ t('Retry the last failed installation') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                         </svg>
@@ -275,19 +275,19 @@
                 <!-- Validation results now go to Output Console below -->
                 <div class="alert alert-info mt-3 text-xs py-2">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <span>Dependencies install automatically when you save. Use "Install" to force rebuild.</span>
+                    <span>{{ t('Dependencies install automatically when you save. Use "Install" to force rebuild.') }}</span>
                 </div>
             </div>
 
             <div class="glass-card rounded-xl p-6">
-                <h3 class="text-lg font-semibold mb-4">Environment Variables</h3>
+                <h3 class="text-lg font-semibold mb-4">{{ t("Environment Variables") }}</h3>
                 <div class="form-control">
                     <textarea name="environment_vars"
                               class="textarea textarea-bordered w-full font-mono text-sm"
                               rows="4"
                               placeholder="API_KEY=secret&#10;DEBUG=true">{{ script.environment_vars if script else '' }}</textarea>
                     <label class="label">
-                        <span class="label-text-alt text-base-content/70">KEY=VALUE format, one per line</span>
+                        <span class="label-text-alt text-base-content/70">{{ t("KEY=VALUE format, one per line") }}</span>
                     </label>
                 </div>
             </div>
@@ -296,12 +296,12 @@
         <!-- Settings sidebar -->
         <div class="space-y-6">
             <div class="glass-card rounded-xl p-6">
-                <h3 class="text-lg font-semibold mb-4">Settings</h3>
+                <h3 class="text-lg font-semibold mb-4">{{ t("Settings") }}</h3>
 
                 <div class="space-y-4">
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">Script Name</span>
+                            <span class="label-text">{{ t("Script Name") }}</span>
                         </label>
                         <input type="text" name="name"
                                value="{{ script.name if script else '' }}"
@@ -311,59 +311,59 @@
                                required
                                {% if script %}readonly{% endif %}>
                         <label class="label">
-                            <span class="label-text-alt text-base-content/70">Letters, numbers, underscores, hyphens only</span>
+                            <span class="label-text-alt text-base-content/70">{{ t("Letters, numbers, underscores, hyphens only") }}</span>
                         </label>
                     </div>
 
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">Script Description</span>
+                            <span class="label-text">{{ t("Script Description") }}</span>
                         </label>
                         <textarea name="description"
                                   class="textarea textarea-bordered w-full"
                                   rows="2"
-                                  placeholder="What does this script do? (general purpose, stays unchanged)">{{ script.description if script else '' }}</textarea>
+                                  placeholder="{{ t('What does this script do?') }}">{{ script.description if script else '' }}</textarea>
                         <label class="label">
-                            <span class="label-text-alt text-base-content/70">Permanent description of the script's purpose</span>
+                            <span class="label-text-alt text-base-content/70">{{ t("Permanent description of the script's purpose") }}</span>
                         </label>
                     </div>
 
                     {% if script %}
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">Version Notes (optional)</span>
+                            <span class="label-text">{{ t("Version Notes (optional)") }}</span>
                         </label>
                         <textarea name="change_summary" id="change-summary" rows="2"
                                   class="textarea textarea-bordered w-full text-sm"
                                   placeholder="e.g., Fixed bug with data parsing, Updated dependencies, Added new feature..."></textarea>
                         <label class="label">
-                            <span class="label-text-alt text-base-content/70">Describe what you changed in this save. Visible in version history.</span>
+                            <span class="label-text-alt text-base-content/70">{{ t("Describe what you changed in this save. Visible in version history.") }}</span>
                         </label>
                     </div>
                     {% endif %}
 
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">Schedule (Cron Expression)</span>
+                            <span class="label-text">{{ t("Schedule (Cron Expression)") }}</span>
                         </label>
 
                         <!-- Preset buttons -->
                         <div class="flex flex-wrap gap-2 mb-3">
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('* * * * *')">Every minute</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/5 * * * *')">Every 5 mins</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/10 * * * *')">Every 10 mins</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/15 * * * *')">Every 15 mins</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/30 * * * *')">Every 30 mins</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 * * * *')">Hourly</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */2 * * *')">Every 2 hours</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */3 * * *')">Every 3 hours</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */6 * * *')">Every 6 hours</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */12 * * *')">Every 12 hours</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 0 * * *')">Daily midnight</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 12 * * *')">Daily noon</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 9 * * 1-5')">Weekdays 9 AM</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 0 * * 0')">Weekly Sunday</button>
-                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 0 1 * *')">Monthly 1st</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('* * * * *')">{{ t("Every minute") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/5 * * * *')">{{ t("Every 5 mins") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/10 * * * *')">{{ t("Every 10 mins") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/15 * * * *')">{{ t("Every 15 mins") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('*/30 * * * *')">{{ t("Every 30 mins") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 * * * *')">{{ t("Hourly") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */2 * * *')">{{ t("Every 2 hours") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */3 * * *')">{{ t("Every 3 hours") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */6 * * *')">{{ t("Every 6 hours") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 */12 * * *')">{{ t("Every 12 hours") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 0 * * *')">{{ t("Daily midnight") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 12 * * *')">{{ t("Daily noon") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 9 * * 1-5')">{{ t("Weekdays 9 AM") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 0 * * 0')">{{ t("Weekly Sunday") }}</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="setCron('0 0 1 * *')">{{ t("Monthly 1st") }}</button>
                         </div>
 
                         <input type="text" name="cron_expression" id="cron-input"
@@ -391,7 +391,7 @@
 
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">Python Version</span>
+                            <span class="label-text">{{ t("Python Version") }}</span>
                         </label>
                         <select name="python_version" class="select select-bordered w-full">
                             {% for ver in python_versions %}
@@ -404,7 +404,7 @@
 
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">Timeout (seconds)</span>
+                            <span class="label-text">{{ t("Timeout (seconds)") }}</span>
                         </label>
                         <input type="number" name="timeout"
                                value="{{ script.timeout if script else 3600 }}"
@@ -418,26 +418,26 @@
 
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">Misfire Grace Time (seconds)</span>
+                            <span class="label-text">{{ t("Misfire Grace Time (seconds)") }}</span>
                         </label>
                         <input type="number" name="misfire_grace_time"
                                value="{{ script.misfire_grace_time if script else 60 }}"
                                min="0" max="3600"
                                class="input input-bordered w-full">
                         <label class="label">
-                            <span class="label-text-alt text-base-content/70">Wait time for missed runs</span>
+                            <span class="label-text-alt text-base-content/70">{{ t("Wait time for missed runs") }}</span>
                         </label>
                     </div>
 
                     <div class="form-control">
                         <label class="label cursor-pointer">
-                            <span class="label-text">Run on schedule</span>
+                            <span class="label-text">{{ t("Run on schedule") }}</span>
                             <input type="checkbox" name="enabled" value="true"
                                    class="toggle toggle-success"
                                    {% if not script or script.enabled %}checked{% endif %}>
                         </label>
                         <label class="label">
-                            <span class="label-text-alt text-base-content/70">Enable automatic cron execution</span>
+                            <span class="label-text-alt text-base-content/70">{{ t("Enable automatic cron execution") }}</span>
                         </label>
                     </div>
                 </div>
@@ -445,57 +445,57 @@
 
             <!-- Reliability -->
             <div class="glass-card rounded-xl p-6">
-                <h3 class="text-lg font-semibold mb-4">Reliability</h3>
+                <h3 class="text-lg font-semibold mb-4">{{ t("Reliability") }}</h3>
                 <div class="space-y-4">
                     <div class="form-control">
                         <label class="label cursor-pointer">
-                            <span class="label-text">Prevent Overlap</span>
+                            <span class="label-text">{{ t("Prevent Overlap") }}</span>
                             <input type="checkbox" name="prevent_overlap" id="prevent-overlap" value="true"
                                    class="toggle toggle-success"
                                    {% if not script or script.prevent_overlap %}checked{% endif %}>
                         </label>
                         <label class="label">
-                            <span class="label-text-alt text-base-content/70">Skip execution if script is already running</span>
+                            <span class="label-text-alt text-base-content/70">{{ t("Skip execution if script is already running") }}</span>
                         </label>
                     </div>
 
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">Retry Count</span>
+                            <span class="label-text">{{ t("Retry Count") }}</span>
                         </label>
                         <input type="number" name="retry_count" id="retry-count"
                                value="{{ script.retry_count if script else 0 }}"
                                min="0" max="10"
                                class="input input-bordered w-full">
                         <label class="label">
-                            <span class="label-text-alt text-base-content/70">Number of retries on failure (0 = no retries)</span>
+                            <span class="label-text-alt text-base-content/70">{{ t("Number of retries on failure (0 = no retries)") }}</span>
                         </label>
                     </div>
 
                     <div id="retry-options" style="{% if not script or script.retry_count == 0 %}display: none;{% endif %}">
                         <div class="form-control mb-4">
                             <label class="label">
-                                <span class="label-text">Retry Delay (seconds)</span>
+                                <span class="label-text">{{ t("Retry Delay (seconds)") }}</span>
                             </label>
                             <input type="number" name="retry_delay"
                                    value="{{ script.retry_delay if script else 60 }}"
                                    min="5" max="3600"
                                    class="input input-bordered w-full">
                             <label class="label">
-                                <span class="label-text-alt text-base-content/70">Seconds to wait between retry attempts</span>
+                                <span class="label-text-alt text-base-content/70">{{ t("Seconds to wait between retry attempts") }}</span>
                             </label>
                         </div>
 
                         <div class="form-control">
                             <label class="label">
-                                <span class="label-text">Max Retry Window (seconds)</span>
+                                <span class="label-text">{{ t("Max Retry Window (seconds)") }}</span>
                             </label>
                             <input type="number" name="max_retry_window"
                                    value="{{ script.max_retry_window if script else 3600 }}"
                                    min="60" max="86400"
                                    class="input input-bordered w-full">
                             <label class="label">
-                                <span class="label-text-alt text-base-content/70">Stop retrying after this many seconds from first attempt</span>
+                                <span class="label-text-alt text-base-content/70">{{ t("Stop retrying after this many seconds from first attempt") }}</span>
                             </label>
                         </div>
                     </div>
@@ -510,22 +510,22 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        Version History
+                        {{ t("Version History") }}
                     </h3>
                     <span id="version-count-badge" class="badge badge-info badge-sm">0</span>
                 </div>
                 <div id="versions-list" class="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
-                    <div class="text-sm text-base-content/70 italic">Loading versions...</div>
+                    <div class="text-sm text-base-content/70 italic">{{ t("Loading versions...") }}</div>
                 </div>
             </div>
             {% endif %}
 
             <div class="glass-card rounded-xl p-6">
-                <h3 class="text-lg font-semibold mb-4">Alerts</h3>
+                <h3 class="text-lg font-semibold mb-4">{{ t("Alerts") }}</h3>
                 <div class="space-y-2">
                     <div class="form-control">
                         <label class="label cursor-pointer">
-                            <span class="label-text">Alert on failure</span>
+                            <span class="label-text">{{ t("Alert on failure") }}</span>
                             <input type="checkbox" name="alert_on_failure" value="true"
                                    class="toggle toggle-success"
                                    {% if not script or script.alert_on_failure %}checked{% endif %}>
@@ -533,7 +533,7 @@
                     </div>
                     <div class="form-control">
                         <label class="label cursor-pointer">
-                            <span class="label-text">Alert on success</span>
+                            <span class="label-text">{{ t("Alert on success") }}</span>
                             <input type="checkbox" name="alert_on_success" value="true"
                                    class="toggle toggle-success"
                                    {% if script and script.alert_on_success %}checked{% endif %}>
@@ -550,10 +550,10 @@
          bottom of whichever sidebar card happens to be longest. -->
     <div class="sticky bottom-0 mt-6 -mx-8 px-8 py-4 bg-base-100 border-t border-base-content/10 flex gap-3 z-10">
         <button type="submit" class="btn btn-primary flex-1">
-            {{ icons.check_circle("w-5 h-5") }} {% if script %}Save Changes{% else %}Create Script{% endif %}
+            {{ icons.check_circle("w-5 h-5") }} {% if script %}{{ t("Save Changes") }}{% else %}{{ t("Create Script") }}{% endif %}
         </button>
         <a href="{% if script %}/scripts/{{ script.id }}{% else %}/{% endif %}" class="btn btn-ghost">
-            Cancel
+            {{ t("Cancel") }}
         </a>
     </div>
 </form>
@@ -564,20 +564,20 @@
         <form method="dialog">
             <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3">✕</button>
         </form>
-        <h3 class="font-bold text-xl mb-1">Start from a Template</h3>
-        <p class="text-sm text-base-content/70 mb-5">Pick a template — all fields will be pre-filled. You can change anything before saving.</p>
+        <h3 class="font-bold text-xl mb-1">{{ t("Start from a Template") }}</h3>
+        <p class="text-sm text-base-content/70 mb-5">{{ t("Pick a template — all fields will be pre-filled. You can change anything before saving.") }}</p>
 
         <!-- Category filter -->
         <div class="flex flex-wrap gap-2 mb-5" id="template-filters">
-            <button type="button" class="btn btn-xs btn-primary tpl-filter-btn" data-cat="all">All</button>
-            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="monitoring">Monitoring</button>
-            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="data">Data</button>
-            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="maintenance">Maintenance</button>
-            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="notification">Notification</button>
+            <button type="button" class="btn btn-xs btn-primary tpl-filter-btn" data-cat="all">{{ t("All") }}</button>
+            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="monitoring">{{ t("Monitoring") }}</button>
+            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="data">{{ t("Data") }}</button>
+            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="maintenance">{{ t("Maintenance") }}</button>
+            <button type="button" class="btn btn-xs btn-outline tpl-filter-btn" data-cat="notification">{{ t("Notification") }}</button>
         </div>
 
         <div id="template-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <div class="text-center py-10 text-base-content/40 col-span-3">Loading templates…</div>
+            <div class="text-center py-10 text-base-content/40 col-span-3">{{ t("Loading templates…") }}</div>
         </div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
@@ -2081,7 +2081,7 @@ ${separator}
             // Calculate next 3 runs
             const nextRuns = calculateNextRuns(expression, 3);
             if (nextRuns.length > 0) {
-                nextRunsEl.textContent = 'Next runs: ' + nextRuns.join(', ');
+                nextRunsEl.textContent = 'Next runs (UTC): ' + nextRuns.join(', ');
             } else {
                 nextRunsEl.textContent = 'Next runs: none found (check expression)';
             }

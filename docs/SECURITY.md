@@ -23,8 +23,17 @@ account that doesn't depend on it.
   API clients; plain HTML routes accept it too (for API-style tooling
   pointed at a page) but an anonymous browser gets a 303 to `/login`
   instead of the Basic Auth popup.
+- `Authorization: Bearer ctk_…` is an alternative for the REST API.
+  Tokens are admin-level credentials (there are no scoped token roles),
+  created and revoked from Settings → API Tokens. Only the SHA-256 hash
+  is stored, so a leaked database dump cannot be replayed as a token;
+  revoking takes effect on the next request. Tokens do not work on HTML
+  page routes — those still use the session cookie or Basic Auth.
 - Expired sessions are purged lazily on read and swept by the daily
   03:00 maintenance job.
+- There is no second factor for password login. If the instance is
+  reachable beyond a trusted team, put authentication at the reverse
+  proxy as well.
 
 All `/api/*` routes require authentication (enforced at router-include
 level in `app/api/__init__.py`, not per-endpoint) except `/api/locale`
@@ -132,10 +141,16 @@ writing them to the `settings` table. The key is derived from `SECRET_KEY`
   password. This was a real gap found and fixed during audit; if you're
   running a version from before that fix, upgrade before relying on
   webhook alerts for anything sensitive.
+- Script `environment_vars` (where DB passwords and API keys are stored)
+  is Fernet-encrypted in `scripts` and `script_versions` through the
+  `EncryptedText` column type (`app/models/types.py`). Values written
+  before this change are re-encrypted on the next startup. The audit log
+  redacts this field and the git mirror never writes it out, but rotating
+  `SECRET_KEY` makes old values unreadable — re-enter them afterward.
 
-Non-sensitive settings (theme, locale, default timeout) are stored as
-plaintext — there's nothing there worth encrypting, and it keeps them
-directly queryable/editable for debugging.
+Non-sensitive settings (theme, locale, default timeout, display timezone,
+concurrency cap) are stored as plaintext — there's nothing there worth
+encrypting, and it keeps them directly queryable/editable for debugging.
 
 ## Script execution model
 
@@ -155,12 +170,24 @@ treating multiple users' scripts as mutually untrusted.
   leak or an infinite loop can consume the container's entire CPU/memory
   budget, including what the Cronator process itself needs — a runaway
   script can degrade or crash the scheduler for every other script.
-- **There is no filesystem or network sandboxing.** A script can read/write
-  anywhere the `cronator` OS user can, and make arbitrary outbound network
-  calls. Script content is stored as plain Python and is not statically
-  vetted beyond a Ruff syntax/undefined-name check offered as a UI
-  convenience (`POST /api/scripts/validate-script`) — it is not a security
-  boundary.
+- **Filesystem sandboxing is optional, via Landlock** (`app/sandbox.py`).
+  When `sandbox_enabled` is on, the child calls `landlock_restrict_self`
+  between fork and exec and keeps only read access to its source, venv,
+  `cronator_lib`, system libraries and configured paths, plus write access
+  to its own directory, this run's artifacts, a private TMPDIR and the
+  operator's `sandbox_extra_paths`. Script content is still plain Python, not vetted
+  beyond a Ruff convenience check: the sandbox is a real kernel boundary
+  for files, not a code-review boundary.
+- **When the sandbox is requested but Landlock cannot be used** (Windows
+  development, kernel < 5.13, unsupported architecture, seccomp), the run
+  still happens **without filesystem restrictions**. This is never silent:
+  the executor logs an ERROR and puts a warning at the top of that run's
+  stderr, visible in the UI and the SSE stream. Operators who need
+  enforced isolation must check that warning (or disable fallback by
+  using a host with Landlock).
+- **Landlock does not restrict network, CPU or memory.** Scripts can still
+  make outbound calls; the built-in templates rely on that. The CPU/memory
+  gap above stays open even with the sandbox enabled.
 - **`prevent_overlap` and `MIN_FREE_SPACE_MB`** (see
   [Operations](OPERATIONS.md)) are reliability features, not sandboxing —
   they stop the *scheduler* from making a bad situation worse, not a

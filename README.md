@@ -79,9 +79,17 @@ it is missing. `start.ps1` and `start.bat` are the Windows equivalents.
   a result per script so one failure does not hide the rest.
 - **See what needs attention.** The dashboard lists the scripts that failed
   today and the enabled scripts with no successful run in seven days.
-- **Drive everything over HTTP.** A REST API with Basic Auth covers the same
-  actions as the interface, and `/health`, `/metrics` and `/api/diagnostics`
-  are there for monitoring.
+- **Drive everything over HTTP.** A REST API with Basic Auth or revocable
+  bearer tokens covers the same actions as the interface, and `/health`,
+  `/metrics` and `/api/diagnostics` are there for monitoring.
+- **Never miss a schedule silently.** Fires that happened while the app was
+  down are recorded as `missed` executions and surfaced on the dashboard;
+  a configurable cap keeps simultaneous scheduled runs from overwhelming a
+  small host.
+- **Read the interface in your language.** English and Russian
+  server-rendered pages, with a display-timezone setting for timestamps.
+  Scripts' environment variables are encrypted at rest. Sandboxed runs are
+  available on Linux through Landlock.
 
 ## Screenshots
 

@@ -23,7 +23,8 @@ setting up a data platform to get there.
 The primary user is the person who writes and operates those scripts. Two
 roles exist in the code. An `admin` can do everything; a `viewer` can read
 scripts, executions, logs, streams, settings and diagnostics, and every
-mutating action answers `403`.
+mutating action answers `403`. API tokens authenticate with admin rights;
+there is no scoped token role.
 
 `docs/README.md` draws the line: a self-hosted scheduler for one team behind
 trusted authentication, not a multi-tenant product.
@@ -115,11 +116,34 @@ Confirmed by the code:
 - Overlap prevention: a run that would overlap a live one is stored as
   `skipped` rather than started.
 - Alerts by email over SMTP and by webhook, switchable per script, with the
-  failure alert throttled to one per hour.
+  failure alert throttled to one per hour. Alert *delivery* failures land on
+  the script row (`last_alert_error`) and the script page, not just the log.
+- Revocable API tokens for automation: `Authorization: Bearer <token>`,
+  stored as SHA-256 hashes. Tokens act with admin rights over the REST API.
+- Missed-schedule detection: a five-minute sweep compares expected cron
+  fires with recorded runs and stores `missed` executions for fires that
+  never happened (including the whole window while the app was down).
+- A configurable global cap on simultaneous scheduled runs; fires over the
+  cap are stored as `skipped` instead of starting.
+- An opt-in Landlock filesystem sandbox for script processes (`sandbox_enabled`).
+  On supported Linux kernels the child gets only the file rights it needs;
+  on unsupported hosts the script still runs, but the lack of isolation is
+  logged at ERROR and written to the top of that run's stderr.
+- A periodic sweep that fails `RUNNING` rows whose process is long gone,
+  complementing the startup-only crash cleanup.
 - Artifacts written by `save_artifact()`, listed and downloadable per run.
 - Version snapshots on every save that changes the source, with a revert.
 - Field-level audit history of script edits, and a separate audit log of
-  user management.
+  user management. `environment_vars` values are redacted in the audit log.
+- Script environment variables are Fernet-encrypted at rest in both
+  `scripts` and `script_versions`, so a database dump does not carry the
+  operator's DB passwords or API keys in plaintext.
+- English and Russian server-rendered pages: the stored locale selects a
+  translation catalog for navigation, tables, forms and cards on every
+  page; a few inert data labels and JavaScript-generated strings stay
+  English.
+- A display-timezone setting (IANA name, default UTC). Storage and cron stay
+  UTC; every rendered timestamp is converted and names its zone.
 - Bulk enable, disable and delete, with a result per script.
 - Two roles, `admin` and `viewer`, enforced on every mutating endpoint and
   on the HTML action routes.
@@ -140,22 +164,30 @@ Confirmed by the code:
 
 Deliberately not true, and worth knowing before a change:
 
-- Scripts are not sandboxed. Each run is a real OS process with the same
-  filesystem access as the app itself.
+- Scripts are not sandboxed by default. Each run is a real OS process with
+  the same filesystem access as the app itself; the optional Landlock
+  sandbox (`sandbox_enabled`) restricts filesystem access when the host
+  supports it, and refuses the run otherwise.
 - There is no CPU or memory limit per script. A runaway script can take the
-  whole container with it.
+  whole container with it. (The global concurrency cap limits *how many*
+  runs start, not how much one run may consume, and Landlock does not
+  touch CPU or memory.)
 - There is no TLS termination in the app. A reverse proxy is expected in
   front of it.
 - There is no queue and no second process to scale out to; the deployment
   document has a section on the limits of the single-process design.
-- The locale setting stores English or Russian, but the templates are not
-  translated yet.
 - There is no automatic update, and the backup service and the in-app
   backup are two separate mechanisms.
-- The cleanup of executions left running by a crash happens once, at startup,
-  and not on a schedule.
 - The `db-backup` service dumps at 02:00 on the host clock, not on a
   schedule the app controls.
+- The missed-run sweep only checks the last seven days of downtime. A
+  longer outage is visible in the seven-day dashboard heuristic, but its
+  individual fires are not recorded one by one.
+- There is no second factor for password login, and tokens carry admin
+  rights rather than scoped permissions. The deployment model is one
+  trusted team behind a reverse proxy, not a multi-tenant service.
+- JavaScript-generated strings (toasts, console markers) are not
+  translated. The server-rendered interface is.
 
 ## Brand Commitments
 
@@ -190,9 +222,9 @@ line are the only written commitments.
 - `app/services/executor.py` is the execution engine, and
   `tests/stateless/services/test_executor.py` covers it.
 - `alembic/versions/` holds nine migrations in one chain.
-- The suite is 86 test files and 688 test functions counted by name (306
-  stateless, 332 stateful, 6 against PostgreSQL, 44 Playwright), before
-  pytest's parametrization expands the count at collection time.
+- The suite spans stateless, stateful, PostgreSQL and Playwright test
+  directories; exact counts change with every addition, so read them from
+  `pytest --collect-only -q` rather than from prose.
 - `CHANGELOG.md` has one released version, 0.1.0 dated 2026-09-06, and an
   Unreleased section.
 
@@ -226,16 +258,14 @@ What the code shows:
 - The interface is server-rendered HTML on a daisyUI theme, and the theme
   is a setting with a default of `dim`.
 - The sidebar buttons carry `aria-label` text for the menu and the close
-  control.
-- A locale setting exists for English and Russian, stored in the settings
-  table and reachable over the API. The templates are not translated yet, so
-  the stored preference does not change the words on the page.
+  control, and those labels follow the active locale.
+- Live logs (execution detail and the editor's test console) are `role="log"`
+  with `aria-live="polite"`, so a screen reader announces new output. The
+  animated running indicator is disabled under `prefers-reduced-motion`.
+- The stat cards, tables and status labels carry their state as text beside
+  colour; the timestamps name their timezone.
 
-What has not been decided: the repository holds no accessibility statement,
-no conformance target, and no record of screen-reader testing. The run status
-is written out as text beside its colour, but the live log has no live
-region for a screen reader to announce, and the status dot animates with no
-`prefers-reduced-motion` guard. The Playwright suite compares screenshots,
-which catches a layout change and says nothing about semantics. A
-keyboard-only path through the script editor is not documented and has not
-been tested.
+What has not been decided: the repository still holds no accessibility
+statement or conformance target. The editor has no documented keyboard-only
+path and none has been tested. Playwright compares screenshots, which
+catches a layout change and says nothing about semantics.

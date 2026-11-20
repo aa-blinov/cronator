@@ -4,11 +4,11 @@
 {% block content %}
 <div id="dashboard-refresh-root">
 <!-- Stats Cards -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
     <div class="stat-card glass-card rounded-xl p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-base-content/70 text-sm">Total Scripts</p>
+                <p class="text-base-content/70 text-sm">{{ t("Total Scripts") }}</p>
                 <p class="text-3xl font-bold mt-1">{{ stats.total_scripts }}</p>
             </div>
             {{ icons.clipboard("w-10 h-10 opacity-50") }}
@@ -18,7 +18,7 @@
     <div class="stat-card glass-card rounded-xl p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-base-content/70 text-sm">Enabled</p>
+                <p class="text-base-content/70 text-sm">{{ t("Enabled") }}</p>
                 <p class="text-3xl font-bold mt-1 text-green-400">{{ stats.enabled_scripts }}</p>
             </div>
             {{ icons.check_circle("w-10 h-10 opacity-50 text-green-400") }}
@@ -28,7 +28,7 @@
     <div class="stat-card glass-card rounded-xl p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-base-content/70 text-sm">Today's Runs</p>
+                <p class="text-base-content/70 text-sm">{{ t("Today's Runs") }}</p>
                 <p class="text-3xl font-bold mt-1 text-blue-400">{{ stats.today_executions }}</p>
             </div>
             {{ icons.arrow_path("w-10 h-10 opacity-50 text-blue-400") }}
@@ -38,7 +38,7 @@
     <div class="stat-card glass-card rounded-xl p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-base-content/70 text-sm">Failed Today</p>
+                <p class="text-base-content/70 text-sm">{{ t("Failed Today") }}</p>
                 <p class="text-3xl font-bold mt-1 {% if stats.failed_today > 0 %}text-red-400{% else %}text-base-content/70{% endif %}">
                     {{ stats.failed_today }}
                 </p>
@@ -50,7 +50,19 @@
     <div class="stat-card glass-card rounded-xl p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-base-content/70 text-sm">Running Now</p>
+                <p class="text-base-content/70 text-sm">{{ t("Missed Schedules Today") }}</p>
+                <p class="text-3xl font-bold mt-1 {% if stats.missed_today > 0 %}text-orange-400{% else %}text-base-content/70{% endif %}">
+                    {{ stats.missed_today }}
+                </p>
+            </div>
+            {{ icons.clock("w-10 h-10 opacity-50 text-orange-400") }}
+        </div>
+    </div>
+
+    <div class="stat-card glass-card rounded-xl p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-base-content/70 text-sm">{{ t("Running Now") }}</p>
                 <p class="text-3xl font-bold mt-1 {% if stats.running_now > 0 %}text-yellow-400{% else %}text-base-content/70{% endif %}">
                     {{ stats.running_now }}
                 </p>
@@ -65,19 +77,19 @@
 <div class="glass-card rounded-xl overflow-hidden border-l-4 border-red-500/50">
     <div class="px-6 py-4 border-b border-base-content/10">
         <h3 class="text-lg font-semibold flex items-center gap-2">
-            {{ icons.exclamation_triangle("w-5 h-5 text-yellow-500") }} Requires Attention
+            {{ icons.exclamation_triangle("w-5 h-5 text-yellow-500") }} {{ t("Requires Attention") }}
         </h3>
-        <p class="text-sm text-base-content/70 mt-1">{{ attention_scripts|length }} script(s) failed today or haven't run in 7 days</p>
+        <p class="text-sm text-base-content/70 mt-1">{{ t("{count} script(s) failed today, missed a schedule, or haven't run in 7 days", count=attention_scripts|length) }}</p>
     </div>
     <div class="overflow-x-auto">
         <table class="table w-full">
             <thead>
                 <tr class="border-b border-base-content/10">
-                    <th class="bg-transparent">Status</th>
-                    <th class="bg-transparent">Name</th>
-                    <th class="bg-transparent">Schedule</th>
-                    <th class="bg-transparent">Last Run</th>
-                    <th class="bg-transparent">Actions</th>
+                    <th class="bg-transparent">{{ t("Status") }}</th>
+                    <th class="bg-transparent">{{ t("Name") }}</th>
+                    <th class="bg-transparent">{{ t("Schedule") }}</th>
+                    <th class="bg-transparent">{{ t("Last Run") }}</th>
+                    <th class="bg-transparent">{{ t("Actions") }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -112,17 +124,17 @@
                     </td>
                     <td>
                         {% if item.last_execution %}
-                            <span class="text-sm">{{ item.last_execution.started_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <span class="text-sm">{{ item.last_execution.started_at|dt('%Y-%m-%d %H:%M') }}</span>
                             <span class="text-xs text-base-content/70 block">{{ item.last_execution.duration_formatted }}</span>
                         {% else %}
-                            <span class="text-base-content/70">Never</span>
+                            <span class="text-base-content/70">{{ t("Never") }}</span>
                         {% endif %}
                     </td>
                     <td>
                         <div class="flex items-center gap-2">
                             {% if is_admin %}
                             <form action="/scripts/{{ item.script.id }}/run" method="POST" class="inline">
-                                <button type="submit" class="btn btn-ghost btn-xs" title="Run now" aria-label="Run {{ item.script.name }} now">
+                                <button type="submit" class="btn btn-ghost btn-xs" title="{{ t('Run now') }}" aria-label="{{ t('Run {name} now', name=item.script.name) }}">
                                     {{ icons.play("w-4 h-4") }}
                                 </button>
                             </form>
@@ -140,20 +152,20 @@
 <!-- Scripts Table -->
 <div class="glass-card rounded-xl overflow-hidden">
     <div class="px-6 py-4 border-b border-base-content/10 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        <h3 class="text-lg font-semibold">Scripts</h3>
+        <h3 class="text-lg font-semibold">{{ t("Scripts") }}</h3>
         <div class="flex items-center gap-3">
             {% if scripts %}
             <input
                 id="script-filter"
                 type="text"
                 class="input input-bordered input-sm w-full sm:w-72"
-                placeholder="Filter scripts…"
+                placeholder="{{ t('Filter scripts…') }}"
                 autocomplete="off"
             />
             {% endif %}
             {% if is_admin %}
             <a href="/scripts/new" class="btn btn-primary btn-sm gap-2">
-                {{ icons.sparkles("w-4 h-4") }} New Script
+                {{ icons.sparkles("w-4 h-4") }} {{ t("New Script") }}
             </a>
             {% endif %}
         </div>
@@ -164,12 +176,12 @@
         <table class="table w-full">
             <thead>
                 <tr class="border-b border-base-content/10">
-                    <th class="bg-transparent">Status</th>
-                    <th class="bg-transparent">Name</th>
-                    <th class="bg-transparent">Schedule</th>
-                    <th class="bg-transparent">Last Run</th>
-                    <th class="bg-transparent">Next Run</th>
-                    <th class="bg-transparent">Actions</th>
+                    <th class="bg-transparent">{{ t("Status") }}</th>
+                    <th class="bg-transparent">{{ t("Name") }}</th>
+                    <th class="bg-transparent">{{ t("Schedule") }}</th>
+                    <th class="bg-transparent">{{ t("Last Run") }}</th>
+                    <th class="bg-transparent">{{ t("Next Run") }}</th>
+                    <th class="bg-transparent">{{ t("Actions") }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -202,7 +214,7 @@
                         <p class="text-xs text-base-content/70 mt-0.5">{{ item.script.description[:50] }}{% if item.script.description|length > 50 %}...{% endif %}</p>
                         {% endif %}
                         {% if item.script.consecutive_failures > 0 %}
-                        <span class="badge badge-error badge-sm mt-1" title="Last failure: {{ item.script.last_failure_at.strftime('%Y-%m-%d %H:%M UTC') if item.script.last_failure_at else 'unknown' }}">
+                        <span class="badge badge-error badge-sm mt-1" title="Last failure: {{ item.script.last_failure_at|dt('%Y-%m-%d %H:%M') if item.script.last_failure_at else 'unknown' }}">
                             {{ item.script.consecutive_failures }} failure{{ 's' if item.script.consecutive_failures != 1 else '' }}
                         </span>
                         {% endif %}
@@ -212,15 +224,15 @@
                     </td>
                     <td>
                         {% if item.last_execution %}
-                            <span class="text-sm">{{ item.last_execution.started_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <span class="text-sm">{{ item.last_execution.started_at|dt('%Y-%m-%d %H:%M') }}</span>
                             <span class="text-xs text-base-content/70 block">{{ item.last_execution.duration_formatted }}</span>
                         {% else %}
-                            <span class="text-base-content/70">Never</span>
+                            <span class="text-base-content/70">{{ t("Never") }}</span>
                         {% endif %}
                     </td>
                     <td>
                         {% if item.next_run and item.script.enabled %}
-                            <span class="text-sm">{{ item.next_run.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <span class="text-sm">{{ item.next_run|dt('%Y-%m-%d %H:%M') }}</span>
                         {% else %}
                             <span class="text-base-content/70">-</span>
                         {% endif %}
@@ -229,17 +241,17 @@
                         <div class="flex items-center gap-2">
                             {% if is_admin %}
                             <form action="/scripts/{{ item.script.id }}/run" method="POST" class="inline">
-                                <button type="submit" class="btn btn-ghost btn-xs" title="Run now" aria-label="Run {{ item.script.name }} now">
+                                <button type="submit" class="btn btn-ghost btn-xs" title="{{ t('Run now') }}" aria-label="{{ t('Run {name} now', name=item.script.name) }}">
                                     {{ icons.play("w-4 h-4") }}
                                 </button>
                             </form>
                             {% endif %}
                             {% if is_admin %}
-                            <a href="/scripts/{{ item.script.id }}/edit" class="btn btn-ghost btn-xs" title="Edit" aria-label="Edit {{ item.script.name }}">
+                            <a href="/scripts/{{ item.script.id }}/edit" class="btn btn-ghost btn-xs" title="{{ t('Edit') }}" aria-label="{{ t('Edit {name}', name=item.script.name) }}">
                                 {{ icons.pencil("w-4 h-4") }}
                             </a>
                             <form action="/scripts/{{ item.script.id }}/toggle" method="POST" class="inline">
-                                <button type="submit" class="btn btn-ghost btn-xs" title="Toggle" aria-label="{% if item.script.enabled %}Disable{% else %}Enable{% endif %} {{ item.script.name }}">
+                                <button type="submit" class="btn btn-ghost btn-xs" title="{{ t('Toggle') }}" aria-label="{% if item.script.enabled %}{{ t('Disable {name}', name=item.script.name) }}{% else %}{{ t('Enable {name}', name=item.script.name) }}{% endif %}">
                                     {% if item.script.enabled %}{{ icons.pause("w-4 h-4") }}{% else %}{{ icons.play("w-4 h-4") }}{% endif %}
                                 </button>
                             </form>
@@ -254,11 +266,11 @@
     {% else %}
     <div class="p-12 text-center">
         {{ icons.inbox("w-20 h-20 mb-4 opacity-50 mx-auto") }}
-        <h3 class="text-xl font-medium text-base-content/70 mb-2">No scripts yet</h3>
-        <p class="text-base-content/70 mb-6">Create your first script to get started</p>
+        <h3 class="text-xl font-medium text-base-content/70 mb-2">{{ t("No scripts yet") }}</h3>
+        <p class="text-base-content/70 mb-6">{{ t("Create your first script to get started") }}</p>
         {% if is_admin %}
         <a href="/scripts/new" class="btn btn-primary gap-2">
-            {{ icons.sparkles("w-5 h-5") }} Create Script
+            {{ icons.sparkles("w-5 h-5") }} {{ t("Create Script") }}
         </a>
         {% endif %}
     </div>

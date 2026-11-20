@@ -165,6 +165,23 @@ async def lifespan(app: FastAPI):
     await executor_service.cleanup_stale_executions()
     logger.info("Stale executions cleaned up")
 
+    # Re-encrypt plaintext environment_vars written before the encrypted
+    # column type existed — a database dump must not carry operator secrets.
+    reencrypted = await encrypt_legacy_env_vars()
+    if reencrypted:
+        logger.info("Re-encrypted %d legacy plaintext environment_vars values", reencrypted)
+
+    # Missed-schedule detection: the cursor persisted before shutdown makes
+    # this first sweep cover the whole downtime window.
+    try:
+        from app.services.missed_runs import detect_missed_runs
+
+        missed = await detect_missed_runs()
+        if missed:
+            logger.warning("Startup sweep recorded %d missed schedule(s)", missed)
+    except Exception:
+        logger.exception("Missed-run detection failed at startup; the periodic job will retry")
+
     # Register all scripts in environment service for coordination
     from sqlalchemy import select
 
@@ -190,6 +207,68 @@ async def lifespan(app: FastAPI):
     #      rather than being SIGKILL'd by the OS and stuck in RUNNING forever
     #   3. Close the database engine to release connections
     await graceful_shutdown(scheduler_service, executor_service, close_db)
+
+
+async def encrypt_legacy_env_vars() -> int:
+    """Re-encrypt plaintext `environment_vars` rows written before the
+    encrypted column type existed.
+
+    The column type encrypts every new write, but old rows stay plaintext
+    until something touches them, and until then every backup carries the
+    operator's secrets in the clear. Assigning the same value back does not
+    dirty the attribute, so each row is explicitly flag_modified — that
+    routes it through the bind processor on flush and stores the ciphertext.
+
+    Returns the number of rows rewritten.
+    """
+    from sqlalchemy import select
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from app.database import async_session_maker
+    from app.models.script import Script
+    from app.models.script_version import ScriptVersion
+    from app.secret_cipher import ENCRYPTED_PREFIX
+
+    updated = 0
+    async with async_session_maker() as db:
+        # notlike() matches against the raw stored column, which is exactly
+        # what we want: legacy plaintext, never the marker-prefixed form.
+        scripts = (
+            (
+                await db.execute(
+                    select(Script).where(
+                        Script.environment_vars != "",
+                        Script.environment_vars.notlike(ENCRYPTED_PREFIX + "%"),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for script in scripts:
+            flag_modified(script, "environment_vars")
+            updated += 1
+
+        versions = (
+            (
+                await db.execute(
+                    select(ScriptVersion).where(
+                        ScriptVersion.environment_vars != "",
+                        ScriptVersion.environment_vars.notlike(ENCRYPTED_PREFIX + "%"),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for version in versions:
+            flag_modified(version, "environment_vars")
+            updated += 1
+
+        if updated:
+            await db.commit()
+
+    return updated
 
 
 async def wait_for_database(attempts: int = 10, delay: float = 2.0) -> None:
@@ -327,9 +406,11 @@ async def access_log(request: Request, call_next):
         import base64
 
         try:
-            user = base64.b64decode(auth.split(" ", 1)[1]).decode(
-                "utf-8", errors="replace"
-            ).split(":", 1)[0]
+            user = (
+                base64.b64decode(auth.split(" ", 1)[1])
+                .decode("utf-8", errors="replace")
+                .split(":", 1)[0]
+            )
         except Exception:
             user = "-"
 
@@ -519,6 +600,44 @@ def filesizeformat(value):
 
 
 app.state.templates.env.filters["filesizeformat"] = filesizeformat
+
+
+def dt_filter(value, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """Render a stored UTC timestamp in the operator's display timezone.
+
+    Every page used to call .strftime() directly, and most did not even
+    say "UTC" — an operator outside UTC read local-looking times that were
+    quietly wrong. The stored value stays UTC; only the rendering moves.
+    """
+    from app.services.display_time import DEFAULT_DISPLAY_TIMEZONE, format_in_display_tz
+    from app.services.settings_service import settings_service
+
+    tz_name = settings_service.get_cached("display_timezone", DEFAULT_DISPLAY_TIMEZONE)
+    return format_in_display_tz(value, tz_name, fmt)
+
+
+app.state.templates.env.filters["dt"] = dt_filter
+
+
+def t_global(text: str, **kwargs) -> str:
+    """Translate a UI literal into the active locale (see app/services/i18n.py)."""
+    from app.services.i18n import current_locale, translate
+
+    return translate(text, current_locale(), **kwargs)
+
+
+app.state.templates.env.globals["t"] = t_global
+
+
+def lang_global() -> str:
+    """The active locale, for <html lang> so screen readers pick the voice."""
+    from app.services.i18n import current_locale
+
+    return current_locale()
+
+
+app.state.templates.env.globals["lang"] = lang_global
+
 
 class CachedStaticFiles(StaticFiles):
     """StaticFiles never sends Cache-Control — every page navigation

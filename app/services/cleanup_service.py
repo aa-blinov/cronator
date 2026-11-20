@@ -16,13 +16,15 @@ logger = logging.getLogger(__name__)
 # How many executions to keep per script × status. TIMEOUT is retained like
 # FAILED — it's a failure mode, not a terminal state that should be skipped —
 # it was missing here entirely, so timed-out executions never got cleaned up
-# by the daily job and accumulated in the DB without bound.
+# by the daily job and accumulated in the DB without bound. MISSED rows are
+# written by the missed-run sweep and are equally bounded on purpose.
 RETENTION_BY_STATUS: dict[str, int] = {
     ExecutionStatus.SUCCESS.value: 200,
     ExecutionStatus.FAILED.value: 500,
     ExecutionStatus.TIMEOUT.value: 500,
     ExecutionStatus.SKIPPED.value: 100,
     ExecutionStatus.CANCELLED.value: 100,
+    ExecutionStatus.MISSED.value: 100,
 }
 
 # Warn when a single cleanup run deletes at least this many rows. A first run
@@ -38,6 +40,7 @@ _RETENTION_ENV = {
     ExecutionStatus.TIMEOUT.value: "EXECUTION_RETENTION_TIMEOUT",
     ExecutionStatus.SKIPPED.value: "EXECUTION_RETENTION_SKIPPED",
     ExecutionStatus.CANCELLED.value: "EXECUTION_RETENTION_CANCELLED",
+    ExecutionStatus.MISSED.value: "EXECUTION_RETENTION_MISSED",
 }
 
 
@@ -201,6 +204,7 @@ class CleanupService:
                 ExecutionStatus.SKIPPED.value,
                 ExecutionStatus.CANCELLED.value,
                 ExecutionStatus.RUNNING.value,
+                ExecutionStatus.MISSED.value,
             ):
                 cnt_result = await db.execute(
                     select(func.count(Execution.id)).where(Execution.status == status)

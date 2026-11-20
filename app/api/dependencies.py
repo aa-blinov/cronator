@@ -67,12 +67,42 @@ async def check_credentials(username: str, password: str) -> None:
         )
 
 
-async def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)) -> str:
-    """Verify HTTP Basic Auth credentials (the API path).
+async def verify_credentials(
+    credentials: HTTPBasicCredentials | None = Depends(security_optional),
+    request: Request = None,  # default keeps direct stateless-test calls valid
+) -> str:
+    """Verify the API credentials: a Bearer token or HTTP Basic Auth.
 
-    The shared gate lives in check_credentials above; this wrapper only
-    adapts the HTTPBasicCredentials to it.
+    Basic Auth remains for scripts and API clients; a Bearer token is the
+    revocable alternative that lets automation avoid carrying the admin
+    password. Tokens are hashed at rest and carry admin rights over the
+    API, like the env-defined admin account.
+
+    The request parameter has a default so stateless tests can still call
+    this directly with just a credentials object; FastAPI injects it from
+    the annotation on real requests.
     """
+    if request is not None:
+        header = request.headers.get("authorization", "")
+        if header.lower().startswith("bearer "):
+            from app.services.api_token_service import verify_token
+
+            actor = await verify_token(header[7:].strip())
+            if actor is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid API token",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            return actor
+
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
     await check_credentials(credentials.username, credentials.password)
     return credentials.username
 

@@ -89,6 +89,16 @@ in the audit log (`/api/scripts/{id}/audit`).
 | `DELETE /users/{id}`     | admin | Blocked with `400` if it would delete the last remaining admin |
 | `POST /users/me/password` | any authenticated user | Self-service password change; body is `current_password` + `new_password`, `401` if the current password is wrong, `400` for the env-fallback admin account (no DB row to update) |
 
+## API tokens (`/api/tokens`)
+
+| Method & Path | Auth | Purpose |
+| --------------- | ------ | --------- |
+| `GET /api/tokens`        | admin | List tokens (prefix only, never the plaintext) |
+| `POST /api/tokens`       | admin | Create `{ "name": "ci-nightly" }`; the response includes the plaintext token **once** |
+| `DELETE /api/tokens/{id}`| admin | Revoke; the row stays with `revoked_at` set |
+
+Use the token on any REST endpoint with `Authorization: Bearer ctk_…` instead of `-u admin:password`. Tokens carry admin rights over the API and only SHA-256 hashes are stored. See [Security](SECURITY.md#authentication).
+
 ## Diagnostics & locale
 
 | Method & Path | Auth | Purpose |

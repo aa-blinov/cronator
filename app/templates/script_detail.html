@@ -5,21 +5,21 @@
 {% if is_admin %}
 <div class="flex items-center gap-2 flex-wrap">
     <button id="run-now-btn" class="btn btn-primary btn-sm gap-2">
-        {{ icons.play("w-4 h-4") }} Run Now
+        {{ icons.play("w-4 h-4") }} {{ t("Run Now") }}
     </button>
     <a href="/scripts/{{ script.id }}/edit" class="btn btn-ghost btn-sm gap-2">
-        {{ icons.pencil("w-4 h-4") }} Edit
+        {{ icons.pencil("w-4 h-4") }} {{ t("Edit") }}
     </a>
     <button id="duplicate-btn" class="btn btn-ghost btn-sm gap-2"
             data-testid="duplicate-btn"
             onclick="duplicateScript({{ script.id }})">
-        {{ icons.copy("w-4 h-4") }} Duplicate
+        {{ icons.copy("w-4 h-4") }} {{ t("Duplicate") }}
     </button>
     <button id="toggle-btn" class="btn btn-ghost btn-sm gap-2">
-        {% if script.enabled %}{{ icons.pause("w-4 h-4") }} Disable{% else %}{{ icons.play("w-4 h-4") }} Enable{% endif %}
+        {% if script.enabled %}{{ icons.pause("w-4 h-4") }} {{ t("Disable") }}{% else %}{{ icons.play("w-4 h-4") }} {{ t("Enable") }}{% endif %}
     </button>
     <button type="button" onclick="deleteScript({{ script.id }})" class="btn btn-error btn-sm gap-2">
-        {{ icons.trash("w-4 h-4") }} Delete
+        {{ icons.trash("w-4 h-4") }} {{ t("Delete") }}
     </button>
 </div>
 {% endif %}
@@ -88,46 +88,46 @@ async function duplicateScript(scriptId) {
 <!-- Script Info -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
     <div class="lg:col-span-2 glass-card rounded-xl p-6">
-        <h3 class="text-lg font-semibold mb-4">Script Information</h3>
+        <h3 class="text-lg font-semibold mb-4">{{ t("Script Information") }}</h3>
 
         <div class="grid grid-cols-2 gap-4">
             <div>
-                <p class="text-base-content/70 text-sm">Name</p>
+                <p class="text-base-content/70 text-sm">{{ t("Name") }}</p>
                 <p class="font-medium">{{ script.name }}</p>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Status</p>
+                <p class="text-base-content/70 text-sm">{{ t("Status") }}</p>
                 <p>
                     {% if script.enabled %}
-                        <span id="script-enabled-badge" class="badge badge-success">Enabled</span>
+                        <span id="script-enabled-badge" class="badge badge-success">{{ t("Enabled") }}</span>
                     {% else %}
-                        <span id="script-enabled-badge" class="badge badge-ghost">Disabled</span>
+                        <span id="script-enabled-badge" class="badge badge-ghost">{{ t("Disabled") }}</span>
                     {% endif %}
                 </p>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Schedule</p>
+                <p class="text-base-content/70 text-sm">{{ t("Schedule") }}</p>
                 <code class="text-sm bg-base-200 px-2 py-1 rounded">{{ script.cron_expression }}</code>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Python Version</p>
+                <p class="text-base-content/70 text-sm">{{ t("Python Version") }}</p>
                 <p>{{ script.python_version }}</p>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Timeout</p>
+                <p class="text-base-content/70 text-sm">{{ t("Timeout") }}</p>
                 <p>{{ script.timeout }}s</p>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Next Run</p>
-                <p id="script-next-run">{% if next_run %}{{ next_run.strftime('%Y-%m-%d %H:%M:%S UTC') }}{% else %}-{% endif %}</p>
+                <p class="text-base-content/70 text-sm">{{ t("Next Run") }}</p>
+                <p id="script-next-run">{% if next_run %}{{ next_run|dt }}{% else %}-{% endif %}</p>
             </div>
             <div class="col-span-2">
-                <p class="text-base-content/70 text-sm">Path</p>
+                <p class="text-base-content/70 text-sm">{{ t("Path") }}</p>
                 <code class="text-xs bg-base-200 px-2 py-1 rounded break-all">{{ script.path }}</code>
             </div>
             {% if script.description %}
             <div class="col-span-2">
-                <p class="text-base-content/70 text-sm">Description</p>
+                <p class="text-base-content/70 text-sm">{{ t("Description") }}</p>
                 <p>{{ script.description }}</p>
             </div>
             {% endif %}
@@ -135,46 +135,54 @@ async function duplicateScript(scriptId) {
 
         {% if script.dependencies %}
         <div class="mt-6">
-            <p class="text-base-content/70 text-sm mb-2">Dependencies</p>
+            <p class="text-base-content/70 text-sm mb-2">{{ t("Dependencies") }}</p>
             <pre class="log-output text-xs">{{ script.dependencies }}</pre>
         </div>
         {% endif %}
     </div>
 
     <div class="glass-card rounded-xl p-6">
-        <h3 class="text-lg font-semibold mb-4">Statistics</h3>
+        <h3 class="text-lg font-semibold mb-4">{{ t("Statistics") }}</h3>
 
         <div class="space-y-4">
             <div>
-                <p class="text-base-content/70 text-sm">Total Executions</p>
+                <p class="text-base-content/70 text-sm">{{ t("Total Executions") }}</p>
                 <p class="text-2xl font-bold">{{ stats.total }}</p>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Success Rate</p>
+                <p class="text-base-content/70 text-sm">{{ t("Success Rate") }}</p>
                 <p class="text-2xl font-bold {% if stats.total == 0 %}text-orange-400{% elif stats.success_rate >= 90 %}text-green-400{% elif stats.success_rate >= 50 %}text-yellow-400{% else %}text-red-400{% endif %}">
                     {{ stats.success_rate }}%
                 </p>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Alerts</p>
+                <p class="text-base-content/70 text-sm">{{ t("Alerts") }}</p>
                 <p class="flex items-center gap-2">
                     {% if script.alert_on_failure %}
-                        <span class="badge badge-error badge-sm">On Failure</span>
+                        <span class="badge badge-error badge-sm">{{ t("On Failure") }}</span>
                     {% endif %}
                     {% if script.alert_on_success %}
-                        <span class="badge badge-success badge-sm">On Success</span>
+                        <span class="badge badge-success badge-sm">{{ t("On Success") }}</span>
                     {% endif %}
                     {% if not script.alert_on_failure and not script.alert_on_success %}
-                        <span class="text-base-content/70">None</span>
+                        <span class="text-base-content/70">{{ t("None") }}</span>
                     {% endif %}
                 </p>
             </div>
             <div>
-                <p class="text-base-content/70 text-sm">Last Alert Sent</p>
+                <p class="text-base-content/70 text-sm">{{ t("Last Alert Sent") }}</p>
                 <p class="font-medium text-sm">
-                    {{ script.last_alert_at.strftime('%Y-%m-%d %H:%M:%S') if script.last_alert_at else 'Never' }}
+                    {{ script.last_alert_at|dt if script.last_alert_at else t('Never') }}
                 </p>
             </div>
+            {% if script.last_alert_error %}
+            <div>
+                <p class="text-base-content/70 text-sm">{{ t("Last Alert Error") }}</p>
+                <p class="font-medium text-sm text-error break-all" title="{{ script.last_alert_error_at|dt if script.last_alert_error_at }}">
+                    {{ script.last_alert_error }}
+                </p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -182,10 +190,10 @@ async function duplicateScript(scriptId) {
 <!-- Execution History -->
 <div class="glass-card rounded-xl overflow-hidden">
     <div class="px-6 py-4 border-b border-base-content/10 flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Execution History</h3>
+        <h3 class="text-lg font-semibold">{{ t("Execution History") }}</h3>
         <div class="form-control">
             <label class="label cursor-pointer gap-2">
-                <span class="label-text text-sm">Show test runs</span>
+                <span class="label-text text-sm">{{ t("Show test runs") }}</span>
                 <input type="checkbox" id="show-test-runs" class="checkbox checkbox-sm" />
             </label>
         </div>
@@ -197,13 +205,13 @@ async function duplicateScript(scriptId) {
         <table class="table w-full">
             <thead>
                 <tr class="border-b border-base-content/10">
-                    <th class="bg-transparent">ID</th>
-                    <th class="bg-transparent">Status</th>
-                    <th class="bg-transparent">Started</th>
-                    <th class="bg-transparent">Duration</th>
-                    <th class="bg-transparent">Exit Code</th>
-                    <th class="bg-transparent">Triggered By</th>
-                    <th class="bg-transparent">Actions</th>
+                    <th class="bg-transparent">{{ t("ID") }}</th>
+                    <th class="bg-transparent">{{ t("Status") }}</th>
+                    <th class="bg-transparent">{{ t("Started") }}</th>
+                    <th class="bg-transparent">{{ t("Duration") }}</th>
+                    <th class="bg-transparent">{{ t("Exit Code") }}</th>
+                    <th class="bg-transparent">{{ t("Triggered By") }}</th>
+                    <th class="bg-transparent">{{ t("Actions") }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -225,7 +233,7 @@ async function duplicateScript(scriptId) {
                             {{ exec.status }}
                         </span>
                     </td>
-                    <td>{{ exec.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>{{ exec.started_at|dt }}</td>
                     <td>{{ exec.duration_formatted }}</td>
                     <td>
                         {% if exec.exit_code is not none %}
@@ -239,10 +247,10 @@ async function duplicateScript(scriptId) {
                     </td>
                     <td>
                         <div class="flex gap-1">
-                            <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">View</a>
+                            <a href="/executions/{{ exec.id }}" class="btn btn-ghost btn-xs">{{ t("View") }}</a>
                             {% if is_admin and exec.status == 'running' %}
                                 <button class="btn btn-error btn-xs cancel-execution-btn" data-execution-id="{{ exec.id }}">
-                                    Cancel
+                                    {{ t("Cancel") }}
                                 </button>
                             {% endif %}
                         </div>
@@ -283,11 +291,11 @@ async function duplicateScript(scriptId) {
     {% else %}
     <div class="p-12 text-center">
         {{ icons.inbox("w-20 h-20 mb-4 opacity-50 mx-auto") }}
-        <h3 class="text-xl font-medium text-base-content/70 mb-2">No executions yet</h3>
-        <p class="text-base-content/70 mb-6">Run the script to see execution history</p>
+        <h3 class="text-xl font-medium text-base-content/70 mb-2">{{ t("No executions yet") }}</h3>
+        <p class="text-base-content/70 mb-6">{{ t("Run the script to see execution history") }}</p>
         {% if is_admin %}
         <button id="run-now-empty-btn" class="btn btn-primary gap-2">
-            {{ icons.play("w-4 h-4") }} Run Now
+            {{ icons.play("w-4 h-4") }} {{ t("Run Now") }}
         </button>
         {% endif %}
     </div>
