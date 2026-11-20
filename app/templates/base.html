@@ -109,7 +109,11 @@
                         <summary class="btn btn-ghost btn-sm btn-square list-none cursor-pointer" aria-label="Account menu">
                             {{ icons.ellipsis_vertical("w-4 h-4") }}
                         </summary>
-                        <ul class="absolute right-0 bottom-12 menu bg-base-200 rounded-box shadow-lg border border-base-content/10 w-48 z-20">
+                        <!-- Opens upward: the footer sits at the viewport's
+                             bottom edge, a downward dropdown runs off-screen
+                             and stretches the page. bottom-full + mb-2 anchor
+                             the menu to the summary's top edge instead. -->
+                        <ul class="absolute right-0 bottom-full mb-2 menu bg-base-200 rounded-box shadow-lg border border-base-content/10 w-48 z-20">
                             <li>
                                 <button type="button" onclick="document.getElementById('change-password-modal').showModal()">Change password</button>
                             </li>
