@@ -18,12 +18,12 @@ async def test_scheduled_fire_over_cap_is_recorded_as_skipped(
 ):
     script = await script_factory(name="cap_script", content="print(1)")
 
-    async def _settings_get(key, default=None):
+    def _settings_get(key, default=None):
         if key == "max_concurrent_executions":
             return 1
         return default
 
-    monkeypatch.setattr(settings_service, "get", _settings_get)
+    monkeypatch.setattr(settings_service, "get_cached", _settings_get)
     # Simulate another live run without actually starting a subprocess.
     exec_service._running_scripts.add(999999)
 

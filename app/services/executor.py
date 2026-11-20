@@ -257,7 +257,7 @@ class ExecutorService:
         from app.sandbox import landlock_abi_version
         from app.services.settings_service import settings_service
 
-        sandbox_requested = bool(await settings_service.get("sandbox_enabled", False))
+        sandbox_requested = bool(settings_service.get_cached("sandbox_enabled", False))
         if sandbox_requested and landlock_abi_version() is None:
             logger.error(
                 "Landlock sandbox unavailable for script %s — running it WITHOUT "
@@ -272,7 +272,7 @@ class ExecutorService:
         # fires in the same tick can both pass — it exists to shed load,
         # not to give exact guarantees. Only scheduled fires are capped: a
         # manual or test run is a deliberate operator action.
-        max_concurrent = await settings_service.get("max_concurrent_executions", 0)
+        max_concurrent = settings_service.get_cached("max_concurrent_executions", 0)
         if (
             isinstance(max_concurrent, int)
             and max_concurrent > 0
@@ -420,7 +420,7 @@ class ExecutorService:
         from app.sandbox import landlock_abi_version
         from app.services.settings_service import settings_service
 
-        sandbox_requested = bool(await settings_service.get("sandbox_enabled", False))
+        sandbox_requested = bool(settings_service.get_cached("sandbox_enabled", False))
         sandbox_fallback = sandbox_requested and landlock_abi_version() is None
         async with async_session_maker() as db:
             try:
@@ -555,7 +555,7 @@ class ExecutorService:
                 if sandbox_requested:
                     from app.sandbox import make_preexec
 
-                    raw_extra = await settings_service.get("sandbox_extra_paths", "[]")
+                    raw_extra = settings_service.get_cached("sandbox_extra_paths", "[]")
                     if isinstance(raw_extra, list):
                         extra_paths = raw_extra
                     else:

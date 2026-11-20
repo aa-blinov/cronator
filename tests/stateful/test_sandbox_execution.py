@@ -54,12 +54,12 @@ async def test_sandbox_unavailable_falls_back_to_unrestricted_run(
 
     script = await script_factory(name="sandbox_fallback", content="print(1)")
 
-    async def _settings_get(key, default=None):
+    def _settings_get(key, default=None):
         if key == "sandbox_enabled":
             return True
         return default
 
-    monkeypatch.setattr(settings_service, "get", _settings_get)
+    monkeypatch.setattr(settings_service, "get_cached", _settings_get)
     monkeypatch.setattr(sandbox, "landlock_abi_version", lambda: None)
     # Prevent the background task from actually starting a subprocess.
     monkeypatch.setattr(exec_service, "_run_script", AsyncMock())
